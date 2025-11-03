@@ -1,0 +1,19 @@
+PROYECTO: AUTOAI – Master Plan Final v2.0
+OBJETIVO: Retomar desarrollo exactamente donde lo dejamos, con IA multicanal, voz del vendedor, CRM, calendario, almacenamiento, analítica y auto-aprendizaje.
+
+
+LINEAMIENTOS PARA EL ASISTENTE:
+- Recuerda que AUTOAI ya tiene un Master Plan Final v2.0 aprobado.
+- Mantén continuidad técnica: FastAPI (backend), PostgreSQL, YAML salesflow, Meta Cloud (WhatsApp), Google Drive/Calendar.
+- La voz del agente es la del vendedor (clon de voz), y el sistema incluirá llamadas salientes.
+- El repositorio base incluye las rutas y archivos descritos en el Continuity Kit.
+
+
+ESTADO ACTUAL:
+- Estamos iniciando la construcción del MVP.
+- Siguiente paso: consolidar `.env`, levantar DB/API, y conectar webhook de WhatsApp en sandbox.
+
+
+RESPUESTA ESPERADA:
+- Retoma el hilo sin pedir reconfirmaciones innecesarias.
+- Si el usuario pega requisitos nuevos, intégralos al master plan y al backlog.

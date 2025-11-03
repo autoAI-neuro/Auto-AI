@@ -1,0 +1,82 @@
+version: 1
+¿Buscas comprar o hacer lease? Dime modelo, año y presupuesto.
+transitions:
+- condition: "intent == 'vehicle_interest'"
+next: ask_requirements
+- condition: "true"
+next: smalltalk
+
+
+smalltalk:
+prompt: "Perfecto, ¿qué vehículo te interesa (marca, modelo, año, color)?"
+transitions:
+- condition: "intent == 'vehicle_interest'"
+next: ask_requirements
+
+
+ask_requirements:
+prompt: |
+Súper. Para ayudarte mejor:
+1) ¿Compra o lease?
+2) Presupuesto mensual (USD)?
+3) ¿Puntaje de crédito aproximado?
+4) ¿Años con tarjeta de crédito?
+5) ¿Color preferido?
+slots:
+- name: deal_type
+- name: budget_monthly
+- name: credit_score
+- name: credit_age
+- name: color_pref
+transitions:
+- condition: "all_slots_filled"
+next: match_inventory
+
+
+match_inventory:
+action: "fetch_inventory(brand, model, year, color_pref)"
+prompt: |
+Opciones disponibles:
+{{inventory.gallery}}
+transitions:
+- condition: "user_says('me gusta', 'muéstrame más')"
+next: request_docs
+- condition: "no_results"
+next: fallback_offer
+
+
+request_docs:
+prompt: |
+Genial. Para avanzar necesito:
+- ID (frente y dorso)
+- SSN
+- 3 últimos estados de cuenta
+- Downpayment (comprobante)
+- Prueba de domicilio
+Sube las fotos aquí.
+action: "await_files_and_store(client_folder)"
+transitions:
+- condition: "files_received"
+next: schedule_appointment
+
+
+schedule_appointment:
+prompt: |
+¿Prefieres cita presencial u online? Tengo mañana 10:30am o 3:00pm.
+action: "calendar_offer_slots()"
+transitions:
+- condition: "time_confirmed"
+next: closing
+
+
+fallback_offer:
+prompt: |
+No tengo ese exacto ahora, pero sí alternativas similares:
+{{inventory.alternatives}}
+transitions:
+- condition: "user_selects"
+next: request_docs
+
+
+closing:
+prompt: "¡Listo! Te confirmo por WhatsApp y correo. {{style.closing_signature}}"
