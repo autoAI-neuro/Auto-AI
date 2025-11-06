@@ -1,21 +1,57 @@
-version: "3.9"
 services:
-db:
-image: postgres:15
-environment:
-POSTGRES_USER: autoai_user
-POSTGRES_PASSWORD: password
-POSTGRES_DB: autoai
-ports: ["5432:5432"]
-volumes: ["pgdata:/var/lib/postgresql/data"]
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: autoai-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - ../.env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - autoai-network
 
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: autoai-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - autoai-network
 
-api:
-build: ../backend
-env_file: ../.env
-ports: ["8000:8000"]
-depends_on: [db]
+  db:
+    image: postgres:15
+    container_name: autoai-db
+    restart: always
+    environment:
+      POSTGRES_USER: autoai
+      POSTGRES_PASSWORD: autoai123
+      POSTGRES_DB: autoaidb
+    ports:
+      - "5432:5432"
+    networks:
+      - autoai-network
+    volumes:
+      - pgdata:/var/lib/postgresql/data
 
+  redis:
+    image: redis:alpine
+    container_name: autoai-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - autoai-network
+
+networks:
+  autoai-network:
+    driver: bridge
 
 volumes:
-pgdata:
+  pgdata:

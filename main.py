@@ -1,0 +1,1 @@
+from fastapi import FastAPIimport redisimport psycopg2import osapp = FastAPI(title="AUTOAI Backend", version="1.0")@app.get("/")def home():return {"status": "ok", "message": "AUTOAI Backend is running 🚀"}@app.get("/health")def health_check():return {"database": os.getenv("DB_HOST"), "redis": os.getenv("REDIS_HOST")}
