@@ -1,21 +1,44 @@
-import React, { useState } from "react";
-import { getHealth, getVersion } from "./api";
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import Register from './pages/Register';
+import Login from './pages/Login';
+import Onboarding from './pages/Onboarding';
+import Dashboard from './pages/Dashboard';
 
-export default function App() {
-  const [health, setHealth] = useState(null);
-  const [version, setVersion] = useState(null);
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { token, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-sans">Cargando...</div>;
+  if (!token) return <Navigate to="/login" replace />;
+  return children;
+};
 
-  const checkHealth = async () => setHealth(await getHealth());
-  const checkVersion = async () => setVersion(await getVersion());
-
+function App() {
   return (
-    <div style={{ fontFamily: "Arial", padding: "2rem", color: "white", backgroundColor: "#1e1e1e", height: "100vh" }}>
-      <h1>🚀 AUTOAI Dashboard</h1>
-      <button onClick={checkHealth}>Check Health</button>
-      <button onClick={checkVersion} style={{ marginLeft: "10px" }}>Check Version</button>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/register" element={<Register />} />
+          <Route path="/login" element={<Login />} />
 
-      {health && <div style={{ marginTop: "20px" }}><strong>Health:</strong> {JSON.stringify(health)}</div>}
-      {version && <div style={{ marginTop: "10px" }}><strong>Version:</strong> {JSON.stringify(version)}</div>}
-    </div>
+          <Route path="/onboarding" element={
+            <ProtectedRoute>
+              <Onboarding />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/" element={<Navigate to="/register" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   );
 }
+
+export default App;
