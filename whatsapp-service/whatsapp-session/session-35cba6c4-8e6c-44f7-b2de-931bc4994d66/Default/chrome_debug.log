@@ -141,3 +141,80 @@ Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [obj
 [0110/011744.728:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
 [0110/012115.311:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
 [0110/012445.861:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/012816.290:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/013146.698:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/013517.147:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/013658.165:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013658.166:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013658.166:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013658.166:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013658.166:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013658.166:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013658.520:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013658.520:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013658.521:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013658.521:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013658.521:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013658.521:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013700.186:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013700.186:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013700.534:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013700.534:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013700.587:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013700.587:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013700.587:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013700.587:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013700.587:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013700.587:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Feature xr-spatial-tracking's parameters are ignored.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'attribution-reporting'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'compute-pressure'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'interest-cohort'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-issuance'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'shared-storage'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'shared-storage-select-url'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-redemption'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'unload'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'window-management'.", source:  (0)
+[0110/013700.628:INFO:CONSOLE(0)] "Document-Policy HTTP header: Unrecognized document policy feature name include-js-call-stacks-in-crash-reports.", source: https://web.whatsapp.com/ (0)
+[0110/013701.084:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013701.085:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013701.085:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013701.085:ERROR:cache_util_win.cc(20)] Unable to move the cache: Acceso denegado. (0x5)
+[0110/013701.085:ERROR:disk_cache.cc(205)] Unable to create cache
+[0110/013701.085:ERROR:gpu_disk_cache.cc(673)] Gpu Cache Creation failed: -2
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Feature xr-spatial-tracking's parameters are ignored.", source:  (0)
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'attribution-reporting'.", source:  (0)
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'compute-pressure'.", source:  (0)
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'interest-cohort'.", source:  (0)
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-issuance'.", source:  (0)
+[0110/013701.132:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Origin trial controlled feature not enabled: 'shared-storage'.", source:  (0)
+[0110/013701.133:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'shared-storage-select-url'.", source:  (0)
+[0110/013701.133:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'private-state-token-redemption'.", source:  (0)
+[0110/013701.133:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'unload'.", source:  (0)
+[0110/013701.133:INFO:CONSOLE(0)] "Error with Permissions-Policy header: Unrecognized feature: 'window-management'.", source:  (0)
+[0110/013701.133:INFO:CONSOLE(0)] "Document-Policy HTTP header: Unrecognized document policy feature name include-js-call-stacks-in-crash-reports.", source: https://web.whatsapp.com/ (0)
+[0110/013701.189:ERROR:service_worker_storage.cc(1933)] Failed to delete the database: Database IO error
+[0110/013701.546:ERROR:service_worker_storage.cc(1933)] Failed to delete the database: Database IO error
+[0110/013708.630:ERROR:quota_database.cc(929)] Could not open the quota database, resetting.
+[0110/013709.141:ERROR:quota_database.cc(929)] Could not open the quota database, resetting.
+[0110/013713.639:ERROR:quota_database.cc(929)] Could not open the quota database, resetting.
+[0110/013714.004:ERROR:quota_database.cc(929)] Could not open the quota database, resetting.
+[0110/013716.847:ERROR:quota_database.cc(931)] Failed to reset the quota database.
+[0110/013716.847:ERROR:quota_database.cc(931)] Failed to reset the quota database.
+[0110/013717.372:ERROR:quota_database.cc(931)] Failed to reset the quota database.
+[0110/013717.372:ERROR:quota_database.cc(931)] Failed to reset the quota database.
+[0110/013847.586:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/013853.871:INFO:CONSOLE(77)] "ErrorUtils caught an error:
+
+page-load-validation-missing-wam-incomplete-ws-timing
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.whatsapp.net/rsrc.php/v4/yv/r/0p5QPbRp7Rp.js (77)
+[0110/013854.383:INFO:CONSOLE(77)] "ErrorUtils caught an error:
+
+page-load-validation-missing-wam-incomplete-ws-timing
+
+Subsequent non-fatal errors won't be logged; see https://fburl.com/debugjs. [object Object]", source: https://static.whatsapp.net/rsrc.php/v4/yv/r/0p5QPbRp7Rp.js (77)
+[0110/014218.297:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/014549.522:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)
+[0110/014919.948:INFO:CONSOLE(113)] "Event handler of 'x-storagemutated-1' event must be added on the initial evaluation of worker script.", source: https://static.whatsapp.net/rsrc.php/v4/ym/r/cflfceaAb9-.js (113)

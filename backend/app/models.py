@@ -22,3 +22,13 @@ class User(Base):
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class Client(Base):
+    __tablename__ = "clients"
+
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, index=True, nullable=False)  # Foreign Key to User
+    name = Column(String, nullable=False)
+    phone = Column(String, nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)

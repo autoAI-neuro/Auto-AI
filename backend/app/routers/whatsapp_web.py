@@ -53,8 +53,22 @@ async def get_whatsapp_status(
             response.raise_for_status()
             data = response.json()
         
+        # Auto-restore session if backend says linked but service is not
+        node_status = data.get('status')
+        if current_user.whatsapp_linked and node_status in ['not_initialized', 'disconnected', 'error']:
+            print(f"[Backend] Auto-restoring session for {current_user.id}")
+            init_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/init/{current_user.id}"
+            async with httpx.AsyncClient(trust_env=False) as client:
+                # Fire and forget (or wait briefly)
+                try:
+                    await client.post(init_url, timeout=5.0)
+                    data['status'] = 'initializing'
+                    data['message'] = 'Restoring session...'
+                except Exception as e:
+                    print(f"[Backend] Failed to restore session: {e}")
+
         # Update database if connected
-        if data.get('status') == 'connected' and not current_user.whatsapp_linked:
+        if node_status == 'connected' and not current_user.whatsapp_linked:
             current_user.whatsapp_linked = True
             db.commit()
             print(f"[Backend] Updated whatsapp_linked for user {current_user.id}")
