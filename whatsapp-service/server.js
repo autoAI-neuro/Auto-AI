@@ -37,6 +37,7 @@ app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: pr
 // Initialize Session
 app.post('/api/whatsapp/init/:userId', async (req, res) => {
     const { userId } = req.params;
+    log(`Received init request for ${userId}`);
 
     if (sessions.has(userId)) {
         const session = sessions.get(userId);
@@ -203,6 +204,17 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 
 
 // Start server
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, () => {
     log(`Running on port ${PORT}`);
+});
+
+// Global Error Handlers
+process.on('uncaughtException', (err) => {
+    log(`[CRITICAL] Uncaught Exception: ${err.message}`);
+    console.error(err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    log(`[CRITICAL] Unhandled Rejection: ${reason}`);
+    console.error(reason);
 });
