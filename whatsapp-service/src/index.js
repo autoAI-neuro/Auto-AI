@@ -215,12 +215,13 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 // ============================================
 // INICIALIZAR SERVIDOR
 // ============================================
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     console.log(`
 ╔════════════════════════════════════════════╗
 ║   🚀 WhatsApp Service (Baileys) Running    ║
 ║                                            ║
-║   Puerto: ${PORT}                            ║
+║   Puerto: ${PORT}                          ║
+║   URL: http://0.0.0.0:${PORT}              ║
 ║   Ambiente: ${process.env.NODE_ENV || 'development'}               ║
 ╚════════════════════════════════════════════╝
     `);
