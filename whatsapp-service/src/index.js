@@ -30,26 +30,39 @@ app.get('/', (req, res) => res.send('WhatsApp Service Online'));
 // ============================================
 // INICIALIZAR CONEXIÓN WHATSAPP
 // ============================================
+// ============================================
+// INICIALIZAR CONEXIÓN WHATSAPP (NON-BLOCKING)
+// ============================================
 app.post('/api/whatsapp/init/:userId', async (req, res) => {
     const { userId } = req.params;
 
-    console.log(`📱 Iniciando conexión WhatsApp para usuario: ${userId}`);
+    console.log(`📱 Solicitud recibida: Init para ${userId}`);
 
-    try {
-        // Verificar si ya existe un cliente para este usuario
-        if (clients.has(userId)) {
-            const existingClient = clients.get(userId);
-            const state = existingClient.getState();
-
-            if (state === 'open') {
-                return res.json({
-                    status: 'connected',
-                    message: 'Ya conectado a WhatsApp'
-                });
-            }
+    // Si ya existe y está conectado, retornar rápido
+    if (clients.has(userId)) {
+        const existingClient = clients.get(userId);
+        if (existingClient.getState() === 'open') {
+            return res.json({ status: 'connected', message: 'Ya conectado' });
         }
+        // Si está inicializando, también retornar
+        if (existingClient.getState() === 'initializing') {
+            return res.json({ status: 'initializing', message: 'Ya se está conectando...' });
+        }
+    }
 
-        // Crear nuevo cliente
+    // Iniciar proceso en background para no bloquear el request (evita 502)
+    startBaileysDetails(userId);
+
+    // Responder inmediatamente al frontend
+    res.json({
+        status: 'initializing',
+        message: 'Inicialización comenzada en segundo plano'
+    });
+});
+
+async function startBaileysDetails(userId) {
+    try {
+        console.log(`🚀 Iniciando Baileys para ${userId} en background...`);
         const client = new BaileysClient(userId, {
             onQR: (qr) => {
                 console.log(`📲 QR generado para usuario: ${userId}`);
@@ -64,7 +77,6 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
                 clients.delete(userId);
             },
             onMessage: async (message) => {
-                // Future: Forward to backend
                 console.log("Message received:", message);
             }
         });
@@ -72,40 +84,11 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
         clients.set(userId, client);
         await client.connect();
 
-        // Esperar un poco para que se genere el QR
-        await new Promise(resolve => setTimeout(resolve, 2000));
-
-        const qr = pendingQRs.get(userId);
-        const state = client.getState();
-
-        if (state === 'open') {
-            return res.json({
-                status: 'connected',
-                message: 'Conectado exitosamente'
-            });
-        }
-
-        if (qr) {
-            return res.json({
-                status: 'qr_ready',
-                qr: qr,
-                message: 'Escanea el código QR'
-            });
-        }
-
-        return res.json({
-            status: 'connecting',
-            message: 'Conectando...'
-        });
-
     } catch (error) {
-        console.error('Error iniciando WhatsApp:', error);
-        res.status(500).json({
-            status: 'error',
-            message: error.message
-        });
+        console.error(`🔥 Error fatal en background para ${userId}:`, error);
+        // Podríamos guardar el error en un mapa de errores para consultarlo luego
     }
-});
+}
 
 // ============================================
 // OBTENER QR CODE
