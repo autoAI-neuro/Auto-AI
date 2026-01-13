@@ -48,64 +48,66 @@ const Onboarding = () => {
         }
     }, [status, navigate]);
 
-    // Poll status until connected
+    // Aggressive Polling Implementation
     useEffect(() => {
-        // Continue polling if not connected and not in a fatal error state
-        if (status !== 'connected' && status !== 'error') {
-            const interval = setInterval(() => {
-                checkStatus();
-            }, 3000);
+        if (!userId) return;
 
-            return () => clearInterval(interval);
-        }
-    }, [status]);
+        console.log("Starting polling for User:", userId);
 
+        const poll = async () => {
+            try {
+                // Use the correct endpoint
+                const response = await whatsappApi.get(`/api/whatsapp/status/${userId}`);
+                const data = response.data;
+
+                console.log(`[Polling] Status: ${data.status}`);
+
+                // Update state
+                setStatus(data.status);
+
+                if (data.qrCode) {
+                    setQrCode(data.qrCode);
+                }
+
+                if (data.status === 'connected') {
+                    // Auto-redirect
+                    setTimeout(() => {
+                        console.log("Redirecting to dashboard...");
+                        navigate('/dashboard');
+                    }, 1000);
+                }
+
+            } catch (err) {
+                // Silent fail on network error, keep trying
+                console.warn("[Polling] Error (will retry):", err);
+                if (err.response?.status === 401) {
+                    navigate('/login');
+                }
+            }
+        };
+
+        // Run immediately
+        poll();
+
+        // Run every 3 seconds
+        const intervalId = setInterval(poll, 3000);
+
+        return () => clearInterval(intervalId);
+    }, [userId, navigate]);
+
+    // Legacy initialize function (kept for the Retry button)
     const initializeWhatsApp = async () => {
         if (!userId) return;
         try {
             setLoading(true);
-            const response = await whatsappApi.post(
-                `/api/whatsapp/init/${userId}`,
-                {},
-                {}
-            );
-            console.log('[Onboarding] WhatsApp initialized:', response.data);
-
-            // Start checking status
-            setTimeout(() => checkStatus(), 2000);
+            await whatsappApi.post(`/api/whatsapp/init/${userId}`);
+            // Polling is already running in useEffect, no need to manually trigger checkStatus
         } catch (err) {
-            console.error('[Onboarding] Error initializing WhatsApp:', err);
-            // Don't set fatal error immediately on init fail, maybe retry?
-            // But if init fails heavily (500), it's an error.
-            setError(err.response?.data?.detail || 'Error al inicializar WhatsApp');
+            console.error('[Onboarding] Error initializing:', err);
+            setError(err.response?.data?.detail || 'Error al iniciar sesión');
             setStatus('error');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const checkStatus = async () => {
-        if (!userId) return;
-        try {
-            const response = await whatsappApi.get(
-                `/api/whatsapp/status/${userId}`
-            );
-
-            const data = response.data;
-            // Only update if status changed to avoid re-renders if utilizing strict equality in other places
-            // But here we rely on status change for effect re-triggering.
-            setStatus(data.status);
-
-            if (data.qrCode) {
-                setQrCode(data.qrCode);
-            }
-        } catch (err) {
-            console.error('[Onboarding] Error checking status:', err);
-            if (err.response?.status === 401) {
-                window.location.href = '/login';
-            }
-            // If connection error (network), we just keep 'initializing' or previous status.
-            // Do not set 'error' state which stops polling.
         }
     };
 

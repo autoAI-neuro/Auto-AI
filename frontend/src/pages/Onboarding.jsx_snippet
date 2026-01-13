@@ -1,0 +1,46 @@
+
+// Force status check independently of state to avoid stale closure issues
+useEffect(() => {
+    let intervalId;
+
+    const poll = async () => {
+        if (!userId) return;
+        try {
+            const response = await whatsappApi.get(`/api/whatsapp/status/${userId}`);
+            const data = response.data;
+            
+            // Log for debugging
+            console.log(`[Polling] Status for ${userId}: ${data.status}`);
+
+            setStatus(prev => {
+                // If we are already connected, don't revert to initializing
+                if (prev === 'connected' && data.status !== 'connected') {
+                     // Wait, if backend says disconnected, we MUST update.
+                     // But let's avoid flicker.
+                     return data.status; 
+                }
+                return data.status;
+            });
+
+            if (data.qrCode) setQrCode(data.qrCode);
+            
+            if (data.status === 'connected') {
+                // Success! Redirect.
+                setTimeout(() => navigate('/dashboard'), 500);
+            }
+
+        } catch (e) {
+            console.warn("Poll failed", e);
+            // Verify if 401
+             if (e.response?.status === 401) {
+                window.location.href = '/login';
+            }
+        }
+    };
+
+    // Start polling loop
+    intervalId = setInterval(poll, 3000);
+
+    // Cleanup
+    return () => clearInterval(intervalId);
+}, [userId, navigate]); // Only re-create if userId changes

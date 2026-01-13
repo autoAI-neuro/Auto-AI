@@ -42,7 +42,13 @@ app.get('/', (req, res) => res.send('WhatsApp Service Online'));
 app.post('/api/whatsapp/init/:userId', async (req, res) => {
     const { userId } = req.params;
 
-    console.log(`📱 Solicitud recibida: Init para ${userId}`);
+    console.log(`📱 Solicitud recibida: Init para UserID: [${userId}]`);
+    console.log(`   - Active Clients: ${Array.from(clients.keys()).join(', ')}`);
+
+    // Verify userId is valid
+    if (userId === 'undefined' || userId === 'null' || !userId) {
+        return res.status(400).json({ status: 'error', message: 'Invalid User ID provided' });
+    }
 
     // Si ya existe y está conectado, retornar rápido
     if (clients.has(userId)) {
