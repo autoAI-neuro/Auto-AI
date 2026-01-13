@@ -38,12 +38,23 @@ const Onboarding = () => {
         }
     }, [userId]);
 
-    // Poll status every 3 seconds
+    // Auto-redirect when connected
     useEffect(() => {
-        if (status === 'qr_ready' || status === 'initializing' || status === 'authenticated') {
+        if (status === 'connected') {
+            const timer = setTimeout(() => {
+                navigate('/dashboard');
+            }, 1000);
+            return () => clearTimeout(timer);
+        }
+    }, [status, navigate]);
+
+    // Poll status until connected
+    useEffect(() => {
+        // Continue polling if not connected and not in a fatal error state
+        if (status !== 'connected' && status !== 'error') {
             const interval = setInterval(() => {
                 checkStatus();
-            }, 3000); // Relaxed polling to 3s
+            }, 3000);
 
             return () => clearInterval(interval);
         }
@@ -53,11 +64,10 @@ const Onboarding = () => {
         if (!userId) return;
         try {
             setLoading(true);
-            // Use whatsappApi to hit the Node.js service directly
             const response = await whatsappApi.post(
                 `/api/whatsapp/init/${userId}`,
                 {},
-                {} // No headers needed for this internal service call usually, or CORS handles it
+                {}
             );
             console.log('[Onboarding] WhatsApp initialized:', response.data);
 
@@ -65,6 +75,8 @@ const Onboarding = () => {
             setTimeout(() => checkStatus(), 2000);
         } catch (err) {
             console.error('[Onboarding] Error initializing WhatsApp:', err);
+            // Don't set fatal error immediately on init fail, maybe retry?
+            // But if init fails heavily (500), it's an error.
             setError(err.response?.data?.detail || 'Error al inicializar WhatsApp');
             setStatus('error');
         } finally {
@@ -80,23 +92,24 @@ const Onboarding = () => {
             );
 
             const data = response.data;
-            console.log('[Onboarding] Status:', data);
-
+            // Only update if status changed to avoid re-renders if utilizing strict equality in other places
+            // But here we rely on status change for effect re-triggering.
             setStatus(data.status);
+
             if (data.qrCode) {
                 setQrCode(data.qrCode);
             }
         } catch (err) {
             console.error('[Onboarding] Error checking status:', err);
-            // If auth error, redirect to login to avoid getting stuck
             if (err.response?.status === 401) {
                 window.location.href = '/login';
             }
+            // If connection error (network), we just keep 'initializing' or previous status.
+            // Do not set 'error' state which stops polling.
         }
     };
 
     const handleContinue = () => {
-        // Navigate to next step (dashboard or next onboarding step)
         navigate('/dashboard');
     };
 
