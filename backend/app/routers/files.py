@@ -74,7 +74,7 @@ async def import_clients(
         log_capture(f"Preview generated for AI (Rows: {len(df)})")
 
         if not os.getenv("OPENAI_API_KEY"):
-            os.environ["OPENAI_API_KEY"] = "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"
+            raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured in environment")
 
         client = OpenAI()
 
