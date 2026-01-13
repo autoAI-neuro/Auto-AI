@@ -1,44 +1,63 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import api from '../config';
+import api, { whatsappApi } from '../config';
 import { Loader, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
+import { jwtDecode } from "jwt-decode";
 
 const Onboarding = () => {
-    const [status, setStatus] = useState('initializing'); // initializing, qr_ready, connected, error
+    const [status, setStatus] = useState('initializing');
     const [qrCode, setQrCode] = useState(null);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(true);
     const { token } = useAuth();
     const navigate = useNavigate();
 
+    // Get userId from token
+    const getUserId = () => {
+        if (!token) return null;
+        try {
+            const decoded = jwtDecode(token);
+            return decoded.sub || decoded.user_id; // Adjust based on your JWT structure
+        } catch (e) {
+            console.error("Invalid token:", e);
+            return null;
+        }
+    };
+
+    const userId = getUserId();
+
     // Initialize WhatsApp connection
     useEffect(() => {
-        initializeWhatsApp();
-    }, []);
+        if (userId) {
+            initializeWhatsApp();
+        } else {
+            setError("No se pudo identificar al usuario. Por favor inicia sesión nuevamente.");
+            setStatus('error');
+            setLoading(false);
+        }
+    }, [userId]);
 
     // Poll status every 3 seconds
     useEffect(() => {
         if (status === 'qr_ready' || status === 'initializing' || status === 'authenticated') {
             const interval = setInterval(() => {
                 checkStatus();
-            }, 2000);
+            }, 3000); // Relaxed polling to 3s
 
             return () => clearInterval(interval);
         }
     }, [status]);
 
     const initializeWhatsApp = async () => {
+        if (!userId) return;
         try {
             setLoading(true);
-            const response = await api.post(
-                '/whatsapp/init',
+            // Use whatsappApi to hit the Node.js service directly
+            const response = await whatsappApi.post(
+                `/api/whatsapp/init/${userId}`,
                 {},
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
+                {} // No headers needed for this internal service call usually, or CORS handles it
             );
             console.log('[Onboarding] WhatsApp initialized:', response.data);
 
@@ -54,14 +73,10 @@ const Onboarding = () => {
     };
 
     const checkStatus = async () => {
+        if (!userId) return;
         try {
-            const response = await api.get(
-                '/whatsapp/status',
-                {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                }
+            const response = await whatsappApi.get(
+                `/api/whatsapp/status/${userId}`
             );
 
             const data = response.data;
