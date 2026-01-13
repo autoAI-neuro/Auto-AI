@@ -11,11 +11,18 @@ const path = require('path');
 function logToFile(msg) {
     const logLine = `[${new Date().toISOString()}] ${msg}\n`;
     fs.appendFileSync(path.join(__dirname, 'debug.log'), logLine);
+    // Also log to console for Railway/Docker logs
+    console.log(msg);
 }
 
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Health Check
+app.get('/health', (req, res) => {
+    res.status(200).json({ status: 'ok', uptime: process.uptime() });
+});
 
 // Store active WhatsApp clients per user
 const clients = new Map();
