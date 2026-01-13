@@ -6,6 +6,9 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
+# Install git (required for some npm packages)
+RUN apk add --no-cache git
+
 # Install dependencies (pure Node.js, no system libs needed)
 RUN npm install
 
