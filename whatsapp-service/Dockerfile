@@ -1,11 +1,12 @@
 # WhatsApp Service with Puppeteer/Chromium for Railway
 FROM node:18
 
-# Install Chromium and dependencies + dumb-init for signal handling
+# Install Chromium and dependencies + dumb-init + missing libs
 RUN apt-get update && apt-get install -y \
     chromium \
     fonts-ipafont-gothic fonts-wqy-zenhei fonts-thai-tlwg fonts-kacst fonts-freefont-ttf \
     dumb-init \
+    libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 libgbm-dev \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
