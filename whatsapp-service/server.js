@@ -278,8 +278,8 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 
 
 // Start server
-const server = app.listen(PORT, () => {
-    logToFile(`[WhatsApp Service] Running on port ${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+    logToFile(`[WhatsApp Service] Running on http://0.0.0.0:${PORT}`);
     console.log(`[WhatsApp Service] Active clients: ${clients.size}`);
 });
 
