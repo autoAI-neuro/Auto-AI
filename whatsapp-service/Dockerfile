@@ -1,22 +1,24 @@
-# Lightweight WhatsApp Service (Baileys)
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
-# Copy package files
+# Copiar archivos de dependencias
 COPY package*.json ./
 
-# Install git (required for some npm packages)
+# Instalar git (necesario para algunas dependencias)
 RUN apk add --no-cache git
 
-# Install dependencies (pure Node.js, no system libs needed)
+# Instalar dependencias
 RUN npm install
 
-# Copy app code
+# Copiar código fuente
 COPY . .
 
-# Expose port (Railway sets PORT env var)
-# EXPOSE 3005
+# Crear directorio para auth
+RUN mkdir -p auth_info
 
-# Start server
-CMD ["node", "server.js"]
+# Exponer puerto
+EXPOSE 3005
+
+# Comando de inicio
+CMD ["npm", "start"]
