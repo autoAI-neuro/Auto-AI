@@ -262,8 +262,9 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 // INICIALIZAR SERVIDOR (MULTI-PORT STRATEGY)
 // ============================================
 // Attempt to listen on multiple ports to catch Railway's traffic regardless of misconfiguration
+// Attempt to listen on multiple ports to catch Railway's traffic regardless of misconfiguration
 const ports = [PORT, 8080, 3000, 3005];
-const uniquePorts = [...new Set(ports)]; // Deduplicate
+const uniquePorts = [...new Set(ports.filter(p => p))]; // Deduplicate and filter undefined
 
 uniquePorts.forEach(p => {
     try {
