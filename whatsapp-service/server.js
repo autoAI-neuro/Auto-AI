@@ -30,6 +30,11 @@ app.get('/health', (req, res) => {
     res.status(200).json({ status: 'ok', uptime: process.uptime() });
 });
 
+// Root route for likely default health checks
+app.get('/', (req, res) => {
+    res.status(200).send('WhatsApp Service Online');
+});
+
 // Store active WhatsApp clients per user
 const clients = new Map();
 const qrCodes = new Map();
