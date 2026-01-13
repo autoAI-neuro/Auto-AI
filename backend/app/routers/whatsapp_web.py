@@ -10,12 +10,9 @@ import os
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
-# Default to localhost for stability
-# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
-# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
-# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
-# FORCE HARDCODE to avoid .env conflict
-WHATSAPP_SERVICE_URL = "http://127.0.0.1:3005"
+# Use environment variable for production, fallback to localhost for development
+WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005")
+print(f"[Backend] WhatsApp Service URL: {WHATSAPP_SERVICE_URL}")
 
 import socket
 import requests
@@ -64,9 +61,9 @@ async def initialize_whatsapp(
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/init/{current_user.id}"
         print(f"[Backend] Calling URL: {url}")
         
-        # Disable proxies to ensure localhost connection works
-        async with httpx.AsyncClient(trust_env=False, proxies={}) as client:
-            response = await client.post(url, timeout=60.0)
+        # Use simple AsyncClient without proxies parameter (not supported in newer httpx)
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(url)
             print(f"[Backend] Response status: {response.status_code}")
             response.raise_for_status()
             return response.json()
