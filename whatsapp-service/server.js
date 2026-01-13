@@ -204,7 +204,7 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
     log(`Running on port ${PORT}`);
 });
 

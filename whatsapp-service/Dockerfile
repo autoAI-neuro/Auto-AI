@@ -16,7 +16,7 @@ RUN npm install
 COPY . .
 
 # Expose port (Railway sets PORT env var)
-EXPOSE 3005
+# EXPOSE 3005
 
 # Start server
 CMD ["node", "server.js"]
