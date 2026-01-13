@@ -42,12 +42,13 @@ class BaileysClient {
                 },
                 printQRInTerminal: true,
                 logger: pino({ level: 'silent' }),
-                browser: ['AutoAI', 'Chrome', '120.0.0'],
+                browser: ['Ubuntu', 'Chrome', '20.0.04'], // Use standard linux signature for stability
                 connectTimeoutMs: 60000,
                 defaultQueryTimeoutMs: 60000,
-                keepAliveIntervalMs: 30000,
+                keepAliveIntervalMs: 10000, // Ping more frequently (10s) to keep connection alive
                 emitOwnEvents: false,
-                markOnlineOnConnect: true
+                markOnlineOnConnect: true,
+                retryRequestDelayMs: 250 // Fast retry on 428 failures
             });
 
             // Manejar eventos de conexión

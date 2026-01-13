@@ -184,11 +184,35 @@ app.post('/api/whatsapp/send', async (req, res) => {
 
     const client = clients.get(userId);
 
-    if (!client || client.getState() !== 'open') {
+    if (!client) {
         return res.status(400).json({
             status: 'error',
-            message: 'WhatsApp no está conectado'
+            message: 'No active session for this user'
         });
+    }
+
+    // Helper: Wait for open state
+    const waitForOpen = async (timeoutMs = 5000) => {
+        if (client.getState() === 'open') return true;
+
+        const startTime = Date.now();
+        while (Date.now() - startTime < timeoutMs) {
+            if (client.getState() === 'open') return true;
+            await new Promise(r => setTimeout(r, 200)); // check every 200ms
+        }
+        return false;
+    };
+
+    // Try to ensure we are connected
+    if (client.getState() !== 'open') {
+        console.log(`[Send] Client for ${userId} not open (${client.getState()}). Waiting...`);
+        const ready = await waitForOpen();
+        if (!ready) {
+            return res.status(503).json({
+                status: 'error',
+                message: `WhatsApp unstable (State: ${client.getState()}). Please try again later.`
+            });
+        }
     }
 
     try {
