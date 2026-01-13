@@ -53,12 +53,25 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
     // Si ya existe y está conectado, retornar rápido
     if (clients.has(userId)) {
         const existingClient = clients.get(userId);
-        if (existingClient.getState() === 'open') {
+        const state = existingClient.getState();
+
+        console.log(`🔍 Checking existing client for ${userId}. State: ${state}`);
+
+        if (state === 'open') {
             return res.json({ status: 'connected', message: 'Ya conectado' });
         }
         // Si está inicializando, también retornar
-        if (existingClient.getState() === 'initializing') {
+        if (state === 'initializing') {
             return res.json({ status: 'initializing', message: 'Ya se está conectando...' });
+        }
+
+        // Si está en otro estado (disconnected, error, etc), MATARLO antes de revivirlo
+        console.log(`⚠️ Client for ${userId} in state '${state}'. Killing zombie...`);
+        try {
+            await existingClient.disconnect();
+            clients.delete(userId);
+        } catch (e) {
+            console.error(`Error killing zombie client for ${userId}:`, e);
         }
     }
 

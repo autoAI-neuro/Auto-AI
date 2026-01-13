@@ -55,11 +55,58 @@ const Dashboard = () => {
     }, []);
 
     const checkWhatsappStatus = async () => {
+        // Decode userId from token to ensure we are querying the right path
+        // (Assuming standard JWT with sub/user_id)
+        // ...actually, the backend should handle this if we used the /api/whatsapp/status/USERID endpoint like Onboarding.
+        // BUT Dashbaord is using generic /whatsapp/status... wait, let's check config.js. 
+        // If config.js uses api directly, it goes to Python backend? 
+        // No, based on context 'api' is AXIOS instance. 
+        // Let's verify if the route is correct.
+
         try {
-            const response = await api.get('/whatsapp/status', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setWhatsappStatus(response.data.status);
+            // NOTE: Onboarding uses `whatsappApi` (Node). Dashboard uses `api` (Python -> internal or Node?).
+            // Previous fix used `whatsappApi` for direct Node access. Dashboard might be hitting Python which doesn't proxy status?
+            // Let's switch Dashboard to use `whatsappApi` just like Onboarding for consistency.
+
+            // Need to import whatsappApi first (Assuming it is exported from ../config)
+
+            // Decoding token manually here is annoying. 
+            // Better to match Onboarding's logic or use a helper.
+            // For now, let's assume we can get userId from the auth context or decode it.
+
+            // Temporary fix: If we are using `api` (Python), maybe it proxies?
+            // If the user says "re-logging fixes it", it implies re-running Onboarding logic works.
+
+            // Let's just use the same logic as "Auto-Heal":
+            // 1. Check Status
+            // 2. If disconnected -> Call Init (blindly) -> This forces backend to look at disk and restore.
+
+            // We need userId.
+            const getUserId = (t) => {
+                if (!t) return null;
+                try {
+                    const base64Url = t.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const decoded = JSON.parse(jsonPayload);
+                    return decoded.sub || decoded.user_id;
+                } catch (e) { return null; }
+            };
+
+            const uid = getUserId(token);
+            if (!uid) return;
+
+            // Import whatsappApi dynamically or assume it's available?
+            // Ideally we change the import at the top. But for this block:
+
+            // We'll use the 'api' instance but point to the whatsapp URL if possible, or just standard fetch
+            // consistently with Onboarding.
+
+            // Actually, let's fix the Import at the top first, then this function.
+            // I will use a multi-step replacement.
+
         } catch (err) {
             console.error('Error checking WhatsApp status:', err);
             setWhatsappStatus('error');
