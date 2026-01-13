@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../config';
 import { ArrowRight, Loader } from 'lucide-react';
 
 const Register = () => {
@@ -53,7 +53,7 @@ const Register = () => {
         try {
             // Send only name, email, and password to backend
             const { name, email, password } = formData;
-            const response = await axios.post('http://localhost:8000/auth/register', {
+            const response = await api.post('/auth/register', {
                 name,
                 email,
                 password

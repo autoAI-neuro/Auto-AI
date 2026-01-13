@@ -2,13 +2,13 @@
 
 
 class Settings(BaseSettings):
-DATABASE_URL: str
-META_VERIFY_TOKEN: str
-META_APP_ID: str
-META_APP_SECRET: str
-WHATSAPP_BUSINESS_ID: str
-WHATSAPP_PHONE_NUMBER_ID: str
-WHATSAPP_ACCESS_TOKEN: str
+    DATABASE_URL: str
+    META_VERIFY_TOKEN: str
+    META_APP_ID: str
+    META_APP_SECRET: str
+    WHATSAPP_BUSINESS_ID: str
+    WHATSAPP_PHONE_NUMBER_ID: str
+    WHATSAPP_ACCESS_TOKEN: str
 
 
 OPENAI_API_KEY: str | None = None
@@ -38,7 +38,7 @@ APP_VERSION: str = "2.0.0"
 
 
 class Config:
-env_file = ".env"
+    env_file = ".env"
 
 
 settings = Settings()

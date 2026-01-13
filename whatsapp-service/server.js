@@ -4,7 +4,14 @@ const qrcode = require('qrcode');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3002;
+const PORT = process.env.PORT || 3005;
+const fs = require('fs');
+const path = require('path');
+
+function logToFile(msg) {
+    const logLine = `[${new Date().toISOString()}] ${msg}\n`;
+    fs.appendFileSync(path.join(__dirname, 'debug.log'), logLine);
+}
 
 // Middleware
 app.use(cors());
@@ -14,13 +21,24 @@ app.use(express.json());
 const clients = new Map();
 const qrCodes = new Map();
 const statuses = new Map();
+const initializingClients = new Set();
 
 // Initialize WhatsApp client for a user
 app.post('/api/whatsapp/init/:userId', async (req, res) => {
     const { userId } = req.params;
 
+    if (initializingClients.has(userId)) {
+        logToFile(`[WhatsApp] Skipping double-init for user: ${userId}`);
+        return res.json({
+            status: 'initializing',
+            message: 'Initialization already in progress'
+        });
+    }
+
+    initializingClients.add(userId);
+
     try {
-        console.log(`[WhatsApp] Initializing client for user: ${userId}`);
+        logToFile(`[WhatsApp] Initializing client for user: ${userId}`);
 
         // Check if client already exists and is ready
         if (clients.has(userId)) {
@@ -28,14 +46,14 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
             try {
                 const state = await existingClient.getState();
                 if (state === 'CONNECTED') {
-                    console.log(`[WhatsApp] User ${userId} already connected`);
+                    logToFile(`[WhatsApp] User ${userId} already connected`);
                     return res.json({
                         status: 'connected',
                         message: 'WhatsApp already connected'
                     });
                 }
             } catch (err) {
-                console.log(`[WhatsApp] Existing client error, creating new one`);
+                logToFile(`[WhatsApp] Existing client error, creating new one`);
                 clients.delete(userId);
             }
         }
@@ -48,45 +66,53 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
             }),
             puppeteer: {
                 headless: true,
-                args: ['--no-sandbox', '--disable-setuid-sandbox']
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--no-first-run',
+                    '--no-zygote',
+                    '--disable-gpu'
+                ]
             }
         });
 
         // QR Code event
         client.on('qr', async (qr) => {
-            console.log(`[WhatsApp] QR generated for user: ${userId}`);
+            logToFile(`[WhatsApp] QR generated for user: ${userId}`);
             try {
                 const qrImage = await qrcode.toDataURL(qr);
                 qrCodes.set(userId, qrImage);
                 statuses.set(userId, 'qr_ready');
             } catch (err) {
-                console.error(`[WhatsApp] QR generation error:`, err);
+                logToFile(`[WhatsApp] QR generation error: ${err}`);
                 statuses.set(userId, 'error');
             }
         });
 
         // Ready event
         client.on('ready', () => {
-            console.log(`[WhatsApp] Client ready for user: ${userId}`);
+            logToFile(`[WhatsApp] Client ready for user: ${userId}`);
             statuses.set(userId, 'connected');
             qrCodes.delete(userId); // Clear QR once connected
         });
 
         // Authenticated event
         client.on('authenticated', () => {
-            console.log(`[WhatsApp] Client authenticated for user: ${userId}`);
+            logToFile(`[WhatsApp] Client authenticated for user: ${userId}`);
             statuses.set(userId, 'authenticated');
         });
 
         // Auth failure event
         client.on('auth_failure', (msg) => {
-            console.error(`[WhatsApp] Auth failure for user ${userId}:`, msg);
+            logToFile(`[WhatsApp] Auth failure for user ${userId}: ${msg}`);
             statuses.set(userId, 'auth_failure');
         });
 
         // Disconnected event
         client.on('disconnected', (reason) => {
-            console.log(`[WhatsApp] Client disconnected for user ${userId}:`, reason);
+            logToFile(`[WhatsApp] Client disconnected for user ${userId}: ${reason}`);
             statuses.set(userId, 'disconnected');
             clients.delete(userId);
             qrCodes.delete(userId);
@@ -98,10 +124,14 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
 
         // Initialize client (don't await - let it run in background)
         client.initialize().catch(err => {
-            console.error(`[WhatsApp] Initialization error for user ${userId}:`, err);
+            logToFile(`[WhatsApp] Initialization error for user ${userId}: ${err}`);
             statuses.set(userId, 'error');
             clients.delete(userId);
+            initializingClients.delete(userId);
         });
+
+        // Remove lock after a short delay to allow background process to start
+        setTimeout(() => initializingClients.delete(userId), 5000);
 
         // Respond immediately
         res.json({
@@ -110,8 +140,9 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[WhatsApp] Error initializing client for user ${userId}:`, error);
+        logToFile(`[WhatsApp] Error initializing client for user ${userId}: ${error}`);
         statuses.set(userId, 'error');
+        initializingClients.delete(userId);
         res.status(500).json({
             status: 'error',
             message: error.message
@@ -141,13 +172,21 @@ app.post('/api/whatsapp/send', async (req, res) => {
         const client = clients.get(userId);
 
         if (!client) {
+            logToFile(`[Send] Client not active for user ${userId}`);
             return res.status(400).json({
                 error: 'WhatsApp not initialized for this user'
             });
         }
 
-        const state = await client.getState();
+        let state;
+        try {
+            state = await client.getState();
+        } catch (e) {
+            state = 'ERROR';
+        }
+
         if (state !== 'CONNECTED') {
+            logToFile(`[Send] User ${userId} not connected. State: ${state}`);
             return res.status(400).json({
                 error: 'WhatsApp not connected'
             });
@@ -160,7 +199,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
         const numberId = await client.getNumberId(formattedNumber);
 
         if (!numberId) {
-            console.warn(`[WhatsApp] Invalid number or not registered: ${formattedNumber}`);
+            logToFile(`[WhatsApp] Invalid number or not registered: ${formattedNumber}`);
             return res.status(400).json({
                 error: 'Phone number not registered on WhatsApp'
             });
@@ -169,7 +208,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
         // Send message using the validated ID
         const msg = await client.sendMessage(numberId._serialized, message);
 
-        console.log(`[WhatsApp] Message sent to ${formattedNumber} by user ${userId}. MsgID: ${msg.id.id}`);
+        logToFile(`[WhatsApp] Message sent to ${formattedNumber} by user ${userId}. MsgID: ${msg.id.id}`);
 
         res.json({
             success: true,
@@ -178,7 +217,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[WhatsApp] Error sending message:`, error);
+        logToFile(`[WhatsApp] Error sending message: ${error}`);
         res.status(500).json({
             error: error.message
         });
@@ -199,7 +238,7 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
             qrCodes.delete(userId);
             statuses.delete(userId);
 
-            console.log(`[WhatsApp] User ${userId} logged out`);
+            logToFile(`[WhatsApp] User ${userId} logged out`);
         }
 
         res.json({
@@ -208,7 +247,7 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
         });
 
     } catch (error) {
-        console.error(`[WhatsApp] Error logging out:`, error);
+        logToFile(`[WhatsApp] Error logging out: ${error}`);
         res.status(500).json({
             error: error.message
         });
@@ -225,23 +264,35 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-    console.log(`[WhatsApp Service] Running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+    logToFile(`[WhatsApp Service] Running on http://0.0.0.0:${PORT}`);
     console.log(`[WhatsApp Service] Active clients: ${clients.size}`);
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-    console.log('\n[WhatsApp Service] Shutting down gracefully...');
+    logToFile('\n[WhatsApp Service] Shutting down gracefully...');
 
     for (const [userId, client] of clients.entries()) {
         try {
             await client.destroy();
-            console.log(`[WhatsApp Service] Destroyed client for user: ${userId}`);
+            logToFile(`[WhatsApp Service] Destroyed client for user: ${userId}`);
         } catch (err) {
-            console.error(`[WhatsApp Service] Error destroying client ${userId}:`, err);
+            logToFile(`[WhatsApp Service] Error destroying client ${userId}: ${err}`);
         }
     }
 
     process.exit(0);
+});
+
+// Global Error Handlers - PREVENT CRASH
+process.on('uncaughtException', (err) => {
+    logToFile(`[CRITICAL] Uncaught Exception: ${err.message}`);
+    logToFile(err.stack);
+    // Don't exit, try to keep running or let supervisor restart if needed
+    // process.exit(1); 
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    logToFile(`[CRITICAL] Unhandled Rejection at: ${promise} reason: ${reason}`);
 });

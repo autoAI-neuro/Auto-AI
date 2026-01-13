@@ -1,0 +1,6 @@
+2026/01/11-23:57:32.590 6a90 Reusing MANIFEST C:\Users\RAYSA\Documents\autoai\whatsapp-service\whatsapp-session\session-b1d0a700-31b5-4706-9f1c-abad6ee7dd27\Default\Local Storage\leveldb/MANIFEST-000001
+2026/01/11-23:57:32.591 6a90 Recovering log #3
+2026/01/11-23:57:32.591 6a90 Reusing old log C:\Users\RAYSA\Documents\autoai\whatsapp-service\whatsapp-session\session-b1d0a700-31b5-4706-9f1c-abad6ee7dd27\Default\Local Storage\leveldb/000003.log 
+2026/01/11-23:58:32.823 1e44 Level-0 table #5: started
+2026/01/11-23:58:32.831 1e44 Level-0 table #5: 19014 bytes OK
+2026/01/11-23:58:32.847 1e44 Delete type=0 #3

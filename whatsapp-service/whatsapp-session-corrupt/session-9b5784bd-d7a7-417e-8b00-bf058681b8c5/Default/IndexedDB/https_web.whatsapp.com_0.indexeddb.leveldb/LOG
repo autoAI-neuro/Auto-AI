@@ -1,0 +1,65 @@
+2026/01/11-23:55:43.431 5984 Reusing MANIFEST C:\Users\RAYSA\Documents\autoai\whatsapp-service\whatsapp-session\session-9b5784bd-d7a7-417e-8b00-bf058681b8c5\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/01/11-23:55:43.431 5984 Recovering log #846
+2026/01/11-23:55:43.552 5984 Reusing old log C:\Users\RAYSA\Documents\autoai\whatsapp-service\whatsapp-session\session-9b5784bd-d7a7-417e-8b00-bf058681b8c5\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000846.log 
+2026/01/11-23:55:43.554 5984 Delete type=2 #834
+2026/01/11-23:55:43.554 5984 Delete type=2 #835
+2026/01/11-23:55:43.554 5984 Delete type=2 #836
+2026/01/11-23:55:43.554 5984 Delete type=2 #848
+2026/01/11-23:55:44.828 5984 Level-0 table #866: started
+2026/01/11-23:55:44.841 5984 Level-0 table #866: 700658 bytes OK
+2026/01/11-23:55:44.842 5984 Delete type=0 #846
+2026/01/11-23:55:44.843 5984 Manual compaction at level-0 from '\x00 \x00\x00\x00' @ 72057594037927935 : 1 .. '\x00!\x00\x00\x00' @ 0 : 0; will stop at '\x00 \x00\x00\x05' @ 3255176 : 1
+2026/01/11-23:55:44.843 5984 Compacting 1@0 + 1@1 files
+2026/01/11-23:55:44.872 5984 Generated table #867@0: 16955 keys, 325875 bytes
+2026/01/11-23:55:44.873 5984 Generated table #868@0: 339 keys, 21734 bytes
+2026/01/11-23:55:44.873 5984 Compacted 1@0 + 1@1 files => 347609 bytes
+2026/01/11-23:55:44.874 5984 compacted to: files[ 0 2 27 0 0 0 0 ]
+2026/01/11-23:55:44.874 5984 Delete type=2 #866
+2026/01/11-23:55:44.875 5984 Manual compaction at level-0 from '\x00 \x00\x00\x05' @ 3255176 : 1 .. '\x00!\x00\x00\x00' @ 0 : 0; will stop at (end)
+2026/01/11-23:55:44.895 9ddc Compacting 1@1 + 10@2 files
+2026/01/11-23:55:44.955 9ddc Generated table #869@1: 30783 keys, 2220067 bytes
+2026/01/11-23:55:45.024 9ddc Generated table #870@1: 31834 keys, 2263744 bytes
+2026/01/11-23:55:45.089 9ddc Generated table #871@1: 34875 keys, 2240810 bytes
+2026/01/11-23:55:45.136 9ddc Generated table #872@1: 19107 keys, 2221660 bytes
+2026/01/11-23:55:45.167 9ddc Generated table #873@1: 10195 keys, 2132628 bytes
+2026/01/11-23:55:45.257 9ddc Generated table #874@1: 88008 keys, 2233669 bytes
+2026/01/11-23:55:45.359 9ddc Generated table #875@1: 98128 keys, 2247934 bytes
+2026/01/11-23:55:45.462 9ddc Generated table #876@1: 99158 keys, 2247793 bytes
+2026/01/11-23:55:45.568 9ddc Generated table #877@1: 99654 keys, 2249441 bytes
+2026/01/11-23:55:45.581 9ddc Generated table #878@1: 10112 keys, 233457 bytes
+2026/01/11-23:55:45.581 9ddc Compacted 1@1 + 10@2 files => 20291203 bytes
+2026/01/11-23:55:45.581 9ddc compacted to: files[ 0 1 27 0 0 0 0 ]
+2026/01/11-23:55:45.582 9ddc Delete type=2 #850
+2026/01/11-23:55:45.582 5984 Compacting 1@1 + 9@2 files
+2026/01/11-23:55:45.658 5984 Generated table #879@1: 62505 keys, 2241450 bytes
+2026/01/11-23:55:45.733 5984 Generated table #880@1: 50432 keys, 2212638 bytes
+2026/01/11-23:55:45.756 5984 Generated table #881@1: 4165 keys, 2145932 bytes
+2026/01/11-23:55:45.777 5984 Generated table #882@1: 1746 keys, 2145762 bytes
+2026/01/11-23:55:45.800 5984 Generated table #883@1: 2421 keys, 2151057 bytes
+2026/01/11-23:55:45.824 5984 Generated table #884@1: 2547 keys, 2148173 bytes
+2026/01/11-23:55:45.846 5984 Generated table #885@1: 2497 keys, 2142612 bytes
+2026/01/11-23:55:45.865 5984 Generated table #886@1: 1856 keys, 2139097 bytes
+2026/01/11-23:55:45.868 5984 Generated table #887@1: 224 keys, 221832 bytes
+2026/01/11-23:55:45.868 5984 Compacted 1@1 + 9@2 files => 17548553 bytes
+2026/01/11-23:55:45.869 5984 compacted to: files[ 0 0 27 0 0 0 0 ]
+2026/01/11-23:55:45.869 5984 Delete type=2 #822
+2026/01/11-23:55:45.869 5984 Delete type=2 #823
+2026/01/11-23:55:45.869 5984 Delete type=2 #824
+2026/01/11-23:55:45.869 5984 Delete type=2 #825
+2026/01/11-23:55:45.869 5984 Delete type=2 #826
+2026/01/11-23:55:45.869 5984 Delete type=2 #827
+2026/01/11-23:55:45.869 5984 Delete type=2 #844
+2026/01/11-23:55:45.869 5984 Delete type=2 #852
+2026/01/11-23:55:45.869 5984 Delete type=2 #853
+2026/01/11-23:55:45.869 5984 Delete type=2 #854
+2026/01/11-23:55:45.870 5984 Delete type=2 #855
+2026/01/11-23:55:45.870 5984 Delete type=2 #856
+2026/01/11-23:55:45.870 5984 Delete type=2 #857
+2026/01/11-23:55:45.870 5984 Delete type=2 #858
+2026/01/11-23:55:45.870 5984 Delete type=2 #859
+2026/01/11-23:55:45.870 5984 Delete type=2 #860
+2026/01/11-23:55:45.870 5984 Delete type=2 #861
+2026/01/11-23:55:45.870 5984 Delete type=2 #862
+2026/01/11-23:55:45.870 5984 Delete type=2 #863
+2026/01/11-23:55:45.870 5984 Delete type=2 #867
+2026/01/11-23:55:45.870 5984 Delete type=2 #868

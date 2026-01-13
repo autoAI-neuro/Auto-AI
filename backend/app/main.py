@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from starlette.middleware.cors import CORSMiddleware
 import os
-from app.routers import auth, whatsapp_web, clients
+from app.routers import auth, whatsapp_web, clients, files
 from app.db.session import engine
 from app.db.base import Base
 from app.models import User  # Import models so SQLAlchemy can detect them
@@ -24,6 +24,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(whatsapp_web.router)
 app.include_router(clients.router)
+app.include_router(files.router)
 
 @app.get("/health")
 def health():

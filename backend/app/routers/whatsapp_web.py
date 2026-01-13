@@ -11,7 +11,41 @@ import os
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
 # Default to localhost for stability
-WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://localhost:3002")
+# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
+# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
+# Default to 127.0.0.1 for stability (avoid IPv6 localhost issues on Windows)
+# FORCE HARDCODE to avoid .env conflict
+WHATSAPP_SERVICE_URL = "http://127.0.0.1:3005"
+
+import socket
+import requests
+
+@router.get("/debug-connectivity")
+def debug_connectivity():
+    """Debug endpoint to test connectivity from within the server process"""
+    results = {}
+    
+    # 1. Test TCP Trace
+    try:
+        host = "127.0.0.1"
+        port = 3002
+        sock = socket.create_connection((host, port), timeout=2)
+        sock.close()
+        results["tcp_127_0_0_1"] = "SUCCESS"
+    except Exception as e:
+        results["tcp_127_0_0_1"] = f"FAILED: {str(e)}"
+        
+    # 2. Test Requests (Sync)
+    try:
+        resp = requests.get(f"{WHATSAPP_SERVICE_URL}/health", timeout=2)
+        results["requests_http"] = f"SUCCESS: {resp.status_code}"
+    except Exception as e:
+        results["requests_http"] = f"FAILED: {str(e)}"
+        
+    return {
+        "config_url": WHATSAPP_SERVICE_URL,
+        "results": results
+    }
 
 class SendMessageRequest(BaseModel):
     phone_number: str
@@ -24,11 +58,14 @@ async def initialize_whatsapp(
 ):
     """Initialize WhatsApp client and generate QR code"""
     try:
+        # Force local connection for desktop app stability
+        # Force local connection for desktop app stability
         print(f"[Backend] Initializing WhatsApp for user: {current_user.id}")
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/init/{current_user.id}"
         print(f"[Backend] Calling URL: {url}")
         
-        async with httpx.AsyncClient(trust_env=False) as client:
+        # Disable proxies to ensure localhost connection works
+        async with httpx.AsyncClient(trust_env=False, proxies={}) as client:
             response = await client.post(url, timeout=60.0)
             print(f"[Backend] Response status: {response.status_code}")
             response.raise_for_status()
@@ -38,7 +75,7 @@ async def initialize_whatsapp(
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")
     except httpx.RequestError as e:
         print(f"[Backend] Connection error: {e}")
-        raise HTTPException(status_code=500, detail=f"Cannot connect to WhatsApp service: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Cannot connect to WhatsApp service @ {url}: {str(e)}")
 
 @router.get("/status")
 async def get_whatsapp_status(
@@ -52,6 +89,7 @@ async def get_whatsapp_status(
             response = await client.get(url, timeout=10.0)
             response.raise_for_status()
             data = response.json()
+            print(f"[Backend] Status from Node for {current_user.id}: {data}")
         
         # Auto-restore session if backend says linked but service is not
         node_status = data.get('status')
@@ -102,7 +140,9 @@ async def send_whatsapp_message(
     except httpx.RequestError as e:
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")
     except httpx.HTTPStatusError as e:
-         raise HTTPException(status_code=e.response.status_code, detail=f"WhatsApp service error: {str(e)}")
+         error_detail = f"WhatsApp service error: {e.response.text}"
+         print(f"[Backend] {error_detail}")
+         raise HTTPException(status_code=e.response.status_code, detail=error_detail)
 
 @router.post("/logout")
 async def logout_whatsapp(

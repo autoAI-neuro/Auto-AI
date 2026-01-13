@@ -1,22 +1,31 @@
-# Python
+# Dependencies
+node_modules/
 __pycache__/
 *.pyc
 .env
+*.env.local
 
-# Node
-node_modules/
+# Build outputs
+dist/
+build/
 
-# OS
-.DS_Store
+# Database
+*.db
+
+# Logs
+*.log
+debug.log
+
+# WhatsApp session (must re-scan QR in production)
+whatsapp-session/
 
 # IDE
 .vscode/
 .idea/
 
-# Python envs
-.venv/
-venv/
+# OS
+.DS_Store
+Thumbs.db
 
-# Build
-dist/
-build/
+# Backups (don't deploy these)
+backups/

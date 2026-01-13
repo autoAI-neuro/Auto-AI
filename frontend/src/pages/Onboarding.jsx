@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import api from '../config';
 import { Loader, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react';
 
 const Onboarding = () => {
@@ -19,10 +19,10 @@ const Onboarding = () => {
 
     // Poll status every 3 seconds
     useEffect(() => {
-        if (status === 'qr_ready' || status === 'initializing') {
+        if (status === 'qr_ready' || status === 'initializing' || status === 'authenticated') {
             const interval = setInterval(() => {
                 checkStatus();
-            }, 3000);
+            }, 2000);
 
             return () => clearInterval(interval);
         }
@@ -31,8 +31,8 @@ const Onboarding = () => {
     const initializeWhatsApp = async () => {
         try {
             setLoading(true);
-            const response = await axios.post(
-                'http://localhost:8000/whatsapp/init',
+            const response = await api.post(
+                '/whatsapp/init',
                 {},
                 {
                     headers: {
@@ -55,8 +55,8 @@ const Onboarding = () => {
 
     const checkStatus = async () => {
         try {
-            const response = await axios.get(
-                'http://localhost:8000/whatsapp/status',
+            const response = await api.get(
+                '/whatsapp/status',
                 {
                     headers: {
                         'Authorization': `Bearer ${token}`
@@ -73,6 +73,10 @@ const Onboarding = () => {
             }
         } catch (err) {
             console.error('[Onboarding] Error checking status:', err);
+            // If auth error, redirect to login to avoid getting stuck
+            if (err.response?.status === 401) {
+                window.location.href = '/login';
+            }
         }
     };
 
@@ -152,8 +156,8 @@ const Onboarding = () => {
                     onClick={handleContinue}
                     disabled={status !== 'connected'}
                     className={`w-full py-3 px-6 rounded-xl font-medium transition-all ${status === 'connected'
-                            ? 'bg-white text-black hover:bg-neutral-200'
-                            : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                        ? 'bg-white text-black hover:bg-neutral-200'
+                        : 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                         }`}
                 >
                     {status === 'connected' ? 'Continuar' : 'Esperando conexión...'}
@@ -162,9 +166,9 @@ const Onboarding = () => {
                 {/* Status Indicator */}
                 <div className="mt-6 flex items-center justify-center gap-2 text-xs text-neutral-600">
                     <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-green-500' :
-                            status === 'qr_ready' ? 'bg-yellow-500 animate-pulse' :
-                                status === 'error' ? 'bg-red-500' :
-                                    'bg-neutral-500 animate-pulse'
+                        status === 'qr_ready' ? 'bg-yellow-500 animate-pulse' :
+                            status === 'error' ? 'bg-red-500' :
+                                'bg-neutral-500 animate-pulse'
                         }`} />
                     <span>
                         {status === 'connected' ? 'Conectado' :
