@@ -162,17 +162,24 @@ class BaileysClient {
 
     async sendText(phone, message) {
         if (!this.sock || this.state !== 'open') {
-            throw new Error('WhatsApp no está conectado');
+            throw new Error(`WhatsApp no está conectado (State: ${this.state})`);
         }
 
         // Formatear número (Flexible)
         const jid = this.formatPhone(phone);
+        console.log(`[Baileys] Sending text to ${jid}`);
 
-        const result = await this.sock.sendMessage(jid, {
-            text: message
-        });
-
-        return result;
+        try {
+            const result = await this.sock.sendMessage(jid, {
+                text: message
+            });
+            return result;
+        } catch (err) {
+            console.error(`[Baileys] Send Failed to ${jid}:`, err);
+            // Log full error object for inspection
+            console.dir(err, { depth: null });
+            throw new Error(`Failed to send to ${phone}: ${err.message}`);
+        }
     }
 
     async sendMedia(phone, mediaUrl, mediaType, caption = '') {
