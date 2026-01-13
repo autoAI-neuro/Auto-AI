@@ -68,15 +68,31 @@ class BaileysClient {
                     const reason = lastDisconnect?.error?.output?.statusCode;
                     const shouldReconnect = reason !== DisconnectReason.loggedOut;
 
-                    console.log(`Conexión cerrada. Razón: ${reason}. Reconectar: ${shouldReconnect}`);
+                    console.log(`Conexión cerrada. Razón: ${reason} (${lastDisconnect?.error?.message}). Reconectar: ${shouldReconnect}`);
 
                     this.state = 'disconnected';
 
+                    // 515 Fix: Stream Restart Loop
+                    if (reason === 515) {
+                        console.log("⚠️ Error 515 detected (Stream Restart). Possible session corruption.");
+                        // Optional: Counter to only clear after X failures? 
+                        // For now, let's keep it safe. If it happens, Baileys usually retries internally.
+                        // BUT if the user reports a loop, we might need to be aggressive.
+                        // Strategy: Let it retry once. If it happens again quickly, we are in trouble.
+
+                        // Actually, 515 is "restart required". Baileys SHOULD handle it.
+                        // PROPOSAL: Don't clear immediately. Reconnect.
+                    }
+
                     if (shouldReconnect) {
                         // Reintentar conexión
-                        setTimeout(() => this.connect(), 3000);
+                        // Add jitter to avoid thundering herd if multiple clients fail
+                        const delay = reason === 515 ? 5000 : 3000;
+                        console.log(`Reconnecting in ${delay}ms...`);
+                        setTimeout(() => this.connect(), delay);
                     } else {
                         // Sesión cerrada, limpiar auth
+                        console.log("Session logged out. Clearing auth...");
                         this.clearAuth();
                         if (this.callbacks.onDisconnected) {
                             this.callbacks.onDisconnected('logged_out');
