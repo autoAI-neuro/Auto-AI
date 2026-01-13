@@ -9,10 +9,16 @@ const fs = require('fs');
 const path = require('path');
 
 function logToFile(msg) {
-    const logLine = `[${new Date().toISOString()}] ${msg}\n`;
-    fs.appendFileSync(path.join(__dirname, 'debug.log'), logLine);
-    // Also log to console for Railway/Docker logs
+    // Log to console for Railway (Primary)
     console.log(msg);
+
+    // Try to log to file (Secondary - graceful fail)
+    try {
+        const logLine = `[${new Date().toISOString()}] ${msg}\n`;
+        fs.appendFileSync(path.join(__dirname, 'debug.log'), logLine);
+    } catch (e) {
+        // Ignore file write errors
+    }
 }
 
 // Middleware
@@ -264,14 +270,7 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
     }
 });
 
-// Health check
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        activeClients: clients.size,
-        timestamp: new Date().toISOString()
-    });
-});
+
 
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
