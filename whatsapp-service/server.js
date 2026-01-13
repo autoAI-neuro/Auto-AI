@@ -1,312 +1,208 @@
-const express = require('express');
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
-const cors = require('cors');
+import express from 'express';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
+import cors from 'cors';
+import qrcode from 'qrcode';
+import fs from 'fs';
+import path from 'path';
+import pino from 'pino';
+import { fileURLToPath } from 'url';
+
+// Fix __dirname for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3005;
-const fs = require('fs');
-const path = require('path');
-
-function logToFile(msg) {
-    // Log to console for Railway (Primary)
-    console.log(msg);
-
-    // Try to log to file (Secondary - graceful fail)
-    try {
-        const logLine = `[${new Date().toISOString()}] ${msg}\n`;
-        fs.appendFileSync(path.join(__dirname, 'debug.log'), logLine);
-    } catch (e) {
-        // Ignore file write errors
-    }
-}
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
+// Logger
+const logger = pino({ level: 'debug' });
+
+// Store active sockets and data
+const sessions = new Map(); // userId -> { sock, status, qr }
+// status: 'initializing', 'qr_ready', 'connected', 'error'
+
+// Helper to log
+function log(msg) {
+    console.log(`[WhatsApp Service] ${msg}`);
+}
+
 // Health Check
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'ok', uptime: process.uptime() });
-});
+app.get('/', (req, res) => res.status(200).send('WhatsApp Service (Baileys) Online'));
+app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
 
-// Root route for likely default health checks
-app.get('/', (req, res) => {
-    res.status(200).send('WhatsApp Service Online');
-});
-
-// Store active WhatsApp clients per user
-const clients = new Map();
-const qrCodes = new Map();
-const statuses = new Map();
-const initializingClients = new Set();
-
-// Initialize WhatsApp client for a user
+// Initialize Session
 app.post('/api/whatsapp/init/:userId', async (req, res) => {
     const { userId } = req.params;
 
-    if (initializingClients.has(userId)) {
-        logToFile(`[WhatsApp] Skipping double-init for user: ${userId}`);
-        return res.json({
-            status: 'initializing',
-            message: 'Initialization already in progress'
-        });
-    }
-
-    initializingClients.add(userId);
-
-    try {
-        logToFile(`[WhatsApp] Initializing client for user: ${userId}`);
-
-        // Check if client already exists and is ready
-        if (clients.has(userId)) {
-            const existingClient = clients.get(userId);
-            try {
-                const state = await existingClient.getState();
-                if (state === 'CONNECTED') {
-                    logToFile(`[WhatsApp] User ${userId} already connected`);
-                    return res.json({
-                        status: 'connected',
-                        message: 'WhatsApp already connected'
-                    });
-                }
-            } catch (err) {
-                logToFile(`[WhatsApp] Existing client error, creating new one`);
-                clients.delete(userId);
-            }
+    if (sessions.has(userId)) {
+        const session = sessions.get(userId);
+        if (session.status === 'connected') {
+            return res.json({ status: 'connected', message: 'Already connected' });
         }
-
-        // Create new client
-        const client = new Client({
-            authStrategy: new LocalAuth({
-                clientId: userId,
-                dataPath: './whatsapp-session'
-            }),
-            puppeteer: {
-                headless: true,
-                // Use system Chromium on Railway (set via PUPPETEER_EXECUTABLE_PATH env var)
-                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-                args: [
-                    '--no-sandbox',
-                    '--disable-setuid-sandbox',
-                    '--disable-dev-shm-usage',
-                    '--disable-accelerated-2d-canvas',
-                    '--no-first-run',
-                    '--no-zygote',
-                    '--single-process',
-                    '--disable-gpu'
-                ]
-            }
-        });
-
-        // QR Code event
-        client.on('qr', async (qr) => {
-            logToFile(`[WhatsApp] QR generated for user: ${userId}`);
-            try {
-                const qrImage = await qrcode.toDataURL(qr);
-                qrCodes.set(userId, qrImage);
-                statuses.set(userId, 'qr_ready');
-            } catch (err) {
-                logToFile(`[WhatsApp] QR generation error: ${err}`);
-                statuses.set(userId, 'error');
-            }
-        });
-
-        // Ready event
-        client.on('ready', () => {
-            logToFile(`[WhatsApp] Client ready for user: ${userId}`);
-            statuses.set(userId, 'connected');
-            qrCodes.delete(userId); // Clear QR once connected
-        });
-
-        // Authenticated event
-        client.on('authenticated', () => {
-            logToFile(`[WhatsApp] Client authenticated for user: ${userId}`);
-            statuses.set(userId, 'authenticated');
-        });
-
-        // Auth failure event
-        client.on('auth_failure', (msg) => {
-            logToFile(`[WhatsApp] Auth failure for user ${userId}: ${msg}`);
-            statuses.set(userId, 'auth_failure');
-        });
-
-        // Disconnected event
-        client.on('disconnected', (reason) => {
-            logToFile(`[WhatsApp] Client disconnected for user ${userId}: ${reason}`);
-            statuses.set(userId, 'disconnected');
-            clients.delete(userId);
-            qrCodes.delete(userId);
-        });
-
-        // Store client
-        clients.set(userId, client);
-        statuses.set(userId, 'initializing');
-
-        // Initialize client (don't await - let it run in background)
-        client.initialize().catch(err => {
-            logToFile(`[WhatsApp] Initialization error for user ${userId}: ${err}`);
-            statuses.set(userId, 'error');
-            clients.delete(userId);
-            initializingClients.delete(userId);
-        });
-
-        // Remove lock after a short delay to allow background process to start
-        setTimeout(() => initializingClients.delete(userId), 5000);
-
-        // Respond immediately
-        res.json({
-            status: 'initializing',
-            message: 'WhatsApp client initialized. Waiting for QR code...'
-        });
-
-    } catch (error) {
-        logToFile(`[WhatsApp] Error initializing client for user ${userId}: ${error}`);
-        statuses.set(userId, 'error');
-        initializingClients.delete(userId);
-        res.status(500).json({
-            status: 'error',
-            message: error.message
-        });
     }
-});
 
-// Get WhatsApp status and QR code
-app.get('/api/whatsapp/status/:userId', (req, res) => {
-    const { userId } = req.params;
-
-    const status = statuses.get(userId) || 'not_initialized';
-    const qrCode = qrCodes.get(userId);
+    // Start initialization in background
+    initializeSession(userId);
 
     res.json({
-        status,
-        qrCode: qrCode || null,
-        hasClient: clients.has(userId)
+        status: 'initializing',
+        message: 'Initialization started'
     });
 });
 
-// Send WhatsApp message
+async function initializeSession(userId) {
+    try {
+        log(`Initializing session for ${userId}`);
+
+        // Auth credentials path
+        const authPath = path.join(__dirname, 'auth_info_baileys', userId);
+        if (!fs.existsSync(authPath)) {
+            fs.mkdirSync(authPath, { recursive: true });
+        }
+
+        const { state, saveCreds } = await useMultiFileAuthState(authPath);
+
+        const sock = makeWASocket({
+            auth: state,
+            printQRInTerminal: false,
+            browser: Browsers.macOS('Desktop'), // Mimics a desktop browser
+            logger: pino({ level: 'silent' }), // Reduce noise
+            connectTimeoutMs: 60000,
+        });
+
+        // Initialize session state if new
+        if (!sessions.has(userId)) {
+            sessions.set(userId, { sock, status: 'initializing', qr: null });
+        } else {
+            const s = sessions.get(userId);
+            s.sock = sock;
+            s.status = 'initializing';
+        }
+
+        // Event: Credentials Update
+        sock.ev.on('creds.update', saveCreds);
+
+        // Event: Connection Update
+        sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+            const session = sessions.get(userId);
+
+            if (qr) {
+                log(`QR generated for ${userId}`);
+                try {
+                    const qrImage = await qrcode.toDataURL(qr);
+                    session.qr = qrImage;
+                    session.status = 'qr_ready';
+                } catch (e) {
+                    log(`QR Error: ${e}`);
+                }
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                log(`Connection closed for ${userId}. Reconnecting: ${shouldReconnect}`);
+
+                if (shouldReconnect) {
+                    initializeSession(userId); // Reconnect
+                } else {
+                    log(`${userId} logged out.`);
+                    session.status = 'disconnected';
+                    session.qr = null;
+                    // Clean up files
+                    try {
+                        fs.rmSync(authPath, { recursive: true, force: true });
+                    } catch (e) { }
+                }
+            } else if (connection === 'open') {
+                log(`${userId} connection opened!`);
+                session.status = 'connected';
+                session.qr = null;
+            }
+        });
+
+    } catch (error) {
+        log(`Fatal error for ${userId}: ${error}`);
+        const session = sessions.get(userId);
+        if (session) session.status = 'error';
+    }
+}
+
+// Get Status
+app.get('/api/whatsapp/status/:userId', (req, res) => {
+    const { userId } = req.params;
+    const session = sessions.get(userId);
+
+    if (!session) {
+        return res.json({ status: 'not_initialized', hasClient: false });
+    }
+
+    res.json({
+        status: session.status,
+        qrCode: session.qr,
+        hasClient: true
+    });
+});
+
+// Send Message
 app.post('/api/whatsapp/send', async (req, res) => {
     const { userId, phoneNumber, message } = req.body;
+    const session = sessions.get(userId);
+
+    if (!session || session.status !== 'connected') {
+        return res.status(400).json({ error: 'WhatsApp not connected' });
+    }
 
     try {
-        const client = clients.get(userId);
+        // Format number: remove non-digits, ensure it ends with @s.whatsapp.net
+        // Assuming international format without + or 00, e.g. 52155...
+        // Baileys expects JID.
 
-        if (!client) {
-            logToFile(`[Send] Client not active for user ${userId}`);
-            return res.status(400).json({
-                error: 'WhatsApp not initialized for this user'
-            });
+        let jid = phoneNumber.replace(/\D/g, '');
+        if (!jid.includes('@s.whatsapp.net')) {
+            jid = jid + '@s.whatsapp.net';
         }
 
-        let state;
-        try {
-            state = await client.getState();
-        } catch (e) {
-            state = 'ERROR';
+        // Verify number existence (optional, can skip for speed or use sock.onWhatsApp)
+        const exists = await session.sock.onWhatsApp(jid);
+        if (!exists || exists.length === 0) {
+            return res.status(400).json({ error: 'Number not registered on WhatsApp' });
         }
+        jid = exists[0].jid; // Use the returned correct JID
 
-        if (state !== 'CONNECTED') {
-            logToFile(`[Send] User ${userId} not connected. State: ${state}`);
-            return res.status(400).json({
-                error: 'WhatsApp not connected'
-            });
-        }
+        const msg = await session.sock.sendMessage(jid, { text: message });
 
-        // Format phone number (remove any non-digit characters)
-        const formattedNumber = phoneNumber.replace(/\D/g, '');
-
-        // Validate number exists on WhatsApp
-        const numberId = await client.getNumberId(formattedNumber);
-
-        if (!numberId) {
-            logToFile(`[WhatsApp] Invalid number or not registered: ${formattedNumber}`);
-            return res.status(400).json({
-                error: 'Phone number not registered on WhatsApp'
-            });
-        }
-
-        // Send message using the validated ID
-        const msg = await client.sendMessage(numberId._serialized, message);
-
-        logToFile(`[WhatsApp] Message sent to ${formattedNumber} by user ${userId}. MsgID: ${msg.id.id}`);
-
-        res.json({
-            success: true,
-            message: 'Message sent successfully',
-            messageId: msg.id.id
-        });
+        log(`Message sent to ${jid}`);
+        res.json({ success: true, messageId: msg.key.id });
 
     } catch (error) {
-        logToFile(`[WhatsApp] Error sending message: ${error}`);
-        res.status(500).json({
-            error: error.message
-        });
+        log(`Send Error: ${error}`);
+        res.status(500).json({ error: error.message });
     }
 });
 
-// Logout/Disconnect WhatsApp
+// Logout
 app.post('/api/whatsapp/logout/:userId', async (req, res) => {
     const { userId } = req.params;
+    const session = sessions.get(userId);
 
-    try {
-        const client = clients.get(userId);
-
-        if (client) {
-            await client.logout();
-            await client.destroy();
-            clients.delete(userId);
-            qrCodes.delete(userId);
-            statuses.delete(userId);
-
-            logToFile(`[WhatsApp] User ${userId} logged out`);
+    if (session && session.sock) {
+        try {
+            await session.sock.logout();
+            sessions.delete(userId);
+            // File cleanup happens in connection.close handler
+        } catch (e) {
+            log(`Logout error: ${e}`);
         }
-
-        res.json({
-            success: true,
-            message: 'Logged out successfully'
-        });
-
-    } catch (error) {
-        logToFile(`[WhatsApp] Error logging out: ${error}`);
-        res.status(500).json({
-            error: error.message
-        });
     }
+    res.json({ success: true });
 });
-
 
 
 // Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-    logToFile(`[WhatsApp Service] Running on http://0.0.0.0:${PORT}`);
-    console.log(`[WhatsApp Service] Active clients: ${clients.size}`);
-});
-
-// Graceful shutdown
-process.on('SIGINT', async () => {
-    logToFile('\n[WhatsApp Service] Shutting down gracefully...');
-
-    for (const [userId, client] of clients.entries()) {
-        try {
-            await client.destroy();
-            logToFile(`[WhatsApp Service] Destroyed client for user: ${userId}`);
-        } catch (err) {
-            logToFile(`[WhatsApp Service] Error destroying client ${userId}: ${err}`);
-        }
-    }
-
-    process.exit(0);
-});
-
-// Global Error Handlers - PREVENT CRASH
-process.on('uncaughtException', (err) => {
-    logToFile(`[CRITICAL] Uncaught Exception: ${err.message}`);
-    logToFile(err.stack);
-    // Don't exit, try to keep running or let supervisor restart if needed
-    // process.exit(1); 
-});
-
-process.on('unhandledRejection', (reason, promise) => {
-    logToFile(`[CRITICAL] Unhandled Rejection at: ${promise} reason: ${reason}`);
+app.listen(PORT, '0.0.0.0', () => {
+    log(`Running on port ${PORT}`);
 });
