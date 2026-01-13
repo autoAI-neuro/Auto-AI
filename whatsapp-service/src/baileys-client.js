@@ -183,12 +183,21 @@ class BaileysClient {
 
         // Formatear número (Flexible)
         const jid = this.formatPhone(phone);
-        console.log(`[Baileys] Sending text to ${jid}`);
-
         try {
-            const result = await this.sock.sendMessage(jid, {
+            console.log(`[Baileys] Socket State: ${this.state}. Sending...`);
+
+            // Timeout wrapper to prevent hanging
+            const sendPromise = this.sock.sendMessage(jid, {
                 text: message
             });
+
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Send Timeout (10s)')), 10000)
+            );
+
+            const result = await Promise.race([sendPromise, timeoutPromise]);
+
+            console.log(`[Baileys] ✅ Sent successfully to ${jid}. MessageID: ${result?.key?.id}`);
             return result;
         } catch (err) {
             console.error(`[Baileys] Send Failed to ${jid}:`, err);
