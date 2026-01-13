@@ -66,6 +66,8 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
             }),
             puppeteer: {
                 headless: true,
+                // Use system Chromium on Railway (set via PUPPETEER_EXECUTABLE_PATH env var)
+                executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
                 args: [
                     '--no-sandbox',
                     '--disable-setuid-sandbox',
@@ -73,6 +75,7 @@ app.post('/api/whatsapp/init/:userId', async (req, res) => {
                     '--disable-accelerated-2d-canvas',
                     '--no-first-run',
                     '--no-zygote',
+                    '--single-process',
                     '--disable-gpu'
                 ]
             }
