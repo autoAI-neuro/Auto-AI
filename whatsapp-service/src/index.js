@@ -215,14 +215,41 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 // ============================================
 // INICIALIZAR SERVIDOR
 // ============================================
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`
-╔════════════════════════════════════════════╗
-║   🚀 WhatsApp Service (Baileys) Running    ║
-║                                            ║
-║   Puerto: ${PORT}                          ║
-║   URL: http://0.0.0.0:${PORT}              ║
-║   Ambiente: ${process.env.NODE_ENV || 'development'}               ║
-╚════════════════════════════════════════════╝
-    `);
+// ============================================
+// INICIALIZAR SERVIDOR (MULTI-PORT STRATEGY)
+// ============================================
+// Attempt to listen on multiple ports to catch Railway's traffic regardless of misconfiguration
+const ports = [PORT, 8080, 3000, 3005];
+const uniquePorts = [...new Set(ports)]; // Deduplicate
+
+uniquePorts.forEach(p => {
+    try {
+        const server = express();
+        // Mount the same app logic? No, express apps are functions. 
+        // We can use the same 'app' instance if we create new http servers.
+        // But app.listen creates a server.
+
+        // Note: app.listen() returns an http.Server object.
+        // We can call it multiple times on the same app.
+
+        app.listen(p, '0.0.0.0', () => {
+            console.log(`✅ Server listening on port ${p}`);
+        }).on('error', (err) => {
+            if (err.code === 'EADDRINUSE') {
+                console.log(`⚠️ Port ${p} is already in use (probably by another listener in this loop), skipping.`);
+            } else {
+                console.error(`❌ Failed to listen on port ${p}:`, err.message);
+            }
+        });
+
+    } catch (e) {
+        console.error(`Error trying to listen on port ${p}:`, e);
+    }
 });
+
+console.log(`
+╔════════════════════════════════════════════╗
+║   🚀 WhatsApp Service (Baileys) Starting   ║
+║   Attempting ports: ${uniquePorts.join(', ')}       ║
+╚════════════════════════════════════════════╝
+`);
