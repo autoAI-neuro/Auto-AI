@@ -8,7 +8,13 @@ const app = express();
 const PORT = process.env.PORT || 3005; // 3005 default for Railway
 
 // Middleware
-app.use(cors());
+// Middleware
+app.use(cors({
+    origin: true, // Reflect request origin
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true
+}));
 app.use(express.json());
 
 // Almacenamiento de clientes por usuario/dealer
