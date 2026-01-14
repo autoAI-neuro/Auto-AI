@@ -95,3 +95,31 @@ DEFAULT_TAGS = [
     {"name": "Compró", "color": "#10b981", "icon": "✅", "order": 4},
     {"name": "Perdido", "color": "#ef4444", "icon": "❌", "order": 5},
 ]
+
+
+class Message(Base):
+    """WhatsApp message history for CRM"""
+    __tablename__ = "messages"
+
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    client_id = Column(String, ForeignKey("clients.id", ondelete="CASCADE"), nullable=True)
+    phone = Column(String, nullable=False)  # Phone number (for messages without client)
+    
+    # Message direction
+    direction = Column(String, nullable=False)  # 'outbound' or 'inbound'
+    
+    # Content
+    content = Column(Text, nullable=True)  # Text content
+    media_url = Column(String, nullable=True)  # URL for media messages
+    media_type = Column(String, nullable=True)  # image, video, audio, document
+    
+    # Status
+    status = Column(String, default="sent")  # sent, delivered, read, failed
+    whatsapp_message_id = Column(String, nullable=True)  # ID from WhatsApp
+    
+    # Timestamps
+    sent_at = Column(DateTime(timezone=True), server_default=func.now())
+    delivered_at = Column(DateTime(timezone=True), nullable=True)
+    read_at = Column(DateTime(timezone=True), nullable=True)
+

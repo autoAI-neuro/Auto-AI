@@ -28,6 +28,7 @@ import SettingsView from '../components/SettingsView';
 import ClientForm from '../components/ClientForm';
 import MediaUploader from '../components/MediaUploader';
 import TagSelector from '../components/TagSelector';
+import ConversationView from '../components/ConversationView';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -64,6 +65,7 @@ const Dashboard = () => {
     const [availableTags, setAvailableTags] = useState([]);
     const [activeTagFilter, setActiveTagFilter] = useState(null); // null = all, or tag_id
     const [clientTagsMap, setClientTagsMap] = useState({}); // clientId -> [tagIds]
+    const [conversationClient, setConversationClient] = useState(null); // Client for conversation view
 
     useEffect(() => {
         if (userId) {
@@ -566,6 +568,13 @@ const Dashboard = () => {
 
                                                 <div className="flex items-center gap-2">
                                                     <button
+                                                        onClick={(e) => { e.stopPropagation(); setConversationClient(client); }}
+                                                        className="text-neutral-600 hover:text-purple-400 transition-colors"
+                                                        title="Ver conversación"
+                                                    >
+                                                        <MessageSquare className="w-4 h-4" />
+                                                    </button>
+                                                    <button
                                                         onClick={(e) => { e.stopPropagation(); handleEditClick(client); }}
                                                         className="text-neutral-600 hover:text-blue-400 transition-colors"
                                                     >
@@ -741,6 +750,15 @@ const Dashboard = () => {
                 .custom - scrollbar:: -webkit - scrollbar - thumb { background: #333; border - radius: 10px; }
                 .custom - scrollbar:: -webkit - scrollbar - thumb:hover { background: #444; }
 `}</style>
+
+            {/* Conversation View Modal */}
+            {conversationClient && (
+                <ConversationView
+                    client={conversationClient}
+                    onClose={() => setConversationClient(null)}
+                    onSendMessage={handleQuickSend}
+                />
+            )}
         </div>
     );
 };

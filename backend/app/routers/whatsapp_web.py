@@ -3,9 +3,10 @@ from sqlalchemy.orm import Session
 import httpx
 from typing import List
 from app.db.session import get_db
-from app.models import User
+from app.models import User, Client
 from app.deps import get_current_user
 from app.utils.reliability import message_rate_limiter
+from app.routers.messages import save_outbound_message
 from pydantic import BaseModel
 import os
 
@@ -165,8 +166,22 @@ async def send_whatsapp_message(
         async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.post(url, json=payload, timeout=30.0)
             response.raise_for_status()
+            result = response.json()
             print(f"[Send] SUCCESS for {current_user.id}")
-            return response.json()
+            
+            # Save message to database for CRM history
+            try:
+                save_outbound_message(
+                    db=db,
+                    user_id=str(current_user.id),
+                    phone=request.phone_number,
+                    content=request.message,
+                    whatsapp_message_id=result.get('messageId')
+                )
+            except Exception as save_err:
+                print(f"[Send] Warning: Failed to save message to DB: {save_err}")
+            
+            return result
     except httpx.RequestError as e:
         print(f"[Send] RequestError: {e}")
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")
