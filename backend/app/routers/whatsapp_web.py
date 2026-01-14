@@ -116,7 +116,7 @@ async def get_whatsapp_status(
     except httpx.HTTPStatusError as e:
          raise HTTPException(status_code=e.response.status_code, detail=f"WhatsApp service error: {str(e)}")
 
-@router.post("/send")
+
 
 async def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None):
     """
