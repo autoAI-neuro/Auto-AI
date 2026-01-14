@@ -264,8 +264,7 @@ async def whatsapp_webhook(
         phone=sender_phone,
         direction="inbound",
         content=text,
-        status="received",
-        created_at=datetime.utcnow()
+        status="received"
     )
     db.add(message)
     db.commit()
