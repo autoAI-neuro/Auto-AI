@@ -29,6 +29,7 @@ import ClientForm from '../components/ClientForm';
 import MediaUploader from '../components/MediaUploader';
 import TagSelector from '../components/TagSelector';
 import ConversationView from '../components/ConversationView';
+import AnalyticsView from '../components/AnalyticsView';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -683,6 +684,8 @@ const Dashboard = () => {
                         </div>
                     </div>
                 );
+            case 'analytics':
+                return <AnalyticsView />;
         }
     };
 

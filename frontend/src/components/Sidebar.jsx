@@ -4,12 +4,14 @@ import {
     Calendar,
     Settings,
     LogOut,
-    Menu
+    Menu,
+    PieChart
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) => {
     const menuItems = [
         { id: 'dashboard', label: 'Panel Principal', icon: LayoutDashboard },
+        { id: 'analytics', label: 'Analíticas', icon: PieChart },
         { id: 'calendar', label: 'Calendario', icon: Calendar },
         { id: 'settings', label: 'Configuración', icon: Settings },
     ];
