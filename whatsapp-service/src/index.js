@@ -103,6 +103,35 @@ async function startBaileysDetails(userId) {
             },
             onMessage: async (message) => {
                 console.log("Message received:", message);
+
+                // Forward to Python Backend
+                const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+                const webhookUrl = `${backendUrl}/api/whatsapp/webhook`;
+
+                try {
+                    console.log(`[Webhook] Forwarding to: ${webhookUrl}`);
+                    const response = await fetch(webhookUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            user_id: userId,
+                            platform: "whatsapp",
+                            sender: message.from,
+                            text: message.body,
+                            timestamp: message.timestamp,
+                            pushName: message.pushName
+                        })
+                    });
+
+                    if (response.ok) {
+                        console.log(`[Webhook] Success: ${response.status}`);
+                    } else {
+                        const errText = await response.text();
+                        console.log(`[Webhook] Error ${response.status}: ${errText}`);
+                    }
+                } catch (err) {
+                    console.log(`[Webhook] Fetch error: ${err.message}`);
+                }
             }
         });
 
