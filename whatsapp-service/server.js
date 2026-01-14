@@ -125,6 +125,43 @@ async function initializeSession(userId) {
             }
         });
 
+        // Event: Incoming Messages
+        sock.ev.on('messages.upsert', async ({ messages, type }) => {
+            if (type === 'notify') {
+                for (const msg of messages) {
+                    if (!msg.key.fromMe) {
+                        try {
+                            const sender = msg.key.remoteJid.replace('@s.whatsapp.net', '');
+                            const text = msg.message?.conversation || msg.message?.extendedTextMessage?.text || msg.message?.imageMessage?.caption || "";
+
+                            log(`Received message from ${sender}: ${text}`);
+
+                            // Forward to Python Backend
+                            // Using fetch (available in Node 18+) or axios if installed. Using fetch for native support.
+                            // Assuming backend is at http://127.0.0.1:8000
+                            const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+
+                            await fetch(`${backendUrl}/api/whatsapp/webhook`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    user_id: userId,
+                                    platform: "whatsapp",
+                                    sender: sender,
+                                    text: text,
+                                    timestamp: msg.messageTimestamp,
+                                    raw: msg
+                                })
+                            });
+
+                        } catch (err) {
+                            log(`Error processing incoming message: ${err}`);
+                        }
+                    }
+                }
+            }
+        });
+
     } catch (error) {
         log(`Fatal error for ${userId}: ${error}`);
         const session = sessions.get(userId);

@@ -182,6 +182,88 @@ async def send_whatsapp_message(
          print(f"[Backend] {error_detail}")
          raise HTTPException(status_code=e.response.status_code, detail=error_detail)
 
+@router.post("/webhook")
+async def whatsapp_webhook(
+    payload: dict,
+    db: Session = Depends(get_db)
+):
+    """Receive incoming messages from Node service"""
+    print(f"[Webhook] Received payload: {payload}")
+    
+    user_id = payload.get("user_id")
+    sender_phone = payload.get("sender")
+    text = payload.get("text")
+    
+    if not user_id or not sender_phone:
+        raise HTTPException(status_code=400, detail="Missing user_id or sender")
+
+    # 1. Verify User
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        print(f"[Webhook] User {user_id} not found")
+        return {"status": "ignored"}
+
+    # 2. Find or Create Client
+    client = db.query(Client).filter(
+        Client.user_id == user_id,
+        Client.phone == sender_phone
+    ).first()
+    
+    if not client:
+        # Create new client automatically (Lead Capture)
+        from app.models import get_uuid
+        client = Client(
+            id=get_uuid(),
+            user_id=user_id,
+            name=f"Lead {sender_phone[-4:]}", # Placeholder name
+            phone=sender_phone,
+            status="Nuevo"
+        )
+        db.add(client)
+        db.commit()
+        db.refresh(client)
+        print(f"[Webhook] New client created: {client.id}")
+        
+        # Trigger Automation: CLIENT_CREATED
+        try:
+            from app.routers.automations import trigger_automations
+            trigger_automations(
+                db, user_id, "CLIENT_CREATED", "ANY", 
+                {"client_id": client.id, "client_name": client.name, "client_phone": client.phone}
+            )
+        except Exception as e:
+            print(f"[Webhook] Automation error: {e}")
+
+    # 3. Save Message to DB
+    from app.models import Message, get_uuid
+    from datetime import datetime
+    
+    message = Message(
+        id=get_uuid(),
+        user_id=user_id,
+        client_id=client.id,
+        phone=sender_phone,
+        direction="inbound",
+        content=text,
+        status="received",
+        created_at=datetime.utcnow()
+    )
+    db.add(message)
+    db.commit()
+    print(f"[Webhook] Message saved for client {client.name}")
+    
+    # 4. Trigger Automation: MESSAGE_RECEIVED
+    try:
+        from app.routers.automations import trigger_automations
+        trigger_automations(
+            db, user_id, "MESSAGE_RECEIVED", "ANY", 
+            {"client_id": client.id, "client_name": client.name, "client_phone": client.phone, "message": text}
+        )
+    except Exception as e:
+        print(f"[Webhook] Automation error: {e}")
+
+    return {"status": "processed"}
+
 @router.post("/logout")
 async def logout_whatsapp(
     current_user: User = Depends(get_current_user),
