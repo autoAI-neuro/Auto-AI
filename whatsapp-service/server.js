@@ -155,7 +155,10 @@ async function initializeSession(userId) {
                                     timestamp: msg.messageTimestamp,
                                     raw: msg
                                 })
-                            });
+                            }).then(res => {
+                                log(`[Webhook] Response: ${res.status}`);
+                                if (!res.ok) res.text().then(t => log(`[Webhook] Error: ${t}`));
+                            }).catch(e => log(`[Webhook] Fetch error: ${e.message}`));
 
                         } catch (err) {
                             log(`Error processing incoming message: ${err}`);
