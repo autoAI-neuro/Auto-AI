@@ -1,6 +1,6 @@
 {
     "name": "whatsapp-service-baileys",
-    "version": "2.1.0",
+    "version": "2.2.0",
     "description": "Lightweight WhatsApp Service using Baileys",
     "main": "src/index.js",
     "scripts": {
