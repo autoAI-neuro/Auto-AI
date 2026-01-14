@@ -102,3 +102,51 @@ async def get_dashboard_metrics(
         "activity_chart": activity_chart,
         "conversion_rate": round(conversion_rate, 1)
     }
+
+
+@router.get("/export")
+async def export_data(
+    format: str = "csv",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Export client data in CSV format"""
+    import csv
+    import io
+    from fastapi.responses import StreamingResponse
+    
+    # Fetch all clients for user
+    clients = db.query(Client).filter(Client.user_id == current_user.id).all()
+    
+    # Prepare CSV data
+    output = io.StringIO()
+    writer = csv.writer(output)
+    
+    # Header
+    writer.writerow(['ID', 'Name', 'Phone', 'Email', 'Notes', 'Status', 'Created At', 'Tags'])
+    
+    for client in clients:
+        # Get tags
+        tags = db.query(Tag).join(ClientTag).filter(ClientTag.client_id == client.id).all()
+        tag_names = ", ".join([t.name for t in tags])
+        
+        writer.writerow([
+            client.id,
+            client.name,
+            client.phone,
+            client.email or "",
+            client.notes.replace('\n', ' ') if client.notes else "",
+            client.status or "",
+            client.created_at.strftime("%Y-%m-%d %H:%M:%S") if client.created_at else "",
+            tag_names
+        ])
+    
+    output.seek(0)
+    
+    filename = f"clients_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

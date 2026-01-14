@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, TrendingUp, Users, MessageSquare, DollarSign, Activity, PieChart } from 'lucide-react';
+import { BarChart, TrendingUp, Users, MessageSquare, DollarSign, Activity, PieChart, Download } from 'lucide-react';
+import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
 
@@ -25,6 +26,28 @@ const AnalyticsView = () => {
         }
     };
 
+    const handleExport = async () => {
+        try {
+            const response = await api.get('/analytics/export?format=csv', {
+                headers: { 'Authorization': `Bearer ${token}` },
+                responseType: 'blob'
+            });
+
+            // Create download link
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `reporte_clientes_autoai_${new Date().toLocaleDateString().replace(/\//g, '-')}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.parentNode.removeChild(link);
+            toast.success('Reporte descargado correctamente');
+        } catch (error) {
+            console.error('Export error:', error);
+            toast.error('Error al exportar reporte');
+        }
+    };
+
     if (loading) return (
         <div className="flex items-center justify-center h-64">
             <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
@@ -43,6 +66,17 @@ const AnalyticsView = () => {
 
     return (
         <div className="space-y-6 animate-fade-in p-6">
+            <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-light text-white">Analíticas</h2>
+                <button
+                    onClick={handleExport}
+                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-xl transition-colors text-sm"
+                >
+                    <Download className="w-4 h-4" />
+                    Exportar CSV
+                </button>
+            </div>
+
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-neutral-900/50 border border-white/5 rounded-xl p-4">
