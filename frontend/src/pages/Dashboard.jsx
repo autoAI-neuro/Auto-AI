@@ -89,7 +89,7 @@ const Dashboard = () => {
     const loadClients = async () => {
         try {
             const response = await api.get('/clients', {
-                headers: { 'Authorization': `Bearer ${token} ` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             setClients(response.data || []);
             setStats(s => ({ ...s, totalClients: response.data?.length || 0 }));
@@ -121,7 +121,7 @@ const Dashboard = () => {
         try {
             const response = await api.post('/files/import-clients', formData, {
                 headers: {
-                    'Authorization': `Bearer ${token} `,
+                    'Authorization': `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
                 }
             });
@@ -153,7 +153,7 @@ const Dashboard = () => {
     const downloadBackup = async () => {
         try {
             const response = await api.get('/files/export-backup', {
-                headers: { 'Authorization': `Bearer ${token} ` },
+                headers: { 'Authorization': `Bearer ${token}` },
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -173,15 +173,15 @@ const Dashboard = () => {
         try {
             if (editingClient) {
                 // Update existing client
-                const response = await api.put(`clients / ${editingClient.id} `, clientData, {
-                    headers: { 'Authorization': `Bearer ${token} ` }
+                const response = await api.put(`/clients/${editingClient.id}`, clientData, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 setClients(clients.map(c => c.id === editingClient.id ? response.data : c));
                 showNotification('Cliente actualizado exitosamente', 'success');
             } else {
                 // Create new client
                 const response = await api.post('/clients', clientData, {
-                    headers: { 'Authorization': `Bearer ${token} ` }
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 setClients([...clients, response.data]);
                 showNotification('Cliente agregado exitosamente', 'success');
@@ -203,8 +203,8 @@ const Dashboard = () => {
         if (!confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
 
         try {
-            await api.delete(`clients / ${id} `, {
-                headers: { 'Authorization': `Bearer ${token} ` }
+            await api.delete(`/clients/${id}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             setClients(clients.filter(c => c.id !== id));
             setSelectedClients(selectedClients.filter(cid => cid !== id));
@@ -251,7 +251,7 @@ const Dashboard = () => {
                 phones: selectedPhones,
                 message: message
             }, {
-                headers: { 'Authorization': `Bearer ${token} ` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
 
             setStats(s => ({
@@ -349,7 +349,7 @@ const Dashboard = () => {
                 phones: [phone],
                 message: messageText
             }, {
-                headers: { 'Authorization': `Bearer ${token} ` }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
             showNotification('Mensaje enviado exitosamente', 'success');
             setStats(s => ({ ...s, messagesSent: s.messagesSent + 1 }));
