@@ -117,11 +117,31 @@ async def get_whatsapp_status(
 @router.post("/send")
 async def send_whatsapp_message(
     request: SendMessageRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Send WhatsApp message to a client"""
+    print(f"[Send] User {current_user.id} attempting to send. whatsapp_linked={current_user.whatsapp_linked}")
+    
+    # If DB says not linked, double-check with Node service (DB might be stale)
     if not current_user.whatsapp_linked:
-        raise HTTPException(status_code=400, detail="WhatsApp not linked")
+        print(f"[Send] DB says not linked. Checking Node service directly...")
+        try:
+            check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
+            async with httpx.AsyncClient(trust_env=False) as client:
+                check_resp = await client.get(check_url, timeout=5.0)
+                node_status = check_resp.json().get('status')
+                print(f"[Send] Node status for {current_user.id}: {node_status}")
+                if node_status == 'connected':
+                    # Update DB to match reality
+                    current_user.whatsapp_linked = True
+                    db.commit()
+                    print(f"[Send] Updated DB whatsapp_linked=True for {current_user.id}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"WhatsApp not linked (Node status: {node_status})")
+        except httpx.RequestError as e:
+            print(f"[Send] Failed to check Node status: {e}")
+            raise HTTPException(status_code=400, detail="WhatsApp not linked and cannot verify")
     
     try:
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
@@ -130,11 +150,14 @@ async def send_whatsapp_message(
             "phoneNumber": request.phone_number,
             "message": request.message
         }
+        print(f"[Send] Calling Node: {url} with payload userId={current_user.id}")
         async with httpx.AsyncClient(trust_env=False) as client:
             response = await client.post(url, json=payload, timeout=30.0)
             response.raise_for_status()
+            print(f"[Send] SUCCESS for {current_user.id}")
             return response.json()
     except httpx.RequestError as e:
+        print(f"[Send] RequestError: {e}")
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")
     except httpx.HTTPStatusError as e:
          error_detail = f"WhatsApp service error: {e.response.text}"
@@ -170,11 +193,27 @@ class BulkMessageRequest(BaseModel):
 @router.post("/send-bulk")
 async def send_bulk_messages(
     request: BulkMessageRequest,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
 ):
     """Send WhatsApp message to multiple clients"""
+    print(f"[SendBulk] User {current_user.id} attempting bulk send. whatsapp_linked={current_user.whatsapp_linked}")
+    
+    # Smart check: verify with Node if DB says not linked
     if not current_user.whatsapp_linked:
-        raise HTTPException(status_code=400, detail="WhatsApp not linked")
+        try:
+            check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
+            async with httpx.AsyncClient(trust_env=False) as client:
+                check_resp = await client.get(check_url, timeout=5.0)
+                node_status = check_resp.json().get('status')
+                if node_status == 'connected':
+                    current_user.whatsapp_linked = True
+                    db.commit()
+                    print(f"[SendBulk] Updated DB whatsapp_linked=True for {current_user.id}")
+                else:
+                    raise HTTPException(status_code=400, detail=f"WhatsApp not linked (status: {node_status})")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=400, detail="WhatsApp not linked")
     
     results = {
         "total": len(request.phones),
