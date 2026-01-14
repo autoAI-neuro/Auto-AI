@@ -66,22 +66,27 @@ class BaileysClient {
 
                 if (connection === 'close') {
                     const reason = lastDisconnect?.error?.output?.statusCode;
-                    const shouldReconnect = reason !== DisconnectReason.loggedOut;
+                    let shouldReconnect = reason !== DisconnectReason.loggedOut;
 
                     console.log(`Conexión cerrada. Razón: ${reason} (${lastDisconnect?.error?.message}). Reconectar: ${shouldReconnect}`);
 
                     this.state = 'disconnected';
 
+                    // 408 Fix: QR Timeout / Expired - DON'T loop forever
+                    if (reason === 408) {
+                        console.log("⚠️ Error 408 detected (QR expired/timeout). Clearing session to allow fresh start.");
+                        this.clearAuth();
+                        shouldReconnect = false; // Stop the loop
+                        if (this.callbacks.onDisconnected) {
+                            this.callbacks.onDisconnected('qr_expired');
+                        }
+                    }
+
                     // 515 Fix: Stream Restart Loop
                     if (reason === 515) {
                         console.log("⚠️ Error 515 detected (Stream Restart). Possible session corruption.");
-                        // Optional: Counter to only clear after X failures? 
-                        // For now, let's keep it safe. If it happens, Baileys usually retries internally.
-                        // BUT if the user reports a loop, we might need to be aggressive.
-                        // Strategy: Let it retry once. If it happens again quickly, we are in trouble.
-
                         // Actually, 515 is "restart required". Baileys SHOULD handle it.
-                        // PROPOSAL: Don't clear immediately. Reconnect.
+                        // PROPOSAL: Don't clear immediately. Reconnect with longer delay.
                     }
 
                     if (shouldReconnect) {
@@ -92,9 +97,11 @@ class BaileysClient {
                         setTimeout(() => this.connect(), delay);
                     } else {
                         // Sesión cerrada, limpiar auth
-                        console.log("Session logged out. Clearing auth...");
-                        this.clearAuth();
-                        if (this.callbacks.onDisconnected) {
+                        console.log("Session ended. Cleaning up...");
+                        if (reason !== 408) { // Already cleared for 408 above
+                            this.clearAuth();
+                        }
+                        if (this.callbacks.onDisconnected && reason !== 408) { // Already called for 408
                             this.callbacks.onDisconnected('logged_out');
                         }
                     }
