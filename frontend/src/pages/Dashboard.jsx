@@ -1,7 +1,7 @@
-```
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api, { whatsappApi } from '../config';
 import { jwtDecode } from "jwt-decode";
 import {
@@ -71,49 +71,13 @@ const Dashboard = () => {
     }, [userId]);
 
     const checkWhatsappStatus = async () => {
-            // NOTE: Onboarding uses `whatsappApi` (Node). Dashboard uses `api` (Python -> internal or Node?).
-            // Previous fix used `whatsappApi` for direct Node access. Dashboard might be hitting Python which doesn't proxy status?
-            // Let's switch Dashboard to use `whatsappApi` just like Onboarding for consistency.
+        if (!userId) return;
 
-            // Need to import whatsappApi first (Assuming it is exported from ../config)
-
-            // Decoding token manually here is annoying. 
-            // Better to match Onboarding's logic or use a helper.
-            // For now, let's assume we can get userId from the auth context or decode it.
-
-            // Temporary fix: If we are using `api` (Python), maybe it proxies?
-            // If the user says "re-logging fixes it", it implies re-running Onboarding logic works.
-
-            // Let's just use the same logic as "Auto-Heal":
-            // 1. Check Status
-            // 2. If disconnected -> Call Init (blindly) -> This forces backend to look at disk and restore.
-
-            // We need userId.
-            const getUserId = (t) => {
-                if (!t) return null;
-                try {
-                    const base64Url = t.split('.')[1];
-                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-                    const jsonPayload = decodeURIComponent(window.atob(base64).split('').map(function (c) {
-                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
-                    }).join(''));
-                    const decoded = JSON.parse(jsonPayload);
-                    return decoded.sub || decoded.user_id;
-                } catch (e) { return null; }
-            };
-
-            const uid = getUserId(token);
-            if (!uid) return;
-
-            // Import whatsappApi dynamically or assume it's available?
-            // Ideally we change the import at the top. But for this block:
-
-            // We'll use the 'api' instance but point to the whatsapp URL if possible, or just standard fetch
-            // consistently with Onboarding.
-
-            // Actually, let's fix the Import at the top first, then this function.
-            // I will use a multi-step replacement.
-
+        try {
+            // Use whatsappApi directly for accurate status
+            const response = await whatsappApi.get(`/api/whatsapp/status/${userId}`);
+            const data = response.data;
+            setWhatsappStatus(data.status);
         } catch (err) {
             console.error('Error checking WhatsApp status:', err);
             setWhatsappStatus('error');
@@ -123,7 +87,7 @@ const Dashboard = () => {
     const loadClients = async () => {
         try {
             const response = await api.get('/clients', {
-                headers: { 'Authorization': `Bearer ${ token } ` }
+                headers: { 'Authorization': `Bearer ${token} ` }
             });
             setClients(response.data || []);
             setStats(s => ({ ...s, totalClients: response.data?.length || 0 }));
@@ -155,18 +119,18 @@ const Dashboard = () => {
         try {
             const response = await api.post('/files/import-clients', formData, {
                 headers: {
-                    'Authorization': `Bearer ${ token } `,
+                    'Authorization': `Bearer ${token} `,
                     'Content-Type': 'multipart/form-data'
                 }
             });
             const count = response.data.imported_count;
             if (count > 0) {
-                showNotification(`Importados ${ count } clientes`, 'success');
+                showNotification(`Importados ${count} clientes`, 'success');
             } else {
                 // Formatting debug info for user viewing (simple alert or console for now)
                 const debugInfo = response.data.debug_info?.join('\n') || "No data";
                 console.log("IMPORT DEBUG:", debugInfo);
-                alert(`0 Clientes importados.\n\nDIAGNÓSTICO: \n${ debugInfo } `);
+                alert(`0 Clientes importados.\n\nDIAGNÓSTICO: \n${debugInfo} `);
                 showNotification(`0 importados.Ver alerta con detalles.`, 'error');
             }
             loadClients();
@@ -178,7 +142,7 @@ const Dashboard = () => {
     };
 
     const handleExport = () => {
-        const url = `files /export -backup ? token = ${ token } `; // Assuming simplified auth or handling auth via axios blob
+        const url = `files /export -backup ? token = ${token} `; // Assuming simplified auth or handling auth via axios blob
         // Using blob method for better header handling usually, but direct link works if cookie/token handled. 
         // Let's use the blob method from before for reliability with Bearer token header.
         downloadBackup();
@@ -187,13 +151,13 @@ const Dashboard = () => {
     const downloadBackup = async () => {
         try {
             const response = await api.get('/files/export-backup', {
-                headers: { 'Authorization': `Bearer ${ token } ` },
+                headers: { 'Authorization': `Bearer ${token} ` },
                 responseType: 'blob'
             });
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `backup_clientes_${ new Date().toISOString().split('T')[0] }.csv`);
+            link.setAttribute('download', `backup_clientes_${new Date().toISOString().split('T')[0]}.csv`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -207,15 +171,15 @@ const Dashboard = () => {
         try {
             if (editingClient) {
                 // Update existing client
-                const response = await api.put(`clients / ${ editingClient.id } `, clientData, {
-                    headers: { 'Authorization': `Bearer ${ token } ` }
+                const response = await api.put(`clients / ${editingClient.id} `, clientData, {
+                    headers: { 'Authorization': `Bearer ${token} ` }
                 });
                 setClients(clients.map(c => c.id === editingClient.id ? response.data : c));
                 showNotification('Cliente actualizado exitosamente', 'success');
             } else {
                 // Create new client
                 const response = await api.post('/clients', clientData, {
-                    headers: { 'Authorization': `Bearer ${ token } ` }
+                    headers: { 'Authorization': `Bearer ${token} ` }
                 });
                 setClients([...clients, response.data]);
                 showNotification('Cliente agregado exitosamente', 'success');
@@ -237,8 +201,8 @@ const Dashboard = () => {
         if (!confirm('¿Estás seguro de que quieres eliminar este cliente?')) return;
 
         try {
-            await api.delete(`clients / ${ id } `, {
-                headers: { 'Authorization': `Bearer ${ token } ` }
+            await api.delete(`clients / ${id} `, {
+                headers: { 'Authorization': `Bearer ${token} ` }
             });
             setClients(clients.filter(c => c.id !== id));
             setSelectedClients(selectedClients.filter(cid => cid !== id));
@@ -285,14 +249,14 @@ const Dashboard = () => {
                 phones: selectedPhones,
                 message: message
             }, {
-                headers: { 'Authorization': `Bearer ${ token } ` }
+                headers: { 'Authorization': `Bearer ${token} ` }
             });
 
             setStats(s => ({
                 ...s,
                 messagesSent: s.messagesSent + selectedClients.length
             }));
-            showNotification(`¡Mensaje enviado a ${ selectedClients.length } clientes!`, 'success');
+            showNotification(`¡Mensaje enviado a ${selectedClients.length} clientes!`, 'success');
             setMessage('');
             setSelectedClients([]);
         } catch (err) {
@@ -304,8 +268,13 @@ const Dashboard = () => {
     };
 
     const showNotification = (text, type = 'info') => {
-        setNotification({ text, type });
-        setTimeout(() => setNotification(null), 3000);
+        if (type === 'success') {
+            toast.success(text);
+        } else if (type === 'error') {
+            toast.error(text);
+        } else {
+            toast(text);
+        }
     };
 
     const handleLogout = () => {
@@ -332,7 +301,7 @@ const Dashboard = () => {
                 phones: [phone],
                 message: messageText
             }, {
-                headers: { 'Authorization': `Bearer ${ token } ` }
+                headers: { 'Authorization': `Bearer ${token} ` }
             });
             showNotification('Mensaje enviado exitosamente', 'success');
             setStats(s => ({ ...s, messagesSent: s.messagesSent + 1 }));
@@ -437,18 +406,16 @@ const Dashboard = () => {
                                             <div
                                                 key={client.id}
                                                 onClick={() => toggleSelectClient(client.id)}
-                                                className={`flex items - center justify - between p - 3 rounded - lg border cursor - pointer transition - all ${
-    selectedClients.includes(client.id)
-    ? 'bg-blue-500/10 border-blue-500/30'
-    : 'bg-neutral-800/30 border-transparent hover:border-white/10'
-} `}
+                                                className={`flex items - center justify - between p - 3 rounded - lg border cursor - pointer transition - all ${selectedClients.includes(client.id)
+                                                    ? 'bg-blue-500/10 border-blue-500/30'
+                                                    : 'bg-neutral-800/30 border-transparent hover:border-white/10'
+                                                    } `}
                                             >
                                                 <div className="flex items-center gap-3">
-                                                    <div className={`w - 5 h - 5 rounded - md border flex items - center justify - center ${
-    selectedClients.includes(client.id)
-    ? 'bg-blue-500 border-blue-500'
-    : 'border-neutral-600'
-} `}>
+                                                    <div className={`w - 5 h - 5 rounded - md border flex items - center justify - center ${selectedClients.includes(client.id)
+                                                        ? 'bg-blue-500 border-blue-500'
+                                                        : 'border-neutral-600'
+                                                        } `}>
                                                         {selectedClients.includes(client.id) && (
                                                             <CheckCircle className="w-3 h-3 text-white" />
                                                         )}
@@ -493,7 +460,7 @@ const Dashboard = () => {
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-neutral-400">
                                             {selectedClients.length > 0
-                                                ? `${ selectedClients.length } cliente${ selectedClients.length > 1 ? 's' : '' } seleccionado${ selectedClients.length > 1 ? 's' : '' } `
+                                                ? `${selectedClients.length} cliente${selectedClients.length > 1 ? 's' : ''} seleccionado${selectedClients.length > 1 ? 's' : ''} `
                                                 : 'Ningún cliente seleccionado'
                                             }
                                         </span>
@@ -524,11 +491,10 @@ const Dashboard = () => {
                                     <button
                                         onClick={sendMessage}
                                         disabled={sending || selectedClients.length === 0 || !message.trim()}
-                                        className={`w - full py - 3.5 rounded - xl font - medium flex items - center justify - center gap - 2 transition - all ${
-    sending || selectedClients.length === 0 || !message.trim()
-    ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
-    : 'bg-white text-black hover:bg-neutral-200'
-} `}
+                                        className={`w - full py - 3.5 rounded - xl font - medium flex items - center justify - center gap - 2 transition - all ${sending || selectedClients.length === 0 || !message.trim()
+                                            ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
+                                            : 'bg-white text-black hover:bg-neutral-200'
+                                            } `}
                                     >
                                         {sending ? (
                                             <>
@@ -568,11 +534,10 @@ const Dashboard = () => {
 
             {/* Notification Toast */}
             {notification && (
-                <div className={`fixed top - 6 right - 6 z - 50 px - 4 py - 3 rounded - xl border backdrop - blur - xl flex items - center gap - 2 animate - slideIn ${
-    notification.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
-    notification.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
-        'bg-neutral-800/50 border-neutral-700 text-neutral-300'
-} `}>
+                <div className={`fixed top - 6 right - 6 z - 50 px - 4 py - 3 rounded - xl border backdrop - blur - xl flex items - center gap - 2 animate - slideIn ${notification.type === 'success' ? 'bg-green-500/10 border-green-500/30 text-green-400' :
+                    notification.type === 'error' ? 'bg-red-500/10 border-red-500/30 text-red-400' :
+                        'bg-neutral-800/50 border-neutral-700 text-neutral-300'
+                    } `}>
                     {notification.type === 'success' && <CheckCircle className="w-4 h-4" />}
                     {notification.type === 'error' && <AlertCircle className="w-4 h-4" />}
                     {notification.text}
@@ -597,14 +562,12 @@ const Dashboard = () => {
                             activeTab === 'calendar' ? 'Calendario' : 'Configuración'
                     }</h2>
 
-                    <div className={`flex items - center gap - 2 px - 3 py - 1 rounded - full text - xs ${
-    whatsappStatus === 'connected'
-    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
-    : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
-} `}>
-                        <div className={`w - 2 h - 2 rounded - full ${
-    whatsappStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
-} `} />
+                    <div className={`flex items - center gap - 2 px - 3 py - 1 rounded - full text - xs ${whatsappStatus === 'connected'
+                        ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                        : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                        } `}>
+                        <div className={`w - 2 h - 2 rounded - full ${whatsappStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500 animate-pulse'
+                            } `} />
                         WhatsApp {whatsappStatus === 'connected' ? 'Conectado' : 'Desconectado'}
                     </div>
                 </header>
