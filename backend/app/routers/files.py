@@ -222,3 +222,107 @@ async def export_backup(
     )
     response.headers["Content-Disposition"] = f"attachment; filename=backup_clientes_{datetime.date.today()}.csv"
     return response
+
+
+# ============================================
+# MEDIA UPLOAD FOR WHATSAPP
+# ============================================
+import uuid
+import shutil
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+# Media storage directory
+MEDIA_DIR = Path("uploads/media")
+MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+
+# Allowed media types
+ALLOWED_MEDIA_TYPES = {
+    "image/jpeg": "image",
+    "image/png": "image",
+    "image/gif": "image",
+    "image/webp": "image",
+    "video/mp4": "video",
+    "video/quicktime": "video",
+    "audio/mpeg": "audio",
+    "audio/mp4": "audio",
+    "audio/ogg": "audio",
+    "application/pdf": "document",
+    "application/msword": "document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",
+}
+
+@router.post("/upload-media")
+async def upload_media(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Upload media file for WhatsApp sending. Returns public URL."""
+    
+    # Validate file type
+    content_type = file.content_type
+    if content_type not in ALLOWED_MEDIA_TYPES:
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Unsupported file type: {content_type}. Allowed: images, videos, audio, documents"
+        )
+    
+    media_type = ALLOWED_MEDIA_TYPES[content_type]
+    
+    # Generate unique filename
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'bin'
+    unique_name = f"{uuid.uuid4()}.{ext}"
+    file_path = MEDIA_DIR / unique_name
+    
+    # Save file
+    try:
+        with open(file_path, 'wb') as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
+    
+    # Get base URL from environment or use Railway URL
+    base_url = os.getenv("BACKEND_PUBLIC_URL", "https://auto-ai-production-b99a.up.railway.app")
+    media_url = f"{base_url}/media/{unique_name}"
+    
+    return {
+        "status": "uploaded",
+        "media_url": media_url,
+        "media_type": media_type,
+        "filename": file.filename,
+        "size": file_path.stat().st_size
+    }
+
+
+@router.get("/media/{filename}")
+async def serve_media(filename: str):
+    """Serve uploaded media files"""
+    file_path = MEDIA_DIR / filename
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    # Determine content type from extension
+    ext = filename.split('.')[-1].lower()
+    content_types = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'mov': 'video/quicktime',
+        'mp3': 'audio/mpeg',
+        'm4a': 'audio/mp4',
+        'pdf': 'application/pdf',
+        'doc': 'application/msword',
+        'docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    }
+    
+    media_type = content_types.get(ext, 'application/octet-stream')
+    
+    return StreamingResponse(
+        open(file_path, 'rb'),
+        media_type=media_type
+    )
+

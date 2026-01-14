@@ -252,3 +252,56 @@ async def send_bulk_messages(
                 results["errors"].append({"phone": phone, "error": str(e)})
                 
     return results
+
+
+class SendMediaRequest(BaseModel):
+    phone_number: str
+    media_url: str
+    media_type: str  # image, video, audio, document
+    caption: str = ""
+
+@router.post("/send-media")
+async def send_whatsapp_media(
+    request: SendMediaRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Send media (image/video/document) via WhatsApp"""
+    print(f"[SendMedia] User {current_user.id} sending {request.media_type}")
+    
+    # Smart linked check
+    if not current_user.whatsapp_linked:
+        try:
+            check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
+            async with httpx.AsyncClient(trust_env=False) as client:
+                check_resp = await client.get(check_url, timeout=5.0)
+                node_status = check_resp.json().get('status')
+                if node_status == 'connected':
+                    current_user.whatsapp_linked = True
+                    db.commit()
+                else:
+                    raise HTTPException(status_code=400, detail=f"WhatsApp not linked (status: {node_status})")
+        except httpx.RequestError as e:
+            raise HTTPException(status_code=400, detail="WhatsApp not linked")
+    
+    try:
+        url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send-media"
+        payload = {
+            "userId": str(current_user.id),
+            "phoneNumber": request.phone_number,
+            "mediaUrl": request.media_url,
+            "mediaType": request.media_type,
+            "caption": request.caption
+        }
+        async with httpx.AsyncClient(trust_env=False) as client:
+            response = await client.post(url, json=payload, timeout=60.0)  # Longer timeout for media
+            response.raise_for_status()
+            print(f"[SendMedia] SUCCESS for {current_user.id}")
+            return response.json()
+    except httpx.RequestError as e:
+        print(f"[SendMedia] RequestError: {e}")
+        raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        error_detail = f"WhatsApp service error: {e.response.text}"
+        print(f"[SendMedia] {error_detail}")
+        raise HTTPException(status_code=e.response.status_code, detail=error_detail)
