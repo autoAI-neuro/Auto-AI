@@ -283,7 +283,7 @@ async def upload_media(
     
     # Get base URL from environment or use Railway URL
     base_url = os.getenv("BACKEND_PUBLIC_URL", "https://auto-ai-production-b99a.up.railway.app")
-    media_url = f"{base_url}/media/{unique_name}"
+    media_url = f"{base_url}/files/media/{unique_name}"
     
     return {
         "status": "uploaded",
