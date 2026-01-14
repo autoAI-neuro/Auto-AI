@@ -137,9 +137,12 @@ async function initializeSession(userId) {
                             log(`Received message from ${sender}: ${text}`);
 
                             // Forward to Python Backend
-                            // Using fetch (available in Node 18+) or axios if installed. Using fetch for native support.
-                            // Assuming backend is at http://127.0.0.1:8000
-                            const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
+                            // Use BACKEND_URL env var. In Railway, set this to internal service URL or public URL.
+                            // Default to Railway internal service name if RAILWAY_PRIVATE_DOMAIN exists, else localhost for local dev.
+                            const backendUrl = process.env.BACKEND_URL ||
+                                (process.env.RAILWAY_PRIVATE_DOMAIN ?
+                                    `http://backend.railway.internal:8000` :
+                                    'http://127.0.0.1:8000');
 
                             await fetch(`${backendUrl}/api/whatsapp/webhook`, {
                                 method: 'POST',
