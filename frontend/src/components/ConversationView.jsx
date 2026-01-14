@@ -23,6 +23,39 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
         scrollToBottom();
     }, [messages]);
 
+    // Polling for new messages
+    useEffect(() => {
+        if (!client?.id) return;
+
+        let intervalId;
+
+        const pollMessages = async () => {
+            try {
+                // Silent fetch (no loading spinner)
+                const response = await api.get(`/messages/conversation/${client.id}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                // Only update if length changed to avoid re-renders/jumps
+                // Or better, just setMessages(response.data) as React handles diffing
+                // But let's check length to be efficient if possible, or just set it.
+                // Simple set is fine.
+                setMessages(prev => {
+                    if (JSON.stringify(prev) !== JSON.stringify(response.data)) {
+                        return response.data;
+                    }
+                    return prev;
+                });
+            } catch (err) {
+                console.error('Polling error:', err);
+            }
+        };
+
+        // Poll every 3 seconds
+        intervalId = setInterval(pollMessages, 3000);
+
+        return () => clearInterval(intervalId);
+    }, [client?.id, token]);
+
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
