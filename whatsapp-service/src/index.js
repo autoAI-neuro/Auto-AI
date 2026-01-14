@@ -253,6 +253,48 @@ app.post('/api/whatsapp/logout/:userId', async (req, res) => {
 });
 
 // ============================================
+// LIMPIAR SESIÓN CORRUPTA (Sin logout de WA)
+// ============================================
+app.post('/api/whatsapp/clear-session/:userId', async (req, res) => {
+    const { userId } = req.params;
+
+    console.log(`🧹 Clearing session for userId: ${userId}`);
+
+    // 1. Matar cliente activo si existe
+    const client = clients.get(userId);
+    if (client) {
+        try {
+            // No hacer logout (eso cierra en WhatsApp), solo destruir localmente
+            if (client.sock) {
+                client.sock.end(); // Force close socket
+            }
+        } catch (e) {
+            console.error(`Error destroying socket for ${userId}:`, e);
+        }
+        clients.delete(userId);
+    }
+    pendingQRs.delete(userId);
+
+    // 2. Limpiar archivos de auth
+    const authFolder = require('path').join(process.cwd(), 'auth_info', userId);
+    const fs = require('fs');
+    try {
+        if (fs.existsSync(authFolder)) {
+            fs.rmSync(authFolder, { recursive: true, force: true });
+            console.log(`🗑️ Auth folder deleted: ${authFolder}`);
+        }
+    } catch (e) {
+        console.error(`Error deleting auth folder for ${userId}:`, e);
+    }
+
+    res.json({
+        status: 'cleared',
+        message: 'Sesión limpiada. Escanea el QR de nuevo.',
+        userId: userId
+    });
+});
+
+// ============================================
 // INICIAR SERVIDOR
 // ============================================
 // ============================================
