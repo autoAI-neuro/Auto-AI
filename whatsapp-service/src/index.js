@@ -106,7 +106,7 @@ async function startBaileysDetails(userId) {
 
                 // Forward to Python Backend
                 const backendUrl = process.env.BACKEND_URL || 'http://127.0.0.1:8000';
-                const webhookUrl = `${backendUrl}/api/whatsapp/webhook`;
+                const webhookUrl = `${backendUrl}/whatsapp/webhook`;
 
                 try {
                     console.log(`[Webhook] Forwarding to: ${webhookUrl}`);
