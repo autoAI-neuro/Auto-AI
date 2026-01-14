@@ -487,21 +487,31 @@ const Dashboard = () => {
                                 {/* Tag Filter Bar */}
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     <button
-                                        onClick={() => selectClientsByTag(null)}
-                                        className={`px-3 py-1 text-xs rounded-full transition-all ${activeTagFilter === null
-                                                ? 'bg-white text-black font-medium'
-                                                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                        onClick={() => { selectClientsByTag(null); setSelectedClients([]); }}
+                                        className={`px-3 py-1 text-xs rounded-full transition-all ${activeTagFilter === null && selectedClients.length === 0
+                                            ? 'bg-white text-black font-medium'
+                                            : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
                                             }`}
                                     >
-                                        Todos
+                                        Limpiar
                                     </button>
+                                    <button
+                                        onClick={() => { setActiveTagFilter(null); setSelectedClients(clients.map(c => c.id)); showNotification(`${clients.length} clientes seleccionados`, 'success'); }}
+                                        className={`px-3 py-1 text-xs rounded-full transition-all ${selectedClients.length === clients.length && clients.length > 0
+                                            ? 'bg-green-600 text-white font-medium'
+                                            : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                            }`}
+                                    >
+                                        ✓ Seleccionar Todos
+                                    </button>
+                                    <span className="border-l border-neutral-700 mx-1"></span>
                                     {availableTags.map(tag => (
                                         <button
                                             key={tag.id}
                                             onClick={() => selectClientsByTag(tag.id)}
                                             className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${activeTagFilter === tag.id
-                                                    ? 'ring-2 ring-white font-medium'
-                                                    : 'hover:opacity-80'
+                                                ? 'ring-2 ring-white font-medium'
+                                                : 'hover:opacity-80'
                                                 }`}
                                             style={{
                                                 backgroundColor: tag.color,
