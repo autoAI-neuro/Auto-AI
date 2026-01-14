@@ -26,6 +26,7 @@ import Sidebar from '../components/Sidebar';
 import CalendarView from '../components/CalendarView';
 import SettingsView from '../components/SettingsView';
 import ClientForm from '../components/ClientForm';
+import MediaUploader from '../components/MediaUploader';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -58,6 +59,7 @@ const Dashboard = () => {
         messagesSent: 0,
         successRate: 100
     });
+    const [showMediaUploader, setShowMediaUploader] = useState(false);
 
     useEffect(() => {
         if (userId) {
@@ -262,6 +264,52 @@ const Dashboard = () => {
         } catch (err) {
             console.error('Error sending message:', err);
             showNotification('Error al enviar mensajes', 'error');
+        } finally {
+            setSending(false);
+        }
+    };
+
+    // Send media to selected clients
+    const handleSendMedia = async (mediaData) => {
+        if (selectedClients.length === 0) {
+            showNotification('Selecciona al menos un cliente', 'error');
+            return;
+        }
+
+        setSending(true);
+        setShowMediaUploader(false);
+
+        try {
+            const selectedPhones = clients
+                .filter(c => selectedClients.includes(c.id))
+                .map(c => c.phone);
+
+            let successCount = 0;
+            for (const phone of selectedPhones) {
+                try {
+                    await api.post('/whatsapp/send-media', {
+                        phone_number: phone,
+                        media_url: mediaData.media_url,
+                        media_type: mediaData.media_type,
+                        caption: mediaData.caption
+                    }, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    successCount++;
+                } catch (err) {
+                    console.error(`Error sending media to ${phone}:`, err);
+                }
+            }
+
+            if (successCount > 0) {
+                showNotification(`¡Media enviada a ${successCount} clientes!`, 'success');
+                setSelectedClients([]);
+            } else {
+                showNotification('Error al enviar media', 'error');
+            }
+        } catch (err) {
+            console.error('Error sending media:', err);
+            showNotification('Error al enviar media', 'error');
         } finally {
             setSending(false);
         }
@@ -482,10 +530,25 @@ const Dashboard = () => {
                                         className="input-elegant resize-none flex-1"
                                     />
 
-                                    {/* Character count */}
-                                    <div className="flex justify-end">
+                                    {/* Character count and attach button */}
+                                    <div className="flex justify-between items-center">
+                                        <button
+                                            onClick={() => setShowMediaUploader(!showMediaUploader)}
+                                            className="flex items-center gap-1 text-purple-400 hover:text-purple-300 text-sm"
+                                        >
+                                            <Upload className="w-4 h-4" />
+                                            {showMediaUploader ? 'Cancelar' : 'Adjuntar Foto/Video'}
+                                        </button>
                                         <span className="text-xs text-neutral-500">{message.length} caracteres</span>
                                     </div>
+
+                                    {/* Media Uploader */}
+                                    {showMediaUploader && (
+                                        <MediaUploader
+                                            onMediaReady={handleSendMedia}
+                                            onCancel={() => setShowMediaUploader(false)}
+                                        />
+                                    )}
 
                                     {/* Send button */}
                                     <button
