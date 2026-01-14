@@ -16,6 +16,11 @@ WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005"
 
 app = FastAPI(title="AUTOAI API", version=APP_VERSION)
 
+@app.on_event("startup")
+async def startup_event():
+    from app.services.scheduler import start_scheduler
+    start_scheduler()
+
 # CORS Configuration - Must be added BEFORE including routers
 app.add_middleware(
     CORSMiddleware,

@@ -180,11 +180,51 @@ async def execute_action(db: Session, user_id: str, action: AutomationAction, co
             from app.routers.whatsapp_web import send_message_internal
             await send_message_internal(db, user_id, client_phone, final_message)
             
+            # Use the internal helper to send
+            from app.routers.whatsapp_web import send_message_internal
+            await send_message_internal(db, user_id, client_phone, final_message)
+            
         elif action.action_type == "WAIT":
-             # TODO: Implementing delays requires a task queue/scheduler (Phase 3.2)
-             print(f"[Automation] Wait action not yet implemented (Phase 3.2)")
+             delay_minutes = int(action.action_payload.get("delay_minutes", 0))
+             if delay_minutes > 0:
+                 from app.services.scheduler import schedule_action_execution
+                 from datetime import datetime, timedelta
+                 
+                 run_date = datetime.now() + timedelta(minutes=delay_minutes)
+                 
+                 # Determine next action in the chain
+                 next_action = db.query(AutomationAction).filter(
+                     AutomationAction.automation_id == action.automation_id,
+                     AutomationAction.order_index > action.order_index
+                 ).order_by(AutomationAction.order_index).first()
+                 
+                 if next_action:
+                     print(f"[Automation] Scheduling next action {next_action.id} in {delay_minutes} mins")
+                     # We need a wrapper to execute action from scheduler context
+                     # Since we can't pass DB session easily, the scheduled job needs to create its own session
+                     await schedule_action_execution(execute_action_job, run_date, args=[user_id, next_action.id, context])
+                 else:
+                     print("[Automation] Wait finished, but no further actions.")
 
     except Exception as e:
         print(f"[Automation] Error executing action {action.id}: {e}")
+
+async def execute_action_job(user_id: str, action_id: str, context: dict):
+    """Wrapper for scheduled execution that manages DB session"""
+    from app.db.session import SessionLocal
+    from app.models import AutomationAction
+    
+    db = SessionLocal()
+    try:
+        action = db.query(AutomationAction).filter(AutomationAction.id == action_id).first()
+        if action:
+            print(f"[Scheduler] Executing deferred action {action_id}")
+            await execute_action(db, user_id, action, context)
+        else:
+            print(f"[Scheduler] Action {action_id} not found (might have been deleted)")
+    except Exception as e:
+         print(f"[Scheduler] Error executing job: {e}")
+    finally:
+        db.close()
 
 
