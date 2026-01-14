@@ -49,6 +49,7 @@ def debug_connectivity():
 class SendMessageRequest(BaseModel):
     phone_number: str
     message: str
+    client_id: str = None
 
 @router.post("/init")
 async def initialize_whatsapp(
@@ -118,7 +119,7 @@ async def get_whatsapp_status(
 
 
 
-async def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None):
+async def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None, client_id: str = None):
     """
     Internal helper to send messages via Node service and save to DB.
     Used by:
@@ -147,7 +148,8 @@ async def send_message_internal(db: Session, user_id: str, phone: str, message: 
             user_id=user_id,
             phone=phone,
             content=message,
-            whatsapp_message_id=result.get('messageId')
+            whatsapp_message_id=result.get('messageId'),
+            client_id=client_id
         )
         return result
 
@@ -173,7 +175,13 @@ async def send_whatsapp_message(
          raise HTTPException(status_code=400, detail="WhatsApp not linked")
 
     try:
-        return await send_message_internal(db, str(current_user.id), request.phone_number, request.message)
+        return await send_message_internal(
+            db, 
+            str(current_user.id), 
+            request.phone_number, 
+            request.message,
+            client_id=request.client_id
+        )
     except httpx.RequestError as e:
         print(f"[Send] RequestError: {e}")
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")

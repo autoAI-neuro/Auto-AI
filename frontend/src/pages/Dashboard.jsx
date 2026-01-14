@@ -392,13 +392,15 @@ const Dashboard = () => {
 
     const handleQuickSend = async (phone, messageText) => {
         try {
-            await api.post('/whatsapp/send-bulk', {
-                phones: [phone],
-                message: messageText
+            // Use singular send endpoint for better tracking and client linking
+            await api.post('/whatsapp/send', {
+                phone_number: phone,
+                message: messageText,
+                client_id: conversationClient?.id
             }, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            showNotification('Mensaje enviado exitosamente', 'success');
+            showNotification('Mensaje enviado', 'success');
             setStats(s => ({ ...s, messagesSent: s.messagesSent + 1 }));
             return true;
         } catch (err) {
