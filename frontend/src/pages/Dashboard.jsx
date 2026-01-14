@@ -61,11 +61,15 @@ const Dashboard = () => {
         successRate: 100
     });
     const [showMediaUploader, setShowMediaUploader] = useState(false);
+    const [availableTags, setAvailableTags] = useState([]);
+    const [activeTagFilter, setActiveTagFilter] = useState(null); // null = all, or tag_id
+    const [clientTagsMap, setClientTagsMap] = useState({}); // clientId -> [tagIds]
 
     useEffect(() => {
         if (userId) {
             checkWhatsappStatus();
             loadClients();
+            loadAvailableTags();
 
             // Poll WhatsApp status every 5 seconds
             const interval = setInterval(checkWhatsappStatus, 5000);
@@ -103,6 +107,44 @@ const Dashboard = () => {
             } else {
                 showNotification("Error al cargar clientes", "error");
             }
+        }
+    };
+
+    const loadAvailableTags = async () => {
+        try {
+            const response = await api.get('/tags', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setAvailableTags(response.data);
+        } catch (err) {
+            console.error('Error loading tags:', err);
+        }
+    };
+
+    // Select all clients that have a specific tag
+    const selectClientsByTag = async (tagId) => {
+        if (!tagId) {
+            // "Todos" selected - clear filter
+            setActiveTagFilter(null);
+            return;
+        }
+
+        setActiveTagFilter(tagId);
+
+        try {
+            // Get clients with this tag
+            const response = await api.get(`/tags/${tagId}/clients`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const clientsWithTag = response.data;
+            const clientIds = clientsWithTag.map(c => c.id);
+            setSelectedClients(clientIds);
+
+            const tag = availableTags.find(t => t.id === tagId);
+            showNotification(`${clientIds.length} clientes con "${tag?.name}" seleccionados`, 'success');
+        } catch (err) {
+            console.error('Error selecting by tag:', err);
+            showNotification('Error al filtrar por etiqueta', 'error');
         }
     };
 
@@ -441,6 +483,35 @@ const Dashboard = () => {
                                         onSubmit={handleSaveClient}
                                     />
                                 )}
+
+                                {/* Tag Filter Bar */}
+                                <div className="flex flex-wrap gap-2 mb-4">
+                                    <button
+                                        onClick={() => selectClientsByTag(null)}
+                                        className={`px-3 py-1 text-xs rounded-full transition-all ${activeTagFilter === null
+                                                ? 'bg-white text-black font-medium'
+                                                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                            }`}
+                                    >
+                                        Todos
+                                    </button>
+                                    {availableTags.map(tag => (
+                                        <button
+                                            key={tag.id}
+                                            onClick={() => selectClientsByTag(tag.id)}
+                                            className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${activeTagFilter === tag.id
+                                                    ? 'ring-2 ring-white font-medium'
+                                                    : 'hover:opacity-80'
+                                                }`}
+                                            style={{
+                                                backgroundColor: tag.color,
+                                                color: 'white'
+                                            }}
+                                        >
+                                            {tag.icon} {tag.name}
+                                        </button>
+                                    ))}
+                                </div>
 
                                 {/* Clients List Table */}
                                 <div className="space-y-2 flex-1 overflow-y-auto pr-2 custom-scrollbar">
