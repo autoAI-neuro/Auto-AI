@@ -5,6 +5,7 @@ from typing import List
 from app.db.session import get_db
 from app.models import User
 from app.deps import get_current_user
+from app.utils.reliability import message_rate_limiter
 from pydantic import BaseModel
 import os
 
@@ -121,6 +122,16 @@ async def send_whatsapp_message(
     db: Session = Depends(get_db)
 ):
     """Send WhatsApp message to a client"""
+    user_id_str = str(current_user.id)
+    
+    # Rate limiting check (100 messages per minute per user)
+    if not message_rate_limiter.is_allowed(user_id_str):
+        remaining = message_rate_limiter.get_remaining(user_id_str)
+        raise HTTPException(
+            status_code=429, 
+            detail=f"Rate limit exceeded. Try again in a few seconds. Remaining: {remaining}"
+        )
+    
     print(f"[Send] User {current_user.id} attempting to send. whatsapp_linked={current_user.whatsapp_linked}")
     
     # If DB says not linked, double-check with Node service (DB might be stale)
