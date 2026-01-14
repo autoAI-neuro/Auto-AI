@@ -204,10 +204,21 @@ async def whatsapp_webhook(
         return {"status": "ignored"}
 
     # 2. Find or Create Client
+    # Try exact match first
     client = db.query(Client).filter(
         Client.user_id == user_id,
         Client.phone == sender_phone
     ).first()
+    
+    # Try normalized match if not found
+    if not client:
+        from app.utils.phone import normalize_phone
+        norm_sender = normalize_phone(sender_phone)
+        all_clients = db.query(Client).filter(Client.user_id == user_id).all()
+        for c in all_clients:
+            if normalize_phone(c.phone) == norm_sender:
+                client = c
+                break
     
     if not client:
         # Create new client automatically (Lead Capture)

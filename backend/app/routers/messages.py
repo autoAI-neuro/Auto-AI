@@ -176,10 +176,26 @@ def save_outbound_message(
     """Save an outbound message to the database"""
     # If no client_id, try to find by phone
     if not client_id:
+        # 1. Try exact match
         client = db.query(Client).filter(
             Client.user_id == user_id,
             Client.phone == phone
         ).first()
+        
+        # 2. Try normalized match
+        if not client:
+            from app.utils.phone import normalize_phone
+            norm_phone = normalize_phone(phone)
+            # Fetch all clients for user and check in python (inefficient but safe for now)
+            # OR use basic SQL wildcard if possible. For now, strict normalized match if DB stores normalized?
+            # Better: strip non-digits from DB side or just iterate.
+            # Let's iterate for safety as list shouldn't be huge per user yet.
+            all_clients = db.query(Client).filter(Client.user_id == user_id).all()
+            for c in all_clients:
+                if normalize_phone(c.phone) == norm_phone:
+                    client = c
+                    break
+        
         if client:
             client_id = client.id
     
