@@ -3,15 +3,15 @@ from starlette.middleware.cors import CORSMiddleware
 import os
 import httpx
 from datetime import datetime
-from app.routers import auth, whatsapp_web, clients, files
+from app.routers import auth, whatsapp_web, clients, files, tags
 from app.db.session import engine, get_db
 from app.db.base import Base
-from app.models import User  # Import models so SQLAlchemy can detect them
+from app.models import User, Tag, ClientTag  # Import models so SQLAlchemy can detect them
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
 
-APP_VERSION = os.getenv("APP_VERSION", "2.1.0")  # Bumped for Phase 2
+APP_VERSION = os.getenv("APP_VERSION", "2.2.0")  # Bumped for Phase 2.3
 WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005")
 
 app = FastAPI(title="AUTOAI API", version=APP_VERSION)
@@ -29,6 +29,7 @@ app.include_router(auth.router)
 app.include_router(whatsapp_web.router)
 app.include_router(clients.router)
 app.include_router(files.router)
+app.include_router(tags.router)
 
 @app.get("/health")
 async def health():

@@ -27,6 +27,7 @@ import CalendarView from '../components/CalendarView';
 import SettingsView from '../components/SettingsView';
 import ClientForm from '../components/ClientForm';
 import MediaUploader from '../components/MediaUploader';
+import TagSelector from '../components/TagSelector';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -476,6 +477,12 @@ const Dashboard = () => {
                                                         </p>
                                                     </div>
                                                 </div>
+
+                                                {/* Tags */}
+                                                <div className="flex-1 px-2" onClick={(e) => e.stopPropagation()}>
+                                                    <TagSelector clientId={client.id} />
+                                                </div>
+
                                                 <div className="flex items-center gap-2">
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleEditClick(client); }}
