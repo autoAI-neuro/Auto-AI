@@ -30,6 +30,7 @@ import MediaUploader from '../components/MediaUploader';
 import TagSelector from '../components/TagSelector';
 import ConversationView from '../components/ConversationView';
 import AnalyticsView from '../components/AnalyticsView';
+import AutomationsPage from './AutomationsPage';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -686,6 +687,8 @@ const Dashboard = () => {
                 );
             case 'analytics':
                 return <AnalyticsView />;
+            case 'automations':
+                return <AutomationsPage />;
         }
     };
 

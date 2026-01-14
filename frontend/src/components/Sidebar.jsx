@@ -5,13 +5,15 @@ import {
     Settings,
     LogOut,
     Menu,
-    PieChart
+    PieChart,
+    Zap
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) => {
     const menuItems = [
         { id: 'dashboard', label: 'Panel Principal', icon: LayoutDashboard },
         { id: 'analytics', label: 'Analíticas', icon: PieChart },
+        { id: 'automations', label: 'Automatizaciones', icon: Zap },
         { id: 'calendar', label: 'Calendario', icon: Calendar },
         { id: 'settings', label: 'Configuración', icon: Settings },
     ];
