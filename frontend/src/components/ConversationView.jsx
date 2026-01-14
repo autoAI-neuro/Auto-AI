@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Image, ArrowLeft, MessageSquare, Loader } from 'lucide-react';
+import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -10,6 +10,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
+    const [generatingReply, setGeneratingReply] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -66,6 +67,37 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
             console.error('Send error:', err);
         } finally {
             setSending(false);
+        }
+    };
+
+    const getSmartReply = async () => {
+        // Get the last inbound message to reply to
+        const lastInbound = [...messages].reverse().find(m => m.direction === 'inbound');
+        if (!lastInbound) {
+            toast.error('No hay mensajes del cliente para responder');
+            return;
+        }
+
+        setGeneratingReply(true);
+        try {
+            const response = await api.post('/ai/smart-reply', {
+                message: lastInbound.content,
+                client_id: client.id
+            }, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
+            if (response.data.suggested_reply) {
+                setNewMessage(response.data.suggested_reply);
+                toast.success('✨ Respuesta sugerida');
+            } else {
+                toast.error('No se pudo generar respuesta');
+            }
+        } catch (err) {
+            console.error('Smart reply error:', err);
+            toast.error('Error al generar respuesta IA');
+        } finally {
+            setGeneratingReply(false);
         }
     };
 
@@ -148,8 +180,8 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                     >
                                         <div
                                             className={`max-w-[70%] rounded-2xl px-4 py-2 ${msg.direction === 'outbound'
-                                                    ? 'bg-purple-600 text-white rounded-br-sm'
-                                                    : 'bg-neutral-800 text-white rounded-bl-sm'
+                                                ? 'bg-purple-600 text-white rounded-br-sm'
+                                                : 'bg-neutral-800 text-white rounded-bl-sm'
                                                 }`}
                                         >
                                             {msg.media_url && (
@@ -187,6 +219,18 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                 {/* Input */}
                 <div className="p-4 border-t border-white/10 bg-neutral-800/50">
                     <div className="flex gap-2">
+                        <button
+                            onClick={getSmartReply}
+                            disabled={generatingReply || messages.length === 0}
+                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-3 rounded-xl transition-all"
+                            title="Generar respuesta con IA"
+                        >
+                            {generatingReply ? (
+                                <Loader className="w-5 h-5 animate-spin" />
+                            ) : (
+                                <Sparkles className="w-5 h-5" />
+                            )}
+                        </button>
                         <input
                             type="text"
                             value={newMessage}
