@@ -117,6 +117,42 @@ async def get_whatsapp_status(
          raise HTTPException(status_code=e.response.status_code, detail=f"WhatsApp service error: {str(e)}")
 
 @router.post("/send")
+
+async def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None):
+    """
+    Internal helper to send messages via Node service and save to DB.
+    Used by:
+    - POST /send endpoint
+    - Automation engine
+    """
+    WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005")
+    
+    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
+    payload = {
+        "userId": user_id,
+        "phoneNumber": phone,
+        "message": message
+    }
+    
+    # Send to Node Service
+    print(f"[SendInternal] Sending to {phone} for {user_id}")
+    async with httpx.AsyncClient(trust_env=False) as client:
+        response = await client.post(url, json=payload, timeout=30.0)
+        response.raise_for_status()
+        result = response.json()
+        
+        # Save to DB
+        save_outbound_message(
+            db=db,
+            user_id=user_id,
+            phone=phone,
+            content=message,
+            whatsapp_message_id=result.get('messageId')
+        )
+        return result
+
+
+@router.post("/send")
 async def send_whatsapp_message(
     request: SendMessageRequest,
     current_user: User = Depends(get_current_user),
@@ -133,55 +169,11 @@ async def send_whatsapp_message(
             detail=f"Rate limit exceeded. Try again in a few seconds. Remaining: {remaining}"
         )
     
-    print(f"[Send] User {current_user.id} attempting to send. whatsapp_linked={current_user.whatsapp_linked}")
-    
-    # If DB says not linked, double-check with Node service (DB might be stale)
     if not current_user.whatsapp_linked:
-        print(f"[Send] DB says not linked. Checking Node service directly...")
-        try:
-            check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
-            async with httpx.AsyncClient(trust_env=False) as client:
-                check_resp = await client.get(check_url, timeout=5.0)
-                node_status = check_resp.json().get('status')
-                print(f"[Send] Node status for {current_user.id}: {node_status}")
-                if node_status == 'connected':
-                    # Update DB to match reality
-                    current_user.whatsapp_linked = True
-                    db.commit()
-                    print(f"[Send] Updated DB whatsapp_linked=True for {current_user.id}")
-                else:
-                    raise HTTPException(status_code=400, detail=f"WhatsApp not linked (Node status: {node_status})")
-        except httpx.RequestError as e:
-            print(f"[Send] Failed to check Node status: {e}")
-            raise HTTPException(status_code=400, detail="WhatsApp not linked and cannot verify")
-    
+         raise HTTPException(status_code=400, detail="WhatsApp not linked")
+
     try:
-        url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
-        payload = {
-            "userId": str(current_user.id),
-            "phoneNumber": request.phone_number,
-            "message": request.message
-        }
-        print(f"[Send] Calling Node: {url} with payload userId={current_user.id}")
-        async with httpx.AsyncClient(trust_env=False) as client:
-            response = await client.post(url, json=payload, timeout=30.0)
-            response.raise_for_status()
-            result = response.json()
-            print(f"[Send] SUCCESS for {current_user.id}")
-            
-            # Save message to database for CRM history
-            try:
-                save_outbound_message(
-                    db=db,
-                    user_id=str(current_user.id),
-                    phone=request.phone_number,
-                    content=request.message,
-                    whatsapp_message_id=result.get('messageId')
-                )
-            except Exception as save_err:
-                print(f"[Send] Warning: Failed to save message to DB: {save_err}")
-            
-            return result
+        return await send_message_internal(db, str(current_user.id), request.phone_number, request.message)
     except httpx.RequestError as e:
         print(f"[Send] RequestError: {e}")
         raise HTTPException(status_code=500, detail=f"WhatsApp service error: {str(e)}")

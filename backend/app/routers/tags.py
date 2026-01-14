@@ -200,6 +200,23 @@ async def assign_tag_to_client(
     db.add(client_tag)
     db.commit()
     
+    # TRIGGER AUTOMATION (Phase 3.1)
+    try:
+        from app.routers.automations import trigger_automations
+        trigger_automations(
+            db, 
+            current_user.id, 
+            "TAG_ADDED", 
+            assign.tag_id, 
+            {
+                "client_id": client.id, 
+                "client_name": client.name,
+                "client_phone": client.phone
+            }
+        )
+    except Exception as e:
+        print(f"[Tag] Error triggering automation: {e}")
+
     return {"message": "Tag assigned", "tag": tag.name}
 
 

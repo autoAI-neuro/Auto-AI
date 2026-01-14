@@ -1,4 +1,4 @@
-from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, Date, Float
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, DateTime, Text, Date, Float, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
@@ -123,3 +123,33 @@ class Message(Base):
     delivered_at = Column(DateTime(timezone=True), nullable=True)
     read_at = Column(DateTime(timezone=True), nullable=True)
 
+
+class Automation(Base):
+    """Automation Rules (If X then Y)"""
+    __tablename__ = "automations"
+    
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    name = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    
+    # Trigger Config
+    trigger_type = Column(String, nullable=False)  # TAG_ADDED, CLIENT_CREATED
+    trigger_value = Column(String, nullable=True)  # e.g., tag_id
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    # Relationships
+    actions = relationship("AutomationAction", backref="automation", cascade="all, delete-orphan", order_by="AutomationAction.order_index")
+
+
+class AutomationAction(Base):
+    """Actions to execute when automation triggers"""
+    __tablename__ = "automation_actions"
+    
+    id = Column(String, primary_key=True, default=get_uuid)
+    automation_id = Column(String, ForeignKey("automations.id", ondelete="CASCADE"), nullable=False)
+    order_index = Column(Integer, default=0)
+    
+    action_type = Column(String, nullable=False)  # SEND_MESSAGE, WAIT, ADD_TAG
+    action_payload = Column(JSON, nullable=True)  # {"message": "top", "delay_minutes": 60}
