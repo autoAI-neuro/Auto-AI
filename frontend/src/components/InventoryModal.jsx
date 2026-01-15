@@ -3,18 +3,14 @@ import { X, Car, Search, Send, Loader } from 'lucide-react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// Force HTTPS for production - bypass potential config issues
-const getApiUrl = () => {
-    const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-    // Force HTTPS in production
-    if (!envUrl.includes('localhost') && envUrl.startsWith('http://')) {
-        return envUrl.replace('http://', 'https://');
-    }
-    return envUrl;
-};
+// PRODUCTION: Hardcoded HTTPS URL (Railway backend)
+// This bypasses ALL environment variable and config issues
+const BACKEND_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:8000'
+    : 'https://auto-ai-production-b99a.up.railway.app';
 
 const inventoryApi = axios.create({
-    baseURL: getApiUrl()
+    baseURL: BACKEND_URL
 });
 
 const InventoryModal = ({ isOpen, onClose, onSelect }) => {
