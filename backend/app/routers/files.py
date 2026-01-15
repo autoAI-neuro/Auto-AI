@@ -280,29 +280,30 @@ async def upload_media(
     try:
         with open(file_path, 'wb') as buffer:
             shutil.copyfileobj(file.file, buffer)
-            
-        # Convert WebM Audio to OGG for WhatsApp PTT
+
+        # Convert WebM Audio to MP4 (AAC) - More compatible
         if content_type == 'audio/webm':
+            if shutil.which('ffmpeg') is None:
+                print("🚨 CRITICAL: FFMPEG NOT INSTALLED IN CONTAINER")
+            
             try:
-                ogg_name = f"{uuid.uuid4()}.ogg"
-                ogg_path = MEDIA_DIR / ogg_name
+                mp4_name = f"{uuid.uuid4()}.mp4"
+                mp4_path = MEDIA_DIR / mp4_name
                 
-                # FFmpeg conversion to OGG Opus
+                # FFmpeg conversion to AAC (MP4)
                 subprocess.run([
                     'ffmpeg', '-i', str(file_path),
-                    '-c:a', 'libopus',
-                    '-b:a', '64k',
-                    '-vn',
+                    '-vn', # No video
+                    '-acodec', 'aac',
                     '-y',
-                    str(ogg_path)
+                    str(mp4_path)
                 ], check=True, capture_output=True)
                 
                 # If successful, use the new file
-                if ogg_path.exists():
+                if mp4_path.exists():
                     os.remove(file_path) # Delete original webm
-                    unique_name = ogg_name
-                    file_path = ogg_path
-                    # We might want to update media_type too, but keeping it as audio is fine
+                    unique_name = mp4_name
+                    final_mime = "audio/mp4" # Force MP4 mime
                     
             except Exception as e:
                 print(f"Audio conversion failed: {e}")
@@ -316,8 +317,9 @@ async def upload_media(
     base_url = os.getenv("BACKEND_PUBLIC_URL", "https://auto-ai-production-b99a.up.railway.app")
     media_url = f"{base_url}/files/media/{unique_name}"
     
-    # Determine final mimetype
-    final_mime = "audio/ogg" if unique_name.endswith(".ogg") else content_type
+    # Determine final mimetype (if not set by conversion)
+    if 'final_mime' not in locals():
+        final_mime = content_type
 
     return {
         "status": "uploaded",
@@ -325,7 +327,7 @@ async def upload_media(
         "media_type": media_type,
         "mimetype": final_mime,
         "filename": unique_name,
-        "size": file_path.stat().st_size
+        "size": Path(MEDIA_DIR / unique_name).stat().st_size
     }
 
 
