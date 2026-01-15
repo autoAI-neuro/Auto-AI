@@ -26,16 +26,17 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await inventoryApi.get('/inventory', {
+            // Note: trailing slash is REQUIRED to avoid FastAPI HTTP redirect
+            const res = await inventoryApi.get('/inventory/', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.data.length === 0) {
                 // Auto-seed for demo
-                await inventoryApi.post('/inventory/seed', {}, {
+                await inventoryApi.post('/inventory/seed/', {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const res2 = await inventoryApi.get('/inventory', {
+                const res2 = await inventoryApi.get('/inventory/', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setCars(res2.data);
