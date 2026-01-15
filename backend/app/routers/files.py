@@ -247,6 +247,7 @@ ALLOWED_MEDIA_TYPES = {
     "audio/mpeg": "audio",
     "audio/mp4": "audio",
     "audio/ogg": "audio",
+    "audio/webm": "audio",
     "application/pdf": "document",
     "application/msword": "document",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "document",

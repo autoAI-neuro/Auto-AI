@@ -266,12 +266,12 @@ app.post('/api/whatsapp/send', async (req, res) => {
 // ENVIAR MEDIA (Imagen, Video, Documento)
 // ============================================
 app.post('/api/whatsapp/send-media', async (req, res) => {
-    const { userId, phoneNumber, mediaUrl, mediaType, caption, ptt } = req.body;
+    const { userId, phoneNumber, mediaUrl, mediaType, caption, ptt, mimetype } = req.body;
 
     // ... (keep logic)
 
     try {
-        const result = await client.sendMedia(phoneNumber, mediaUrl, mediaType, caption || '', { ptt });
+        const result = await client.sendMedia(phoneNumber, mediaUrl, mediaType, caption || '', { ptt, mimetype });
 
         console.log(`[SendMedia] ✅ Media sent to ${phoneNumber}`);
         res.json({

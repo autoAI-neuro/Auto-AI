@@ -250,7 +250,7 @@ class BaileysClient {
             case 'audio':
                 messageContent = {
                     audio: { url: mediaUrl },
-                    mimetype: 'audio/mp4',
+                    mimetype: options.mimetype || 'audio/mp4',
                     ptt: options.ptt || false
                 };
                 break;
