@@ -1,60 +1,71 @@
 import React, { useState, useEffect } from 'react';
-import { X, Car, Search, Send, Loader } from 'lucide-react';
-import axios from 'axios';
+import { X, Car, Search, Send, Loader, ChevronRight, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// PRODUCTION: Hardcoded HTTPS URL (Railway backend)
-// This bypasses ALL environment variable and config issues
-const BACKEND_URL = window.location.hostname === 'localhost'
-    ? 'http://localhost:8000'
-    : 'https://auto-ai-production-b99a.up.railway.app';
-
-const inventoryApi = axios.create({
-    baseURL: BACKEND_URL
-});
-
 const InventoryModal = ({ isOpen, onClose, onSelect }) => {
-    const [cars, setCars] = useState([]);
+    const [catalog, setCatalog] = useState(null);
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedBrand, setSelectedBrand] = useState(null);
+    const [view, setView] = useState('brands'); // 'brands' | 'models'
 
     useEffect(() => {
-        if (isOpen) fetchInventory();
+        if (isOpen) loadCatalog();
     }, [isOpen]);
 
-    const fetchInventory = async () => {
+    const loadCatalog = async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            // Note: trailing slash is REQUIRED to avoid FastAPI HTTP redirect
-            const res = await inventoryApi.get('/inventory/', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            if (res.data.length === 0) {
-                // Auto-seed for demo
-                await inventoryApi.post('/inventory/seed/', {}, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                const res2 = await inventoryApi.get('/inventory/', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setCars(res2.data);
-            } else {
-                setCars(res.data);
-            }
+            // Load from local JSON file - NO backend needed!
+            const res = await fetch('/inventory/catalog.json');
+            const data = await res.json();
+            setCatalog(data);
         } catch (error) {
-            console.error('Inventory error:', error);
-            toast.error('Error cargando inventario');
+            console.error('Error loading catalog:', error);
+            toast.error('Error cargando catálogo');
         } finally {
             setLoading(false);
         }
     };
 
-    const filteredCars = cars.filter(car =>
-        car.make.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        car.model.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const handleBrandSelect = (brand) => {
+        setSelectedBrand(brand);
+        setView('models');
+    };
+
+    const handleBack = () => {
+        setSelectedBrand(null);
+        setView('brands');
+    };
+
+    const handleModelSelect = (model) => {
+        onSelect({
+            make: selectedBrand.name,
+            model: model.name,
+            year: model.year,
+            price: model.price,
+            description: model.description,
+            primary_image_url: model.image
+        });
+    };
+
+    // Filter brands and models by search term
+    const getFilteredBrands = () => {
+        if (!catalog) return [];
+        if (!searchTerm) return catalog.brands;
+        return catalog.brands.filter(brand =>
+            brand.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            brand.models.some(m => m.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        );
+    };
+
+    const getFilteredModels = () => {
+        if (!selectedBrand) return [];
+        if (!searchTerm) return selectedBrand.models;
+        return selectedBrand.models.filter(model =>
+            model.name.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+    };
 
     if (!isOpen) return null;
 
@@ -65,12 +76,24 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex justify-between items-center">
                     <div className="flex items-center gap-3">
+                        {view === 'models' && (
+                            <button
+                                onClick={handleBack}
+                                className="p-2 hover:bg-white/10 rounded-full transition-colors mr-2"
+                            >
+                                <ArrowLeft className="w-5 h-5 text-gray-400" />
+                            </button>
+                        )}
                         <div className="p-2 bg-blue-500/20 rounded-lg">
                             <Car className="w-6 h-6 text-blue-400" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-white">Inventario de Vehículos</h2>
-                            <p className="text-sm text-gray-400">Selecciona un vehículo para enviar</p>
+                            <h2 className="text-xl font-bold text-white">
+                                {view === 'brands' ? 'Inventario de Vehículos' : selectedBrand?.name}
+                            </h2>
+                            <p className="text-sm text-gray-400">
+                                {view === 'brands' ? 'Selecciona una marca' : 'Selecciona un modelo'}
+                            </p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -92,49 +115,65 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
                     </div>
                 </div>
 
-                {/* Car Grid */}
+                {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
                     {loading ? (
                         <div className="flex justify-center items-center h-40">
                             <Loader className="w-8 h-8 text-blue-500 animate-spin" />
                         </div>
+                    ) : view === 'brands' ? (
+                        /* Brand Grid */
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {getFilteredBrands().map(brand => (
+                                <button
+                                    key={brand.name}
+                                    onClick={() => handleBrandSelect(brand)}
+                                    className="bg-neutral-800 border border-white/5 rounded-xl p-6 hover:border-blue-500/50 transition-all group text-left"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-white mb-1">{brand.name}</h3>
+                                            <p className="text-sm text-gray-500">{brand.models.length} modelos</p>
+                                        </div>
+                                        <ChevronRight className="w-6 h-6 text-gray-500 group-hover:text-blue-400 transition-colors" />
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
                     ) : (
+                        /* Model Grid */
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {filteredCars.map(car => (
-                                <div key={car.id} className="bg-neutral-800 border border-white/5 rounded-xl overflow-hidden hover:border-blue-500/50 transition-all group">
+                            {getFilteredModels().map(model => (
+                                <div key={model.name} className="bg-neutral-800 border border-white/5 rounded-xl overflow-hidden hover:border-blue-500/50 transition-all group">
                                     <div className="relative h-40 overflow-hidden bg-neutral-700">
-                                        {car.primary_image_url ? (
-                                            <img
-                                                src={car.primary_image_url}
-                                                alt={`${car.make} ${car.model}`}
-                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                                onError={(e) => e.target.style.display = 'none'}
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <Car className="w-16 h-16 text-neutral-500" />
-                                            </div>
-                                        )}
+                                        <img
+                                            src={model.image}
+                                            alt={`${selectedBrand.name} ${model.name}`}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none';
+                                            }}
+                                        />
                                         <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 backdrop-blur-md rounded-lg text-xs font-bold text-white border border-white/10">
-                                            {car.year}
+                                            {model.year}
                                         </div>
                                     </div>
 
                                     <div className="p-4">
-                                        <h3 className="text-lg font-bold text-white mb-1">{car.make} {car.model}</h3>
-                                        <div className="flex justify-between items-center mb-3">
+                                        <h3 className="text-lg font-bold text-white mb-1">
+                                            {selectedBrand.name} {model.name}
+                                        </h3>
+                                        <div className="flex justify-between items-center mb-2">
                                             <span className="text-green-400 font-mono font-bold text-lg">
-                                                ${car.price?.toLocaleString()}
+                                                ${model.price?.toLocaleString()}
                                             </span>
-                                            {car.mileage && (
-                                                <span className="text-xs text-gray-500">
-                                                    {car.mileage.toLocaleString()} mi
-                                                </span>
-                                            )}
                                         </div>
+                                        <p className="text-xs text-gray-500 mb-3 line-clamp-2">
+                                            {model.description}
+                                        </p>
 
                                         <button
-                                            onClick={() => onSelect(car)}
+                                            onClick={() => handleModelSelect(model)}
                                             className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2 transition-colors font-medium text-sm"
                                         >
                                             <Send className="w-4 h-4" />
@@ -146,10 +185,17 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
                         </div>
                     )}
 
-                    {!loading && filteredCars.length === 0 && (
+                    {!loading && view === 'brands' && getFilteredBrands().length === 0 && (
                         <div className="text-center py-12 text-gray-500">
                             <Car className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                            <p>No se encontraron vehículos</p>
+                            <p>No se encontraron marcas</p>
+                        </div>
+                    )}
+
+                    {!loading && view === 'models' && getFilteredModels().length === 0 && (
+                        <div className="text-center py-12 text-gray-500">
+                            <Car className="w-16 h-16 mx-auto mb-4 opacity-30" />
+                            <p>No se encontraron modelos</p>
                         </div>
                     )}
                 </div>
