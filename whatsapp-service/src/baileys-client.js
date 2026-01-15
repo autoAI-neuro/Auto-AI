@@ -19,9 +19,16 @@ class BaileysClient {
         this.callbacks = callbacks;
         this.authFolder = path.join(process.cwd(), 'auth_info', userId);
 
+        console.log(`[BaileysClient] Initializing for ${userId}`);
+        console.log(`[BaileysClient] Auth Folder: ${this.authFolder}`);
+
         // Crear directorio de auth si no existe
         if (!fs.existsSync(this.authFolder)) {
+            console.log(`[BaileysClient] Auth folder does not exist, creating...`);
             fs.mkdirSync(this.authFolder, { recursive: true });
+        } else {
+            const files = fs.readdirSync(this.authFolder);
+            console.log(`[BaileysClient] Auth folder exists with ${files.length} files.`);
         }
     }
 
@@ -97,10 +104,15 @@ class BaileysClient {
                         setTimeout(() => this.connect(), delay);
                     } else {
                         // Sesión cerrada, limpiar auth
-                        console.log("Session ended. Cleaning up...");
-                        if (reason !== 408) { // Already cleared for 408 above
+                        console.log("Session ended. Connection closed.");
+                        // DO NOT CLEAR AUTH AUTOMATICALLY
+                        // Persist session files so we can reconnect on restart.
+                        // Only clear if explicitly necessary (handled by API /logout or /clear-session).
+                        /*
+                        if (reason !== 408) { 
                             this.clearAuth();
                         }
+                        */
                         if (this.callbacks.onDisconnected && reason !== 408) { // Already called for 408
                             this.callbacks.onDisconnected('logged_out');
                         }

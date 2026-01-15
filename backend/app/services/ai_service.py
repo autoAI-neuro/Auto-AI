@@ -114,29 +114,31 @@ def generate_smart_reply(message_content: str, client_name: str = None, context:
     name_str = f"El cliente se llama {client_name}." if client_name else ""
     context_str = f"Contexto adicional: {context}" if context else ""
     
-    prompt = f"""Genera una respuesta profesional pero amigable para el siguiente mensaje de un cliente.
+    prompt = f"""Como vendedor experto, genera la MEJOR respuesta para cerrar la venta o avanzar el trato.
 {name_str}
 {context_str}
 
 MENSAJE DEL CLIENTE:
 "{message_content}"
 
-La respuesta debe ser:
-- Corta (máximo 2-3 oraciones)
-- Profesional pero cálida
-- En español
-- Lista para enviar por WhatsApp
+REGLAS DE ORO:
+1. MAXIMO 2 oraciones. Sé conciso. La gente no lee textos largos.
+2. Usa un tono cálido pero con autoridad.
+3. Termina siempre con una pregunta o llamada a la acción clara.
+4. No uses saludos genéricos como "Espero que estés bien". Ve al grano amablemente.
+5. Español neutro y natural.
 
-Responde SOLO con el texto de la respuesta, sin comillas ni explicaciones.
+Responde SOLO con el texto de la respuesta.
 """
 
     try:
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "Eres un asistente de ventas profesional. Generas respuestas amigables y efectivas."},
+                {"role": "system", "content": "Eres un vendedor experto de alto nivel. Tu objetivo es cerrar ventas. Eres carismático, breve y persuasivo."},
                 {"role": "user", "content": prompt}
             ],
+            temperature=0.7,
             max_tokens=150
         )
         
