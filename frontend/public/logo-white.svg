@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Ultra minimal: Just a stylized "A" with clean lines -->
+  
+  <!-- The "A" shape - two angled lines meeting at top -->
+  <polygon points="256,80 400,432 340,432 256,180 172,432 112,432" fill="white"/>
+  
+  <!-- The crossbar - represents the road/highway -->
+  <rect x="160" y="310" width="192" height="24" rx="12" fill="white"/>
+  
+  <!-- The AI dot - intelligence indicator, positioned in the center -->
+  <circle cx="256" cy="248" r="16" fill="#3b82f6"/>
+</svg>
