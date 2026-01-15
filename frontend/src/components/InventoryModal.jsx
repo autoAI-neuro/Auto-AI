@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { X, Car, Search, Send, Loader } from 'lucide-react';
-import api from '../config';
+import axios from 'axios';
 import toast from 'react-hot-toast';
+
+// Force HTTPS for production - bypass potential config issues
+const getApiUrl = () => {
+    const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+    // Force HTTPS in production
+    if (!envUrl.includes('localhost') && envUrl.startsWith('http://')) {
+        return envUrl.replace('http://', 'https://');
+    }
+    return envUrl;
+};
+
+const inventoryApi = axios.create({
+    baseURL: getApiUrl()
+});
 
 const InventoryModal = ({ isOpen, onClose, onSelect }) => {
     const [cars, setCars] = useState([]);
@@ -16,16 +30,16 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
         setLoading(true);
         try {
             const token = localStorage.getItem('token');
-            const res = await api.get('/inventory', {
+            const res = await inventoryApi.get('/inventory', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
             if (res.data.length === 0) {
                 // Auto-seed for demo
-                await api.post('/inventory/seed', {}, {
+                await inventoryApi.post('/inventory/seed', {}, {
                     headers: { Authorization: `Bearer ${token}` }
                 });
-                const res2 = await api.get('/inventory', {
+                const res2 = await inventoryApi.get('/inventory', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setCars(res2.data);
@@ -33,7 +47,7 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
                 setCars(res.data);
             }
         } catch (error) {
-            console.error(error);
+            console.error('Inventory error:', error);
             toast.error('Error cargando inventario');
         } finally {
             setLoading(false);
