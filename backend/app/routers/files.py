@@ -261,7 +261,7 @@ async def upload_media(
     """Upload media file for WhatsApp sending. Returns public URL."""
     
     # Validate file type
-    content_type = file.content_type
+    content_type = file.content_type.split(';')[0].strip().lower()
     if content_type not in ALLOWED_MEDIA_TYPES:
         raise HTTPException(
             status_code=400, 
