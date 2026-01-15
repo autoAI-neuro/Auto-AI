@@ -268,7 +268,10 @@ app.post('/api/whatsapp/send', async (req, res) => {
 app.post('/api/whatsapp/send-media', async (req, res) => {
     const { userId, phoneNumber, mediaUrl, mediaType, caption, ptt, mimetype } = req.body;
 
-    // ... (keep logic)
+    if (!clients.has(userId)) {
+        return res.status(404).json({ error: 'Client not found or not connected' });
+    }
+    const client = clients.get(userId);
 
     try {
         const result = await client.sendMedia(phoneNumber, mediaUrl, mediaType, caption || '', { ptt, mimetype });
