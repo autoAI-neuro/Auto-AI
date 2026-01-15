@@ -6,20 +6,56 @@
                 {
                     "name": "Corolla",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Corolla/corolla_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "Confiable • Económico • Bajo consumo • Ideal para ciudad"
                 },
                 {
                     "name": "Camry",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Camry/camry_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "Elegante • Espacioso • Motor potente • Confort premium"
                 },
                 {
                     "name": "RAV4",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/RAV4/rav4_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "SUV versátil • 4x4 • Amplio espacio • Ideal para familia"
+                },
+                {
+                    "name": "Highlander",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Highlander/highlander_1.jpg",
+                    "year": 2025,
+                    "qualities": "3 filas de asientos • Lujo familiar • Seguro • Espacioso"
+                },
+                {
+                    "name": "4Runner",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/4Runner/4runner_1.jpg",
+                    "year": 2025,
+                    "qualities": "Off-road extremo • 4x4 potente • Resistente • Aventurero"
+                },
+                {
+                    "name": "Tacoma",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Tacoma/tacoma_1.jpg",
+                    "year": 2025,
+                    "qualities": "Pick-up versátil • Trabajo pesado • Duradera • Todo terreno"
+                },
+                {
+                    "name": "Tundra",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Tundra/tundra_1.jpg",
+                    "year": 2026,
+                    "qualities": "Pick-up full-size • Potencia máxima • Capacidad de carga • Premium"
+                },
+                {
+                    "name": "GR Supra",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Supra/supra_1.jpg",
+                    "year": 2025,
+                    "qualities": "Deportivo puro • 382 HP • Diseño icónico • Adrenalina"
+                },
+                {
+                    "name": "Prius",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Prius/prius_1.jpg",
+                    "year": 2025,
+                    "qualities": "Híbrido líder • Ultra eficiente • Ecológico • Tecnología avanzada"
                 }
             ]
         },
@@ -29,20 +65,50 @@
                 {
                     "name": "Civic",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Civic/civic_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "Deportivo • Eficiente • Tecnología avanzada • Diseño moderno"
                 },
                 {
                     "name": "Accord",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Accord/accord_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "Premium • Alto rendimiento • Lujo interior • Seguridad máxima"
                 },
                 {
                     "name": "CR-V",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Honda/CR-V/crv_1.jpg",
-                    "year": 2024,
+                    "year": 2025,
                     "qualities": "SUV familiar • Espaciosa • Cómoda • Perfecta para viajes"
+                },
+                {
+                    "name": "Pilot",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Pilot/pilot_1.jpg",
+                    "year": 2025,
+                    "qualities": "3 filas de asientos • SUV grande • Familiar • Versátil"
+                },
+                {
+                    "name": "HR-V",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/HR-V/hrv_1.jpg",
+                    "year": 2025,
+                    "qualities": "SUV compacta • Ágil • Económica • Moderna"
+                },
+                {
+                    "name": "Odyssey",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Odyssey/odyssey_1.jpg",
+                    "year": 2025,
+                    "qualities": "Minivan familiar • 8 asientos • Entretenimiento • Confort total"
+                },
+                {
+                    "name": "Ridgeline",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Ridgeline/ridgeline_1.jpg",
+                    "year": 2026,
+                    "qualities": "Pick-up innovadora • Versátil • Cómoda • Dual-action tailgate"
+                },
+                {
+                    "name": "Passport",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Passport/passport_1.jpg",
+                    "year": 2026,
+                    "qualities": "SUV aventurera • Off-road • Robusta • Estilo audaz"
                 }
             ]
         }
