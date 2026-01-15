@@ -56,6 +56,18 @@
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Prius/prius_1.jpg",
                     "year": 2025,
                     "qualities": "Híbrido líder • Ultra eficiente • Ecológico • Tecnología avanzada"
+                },
+                {
+                    "name": "bZ4X",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/bZ4X/bz4x_1.jpg",
+                    "year": 2025,
+                    "qualities": "⚡ 100% Eléctrico • Cero emisiones • 250 mi rango • Futuro hoy"
+                },
+                {
+                    "name": "Crown",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Crown/crown_1.jpg",
+                    "year": 2025,
+                    "qualities": "Híbrido de lujo • Diseño único • Premium • Elegancia japonesa"
                 }
             ]
         },
@@ -109,6 +121,12 @@
                     "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Passport/passport_1.jpg",
                     "year": 2026,
                     "qualities": "SUV aventurera • Off-road • Robusta • Estilo audaz"
+                },
+                {
+                    "name": "Prologue",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Prologue/prologue_1.jpg",
+                    "year": 2025,
+                    "qualities": "⚡ 100% Eléctrico • 300 mi rango • Tecnología GM • Futuro Honda"
                 }
             ]
         }
