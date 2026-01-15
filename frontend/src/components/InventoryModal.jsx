@@ -43,8 +43,7 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
             make: selectedBrand.name,
             model: model.name,
             year: model.year,
-            price: model.price,
-            description: model.description,
+            qualities: model.qualities,
             primary_image_url: model.image
         });
     };
@@ -160,16 +159,11 @@ const InventoryModal = ({ isOpen, onClose, onSelect }) => {
                                     </div>
 
                                     <div className="p-4">
-                                        <h3 className="text-lg font-bold text-white mb-1">
+                                        <h3 className="text-lg font-bold text-white mb-2">
                                             {selectedBrand.name} {model.name}
                                         </h3>
-                                        <div className="flex justify-between items-center mb-2">
-                                            <span className="text-green-400 font-mono font-bold text-lg">
-                                                ${model.price?.toLocaleString()}
-                                            </span>
-                                        </div>
-                                        <p className="text-xs text-gray-500 mb-3 line-clamp-2">
-                                            {model.description}
+                                        <p className="text-sm text-blue-400 mb-3">
+                                            {model.qualities}
                                         </p>
 
                                         <button

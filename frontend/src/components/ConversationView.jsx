@@ -556,7 +556,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     setSending(true);
                     setShowInventory(false);
                     try {
-                        const caption = `🚗 *${car.make} ${car.model} ${car.year}*\n💰 $${car.price?.toLocaleString()} | 📍 ${car.mileage ? car.mileage.toLocaleString() + ' mi' : 'N/A'}\n\n${car.description || 'Vehículo disponible.'}\n\n¿Te gustaría verlo?`;
+                        const caption = `🚗 *${car.make} ${car.model} ${car.year}*\n\n✨ ${car.qualities || 'Excelente vehículo disponible'}\n\n¿Te interesa conocer más detalles?`;
 
                         await api.post('/whatsapp/send-media', {
                             phone_number: client.phone,
