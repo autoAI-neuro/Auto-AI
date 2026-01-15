@@ -3,10 +3,10 @@ from starlette.middleware.cors import CORSMiddleware
 import os
 import httpx
 from datetime import datetime
-from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations
+from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory
 from app.db.session import engine, get_db
 from app.db.base import Base
-from app.models import User, Tag, ClientTag, Message, Automation, AutomationAction  # Import models so SQLAlchemy can detect them
+from app.models import User, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem  # Import models so SQLAlchemy can detect them
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
@@ -39,6 +39,7 @@ app.include_router(messages.router)
 app.include_router(ai.router)
 app.include_router(analytics.router)
 app.include_router(automations.router)
+app.include_router(inventory.router)
 
 @app.get("/health")
 async def health():

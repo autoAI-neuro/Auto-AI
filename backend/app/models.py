@@ -153,3 +153,25 @@ class AutomationAction(Base):
     
     action_type = Column(String, nullable=False)  # SEND_MESSAGE, WAIT, ADD_TAG
     action_payload = Column(JSON, nullable=True)  # {"message": "top", "delay_minutes": 60}
+
+
+class InventoryItem(Base):
+    """Inventory items (Cars) for the dealership"""
+    __tablename__ = "inventory_items"
+
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, ForeignKey("users.id"))
+    
+    make = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    year = Column(Integer, nullable=False)
+    price = Column(Float, nullable=False)
+    mileage = Column(Integer, nullable=True)
+    color = Column(String, nullable=True)
+    
+    primary_image_url = Column(String, nullable=True)
+    
+    status = Column(String, default="available")
+    description = Column(Text, nullable=True)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

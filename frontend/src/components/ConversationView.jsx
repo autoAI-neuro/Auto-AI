@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2 } from 'lucide-react';
+import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2, Car } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
+import InventoryModal from './InventoryModal';
 
 const ConversationView = ({ client, onClose, onSendMessage }) => {
     const { token } = useAuth();
@@ -11,6 +12,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [loading, setLoading] = useState(true);
     const [sending, setSending] = useState(false);
     const [generatingReply, setGeneratingReply] = useState(false);
+    const [showInventory, setShowInventory] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -490,6 +492,13 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                         <Image className="w-5 h-5" />
                                     </button>
                                     <button
+                                        onClick={() => setShowInventory(true)}
+                                        className="p-3 bg-neutral-800 hover:bg-neutral-700 text-blue-400 hover:text-blue-300 rounded-xl transition-colors"
+                                        title="Enviar Vehículo"
+                                    >
+                                        <Car className="w-5 h-5" />
+                                    </button>
+                                    <button
                                         onClick={getSmartReply}
                                         disabled={generatingReply || messages.length === 0}
                                         className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
@@ -540,6 +549,40 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     )}
                 </div>
             </div>
+            <InventoryModal
+                isOpen={showInventory}
+                onClose={() => setShowInventory(false)}
+                onSelect={async (car) => {
+                    setSending(true);
+                    setShowInventory(false);
+                    try {
+                        const caption = `🚗 *${car.make} ${car.model} ${car.year}*\n💰 $${car.price?.toLocaleString()} | 📍 ${car.mileage ? car.mileage.toLocaleString() + ' mi' : 'N/A'}\n\n${car.description || 'Vehículo disponible.'}\n\n¿Te gustaría verlo?`;
+
+                        await api.post('/whatsapp/send-media', {
+                            phone_number: client.phone,
+                            media_url: car.primary_image_url,
+                            media_type: 'image',
+                            caption: caption
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            content: caption,
+                            media_url: car.primary_image_url,
+                            media_type: 'image',
+                            direction: 'outbound',
+                            status: 'sent',
+                            sent_at: new Date().toISOString()
+                        }]);
+                        toast.success('Vehículo enviado');
+                    } catch (error) {
+                        console.error(error);
+                        toast.error('Error enviando vehículo');
+                    } finally {
+                        setSending(false);
+                    }
+                }}
+            />
         </div>
     );
 };
