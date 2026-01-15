@@ -1,17 +1,42 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calculator, DollarSign, Calendar, Percent, Send, Car } from 'lucide-react';
+import { X, Calculator, DollarSign, Calendar, Percent, Send, Car, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+// Credit score tiers with corresponding APR ranges
+const CREDIT_TIERS = [
+    { min: 750, max: 850, label: 'Excelente', color: 'text-green-400', bgColor: 'bg-green-500/20', aprRange: { min: 3.5, max: 5.5 }, defaultApr: 4.5 },
+    { min: 700, max: 749, label: 'Muy Bueno', color: 'text-blue-400', bgColor: 'bg-blue-500/20', aprRange: { min: 5.0, max: 7.5 }, defaultApr: 6.0 },
+    { min: 650, max: 699, label: 'Bueno', color: 'text-cyan-400', bgColor: 'bg-cyan-500/20', aprRange: { min: 7.0, max: 10.0 }, defaultApr: 8.5 },
+    { min: 600, max: 649, label: 'Regular', color: 'text-yellow-400', bgColor: 'bg-yellow-500/20', aprRange: { min: 10.0, max: 15.0 }, defaultApr: 12.5 },
+    { min: 500, max: 599, label: 'Bajo', color: 'text-orange-400', bgColor: 'bg-orange-500/20', aprRange: { min: 15.0, max: 20.0 }, defaultApr: 17.5 },
+    { min: 300, max: 499, label: 'Muy Bajo', color: 'text-red-400', bgColor: 'bg-red-500/20', aprRange: { min: 20.0, max: 29.9 }, defaultApr: 24.9 },
+];
+
+const getCreditTier = (score) => {
+    return CREDIT_TIERS.find(tier => score >= tier.min && score <= tier.max) || CREDIT_TIERS[CREDIT_TIERS.length - 1];
+};
+
 const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
+    const [creditScore, setCreditScore] = useState(700);
     const [formData, setFormData] = useState({
         vehiclePrice: vehicleInfo?.price || 35000,
         downPayment: 5000,
-        interestRate: 6.9,
+        interestRate: 6.0,
         loanTermMonths: 60,
         tradeInValue: 0
     });
 
     const [result, setResult] = useState(null);
+    const currentTier = getCreditTier(creditScore);
+
+    // Update APR when credit score changes
+    useEffect(() => {
+        const tier = getCreditTier(creditScore);
+        setFormData(prev => ({
+            ...prev,
+            interestRate: tier.defaultApr
+        }));
+    }, [creditScore]);
 
     // Calculate when form changes
     useEffect(() => {
@@ -72,8 +97,11 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
 📊 *A financiar*: $${result.principal.toLocaleString()}
 📅 Plazo: ${formData.loanTermMonths} meses
 📈 Tasa: ${formData.interestRate}% APR
+⭐ Crédito: ${currentTier.label} (${creditScore})
 
 ✨ *Pago Mensual: $${result.monthlyPayment.toLocaleString()}*
+
+_Basado en puntaje crediticio de ${creditScore} puntos_
 
 ¿Te gustaría continuar con esta opción?`;
 
@@ -88,10 +116,10 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl">
+            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
 
                 {/* Header */}
-                <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                <div className="p-4 border-b border-white/10 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-green-500/20 rounded-lg">
                             <Calculator className="w-6 h-6 text-green-400" />
@@ -108,6 +136,47 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
 
                 {/* Form */}
                 <div className="p-6 space-y-5">
+
+                    {/* Credit Score Section */}
+                    <div className={`p-4 rounded-xl border ${currentTier.bgColor} border-white/10`}>
+                        <div className="flex items-center justify-between mb-3">
+                            <label className="text-sm text-gray-300 flex items-center gap-2">
+                                <Star className="w-4 h-4" /> Puntaje Crediticio (FICO)
+                            </label>
+                            <div className={`flex items-center gap-2 ${currentTier.color}`}>
+                                <span className="text-2xl font-bold">{creditScore}</span>
+                                <span className="text-sm px-2 py-0.5 rounded-full bg-white/10">{currentTier.label}</span>
+                            </div>
+                        </div>
+                        <input
+                            type="range"
+                            min="300"
+                            max="850"
+                            value={creditScore}
+                            onChange={(e) => setCreditScore(parseInt(e.target.value))}
+                            className="w-full h-2 rounded-full appearance-none cursor-pointer"
+                            style={{
+                                background: `linear-gradient(to right, 
+                                    #ef4444 0%, 
+                                    #f97316 20%, 
+                                    #eab308 40%, 
+                                    #22d3ee 60%, 
+                                    #3b82f6 80%, 
+                                    #22c55e 100%)`
+                            }}
+                        />
+                        <div className="flex justify-between mt-2 text-xs text-gray-500">
+                            <span>300</span>
+                            <span>500</span>
+                            <span>650</span>
+                            <span>700</span>
+                            <span>750</span>
+                            <span>850</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2 text-center">
+                            Tasa estimada: <span className={currentTier.color}>{currentTier.aprRange.min}% - {currentTier.aprRange.max}% APR</span>
+                        </p>
+                    </div>
 
                     {/* Vehicle Price */}
                     <div>
@@ -160,6 +229,7 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
                                 <Percent className="w-4 h-4" /> Tasa APR
+                                <span className="text-xs text-gray-500">(ajustable)</span>
                             </label>
                             <div className="relative">
                                 <input
@@ -197,6 +267,9 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
                             <p className="text-4xl font-bold text-green-400">
                                 ${result.monthlyPayment.toLocaleString()}
                             </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                                Con crédito <span className={currentTier.color}>{currentTier.label}</span> @ {formData.interestRate}% APR
+                            </p>
                         </div>
 
                         <div className="grid grid-cols-3 gap-4 text-center text-sm">
@@ -217,7 +290,7 @@ ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleS
                 )}
 
                 {/* Actions */}
-                <div className="p-4 border-t border-white/10 flex gap-3">
+                <div className="p-4 border-t border-white/10 flex gap-3 sticky bottom-0 bg-neutral-900">
                     <button
                         onClick={onClose}
                         className="flex-1 py-3 bg-neutral-800 hover:bg-neutral-700 text-white rounded-xl transition-colors"
