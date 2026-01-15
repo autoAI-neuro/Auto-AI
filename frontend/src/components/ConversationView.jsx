@@ -78,33 +78,101 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
         }
     };
 
+    const [pendingMedia, setPendingMedia] = useState(null);
+    const fileInputRef = useRef(null);
+
+    // ... (keep existing useEffects)
+
+    const handleFileSelect = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Basic validation
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error('El archivo es demasiado grande (Máx 10MB)');
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        const loadingToast = toast.loading('Subiendo archivo...');
+
+        try {
+            const response = await api.post('/files/upload-media', formData, {
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+
+            setPendingMedia({
+                url: response.data.media_url,
+                type: response.data.media_type,
+                filename: response.data.filename
+            });
+            toast.dismiss(loadingToast);
+        } catch (err) {
+            console.error('Upload error:', err);
+            toast.dismiss(loadingToast);
+            toast.error('Error al subir archivo');
+        } finally {
+            // Reset input
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+
     const handleSend = async () => {
-        if (!newMessage.trim()) return;
+        if (!newMessage.trim() && !pendingMedia) return;
 
         setSending(true);
         try {
-            // Send via parent's handler
-            await onSendMessage(client.phone, newMessage);
+            if (pendingMedia) {
+                // Send Media Message
+                await api.post('/whatsapp/send-media', {
+                    phone_number: client.phone,
+                    media_url: pendingMedia.url,
+                    media_type: pendingMedia.type,
+                    caption: newMessage // Message acts as caption
+                }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
 
-            // Add to local messages immediately
-            setMessages(prev => [...prev, {
-                id: Date.now().toString(),
-                direction: 'outbound',
-                content: newMessage,
-                sent_at: new Date().toISOString(),
-                status: 'sent'
-            }]);
+                // Add to local messages
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    direction: 'outbound',
+                    content: newMessage, // Caption
+                    media_url: pendingMedia.url,
+                    media_type: pendingMedia.type,
+                    sent_at: new Date().toISOString(),
+                    status: 'sent'
+                }]);
+            } else {
+                // Send Text Message
+                await onSendMessage(client.phone, newMessage);
+
+                // Add to local
+                setMessages(prev => [...prev, {
+                    id: Date.now().toString(),
+                    direction: 'outbound',
+                    content: newMessage,
+                    sent_at: new Date().toISOString(),
+                    status: 'sent'
+                }]);
+            }
 
             setNewMessage('');
+            setPendingMedia(null);
         } catch (err) {
             console.error('Send error:', err);
+            toast.error('Error al enviar mensaje');
         } finally {
             setSending(false);
         }
     };
 
     const getSmartReply = async () => {
-        // Get the last inbound message to reply to
         const lastInbound = [...messages].reverse().find(m => m.direction === 'inbound');
         if (!lastInbound) {
             toast.error('No hay mensajes del cliente para responder');
@@ -153,7 +221,6 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
         return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
     };
 
-    // Group messages by date
     const groupedMessages = messages.reduce((groups, msg) => {
         const date = new Date(msg.sent_at).toDateString();
         if (!groups[date]) {
@@ -184,7 +251,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                 </div>
 
                 {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/50">
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-950/50 custom-scrollbar">
                     {loading ? (
                         <div className="flex items-center justify-center h-full">
                             <Loader className="w-8 h-8 text-purple-500 animate-spin" />
@@ -198,14 +265,11 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     ) : (
                         Object.entries(groupedMessages).map(([date, msgs]) => (
                             <div key={date}>
-                                {/* Date divider */}
                                 <div className="flex items-center justify-center my-4">
                                     <span className="bg-neutral-800 text-gray-400 text-xs px-3 py-1 rounded-full">
                                         {formatDate(msgs[0].sent_at)}
                                     </span>
                                 </div>
-
-                                {/* Messages for this date */}
                                 {msgs.map(msg => (
                                     <div
                                         key={msg.id}
@@ -226,15 +290,15 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                                             className="max-w-full rounded-lg"
                                                         />
                                                     ) : (
-                                                        <div className="flex items-center gap-2 text-sm opacity-70">
+                                                        <div className="flex items-center gap-2 text-sm opacity-70 p-2 bg-black/20 rounded">
                                                             <Image className="w-4 h-4" />
-                                                            {msg.media_type}
+                                                            <span>{msg.media_type}</span>
                                                         </div>
                                                     )}
                                                 </div>
                                             )}
-                                            {msg.content && <p className="text-sm">{msg.content}</p>}
-                                            <p className={`text-xs mt-1 ${msg.direction === 'outbound' ? 'text-purple-200' : 'text-gray-400'
+                                            {msg.content && <p className="text-sm pb-1">{msg.content}</p>}
+                                            <p className={`text-[10px] text-right ${msg.direction === 'outbound' ? 'text-purple-200' : 'text-gray-400'
                                                 }`}>
                                                 {formatTime(msg.sent_at)}
                                                 {msg.direction === 'outbound' && msg.status === 'sent' && ' ✓'}
@@ -249,33 +313,80 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     <div ref={messagesEndRef} />
                 </div>
 
-                {/* Input */}
+                {/* Input Area */}
                 <div className="p-4 border-t border-white/10 bg-neutral-800/50">
-                    <div className="flex gap-2">
-                        <button
-                            onClick={getSmartReply}
-                            disabled={generatingReply || messages.length === 0}
-                            className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white px-3 rounded-xl transition-all"
-                            title="Generar respuesta con IA"
-                        >
-                            {generatingReply ? (
-                                <Loader className="w-5 h-5 animate-spin" />
-                            ) : (
-                                <Sparkles className="w-5 h-5" />
-                            )}
-                        </button>
+
+                    {/* Media Preview inside Input Area */}
+                    {pendingMedia && (
+                        <div className="mb-3 p-3 bg-neutral-900 rounded-xl border border-white/10 flex items-center justify-between animate-slideIn">
+                            <div className="flex items-center gap-3">
+                                {pendingMedia.type === 'image' ? (
+                                    <img src={pendingMedia.url} alt="Preview" className="w-12 h-12 object-cover rounded-lg" />
+                                ) : (
+                                    <div className="w-12 h-12 bg-neutral-800 rounded-lg flex items-center justify-center">
+                                        <Image className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                )}
+                                <div className="overflow-hidden">
+                                    <p className="text-sm text-white font-medium truncate max-w-[200px]">{pendingMedia.filename}</p>
+                                    <p className="text-xs text-gray-400 capitalize">{pendingMedia.type}</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setPendingMedia(null)}
+                                className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        </div>
+                    )}
+
+                    <div className="flex gap-2 items-end">
                         <input
-                            type="text"
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && !sending && handleSend()}
-                            placeholder="Escribe un mensaje..."
-                            className="flex-1 bg-neutral-900 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            onChange={handleFileSelect}
+                            accept="image/*,video/*,application/pdf"
                         />
+
+                        <div className="flex flex-col gap-2">
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="p-3 bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white rounded-xl transition-colors"
+                                title="Adjuntar foto/video"
+                            >
+                                <Image className="w-5 h-5" />
+                            </button>
+                            <button
+                                onClick={getSmartReply}
+                                disabled={generatingReply || messages.length === 0}
+                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
+                                title="Generar respuesta con IA"
+                            >
+                                {generatingReply ? (
+                                    <Loader className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <Sparkles className="w-5 h-5" />
+                                )}
+                            </button>
+                        </div>
+
+                        <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl flex items-center">
+                            <textarea
+                                value={newMessage}
+                                onChange={(e) => setNewMessage(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && handleSend()}
+                                placeholder={pendingMedia ? "Añadir descripción..." : "Escribe un mensaje..."}
+                                className="w-full bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 px-4 py-3 resize-none max-h-[100px] custom-scrollbar"
+                                rows={1}
+                            />
+                        </div>
+
                         <button
                             onClick={handleSend}
-                            disabled={sending || !newMessage.trim()}
-                            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white px-4 rounded-xl transition-colors"
+                            disabled={sending || (!newMessage.trim() && !pendingMedia)}
+                            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors self-end h-[48px] w-[48px] flex items-center justify-center shrink-0"
                         >
                             {sending ? (
                                 <Loader className="w-5 h-5 animate-spin" />
