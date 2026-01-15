@@ -3,6 +3,7 @@ from starlette.middleware.cors import CORSMiddleware
 import os
 import httpx
 from datetime import datetime
+from sqlalchemy import text
 from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory
 from app.db.session import engine, get_db
 from app.db.base import Base
@@ -54,7 +55,7 @@ async def health():
     # Check Database
     try:
         db = next(get_db())
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         status["services"]["database"] = {"status": "ok"}
     except Exception as e:
         status["services"]["database"] = {"status": "error", "message": str(e)}
