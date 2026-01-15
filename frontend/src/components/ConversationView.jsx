@@ -149,7 +149,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                             media_type: 'audio',
                             caption: '',
                             ptt: true,
-                            mimetype: 'audio/webm'
+                            mimetype: uploadRes.data.mimetype || 'audio/webm'
                         }, { headers: { 'Authorization': `Bearer ${token}` } });
 
                         // 3. Optimistic UI

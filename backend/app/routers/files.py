@@ -229,6 +229,7 @@ async def export_backup(
 # ============================================
 import uuid
 import shutil
+import subprocess
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
 
@@ -279,6 +280,35 @@ async def upload_media(
     try:
         with open(file_path, 'wb') as buffer:
             shutil.copyfileobj(file.file, buffer)
+            
+        # Convert WebM Audio to OGG for WhatsApp PTT
+        if content_type == 'audio/webm':
+            try:
+                ogg_name = f"{uuid.uuid4()}.ogg"
+                ogg_path = MEDIA_DIR / ogg_name
+                
+                # FFmpeg conversion to OGG Opus
+                subprocess.run([
+                    'ffmpeg', '-i', str(file_path),
+                    '-c:a', 'libopus',
+                    '-b:a', '64k',
+                    '-vn',
+                    '-y',
+                    str(ogg_path)
+                ], check=True, capture_output=True)
+                
+                # If successful, use the new file
+                if ogg_path.exists():
+                    os.remove(file_path) # Delete original webm
+                    unique_name = ogg_name
+                    file_path = ogg_path
+                    # We might want to update media_type too, but keeping it as audio is fine
+                    
+            except Exception as e:
+                print(f"Audio conversion failed: {e}")
+                # Continue with original file if conversion fails
+                pass
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
     
@@ -286,11 +316,15 @@ async def upload_media(
     base_url = os.getenv("BACKEND_PUBLIC_URL", "https://auto-ai-production-b99a.up.railway.app")
     media_url = f"{base_url}/files/media/{unique_name}"
     
+    # Determine final mimetype
+    final_mime = "audio/ogg" if unique_name.endswith(".ogg") else content_type
+
     return {
         "status": "uploaded",
         "media_url": media_url,
         "media_type": media_type,
-        "filename": file.filename,
+        "mimetype": final_mime,
+        "filename": unique_name,
         "size": file_path.stat().st_size
     }
 
