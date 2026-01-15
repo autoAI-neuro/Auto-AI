@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles } from 'lucide-react';
+import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
@@ -80,6 +80,104 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
 
     const [pendingMedia, setPendingMedia] = useState(null);
     const fileInputRef = useRef(null);
+
+    // Recording State
+    const [isRecording, setIsRecording] = useState(false);
+    const [recordingDuration, setRecordingDuration] = useState(0);
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+    const timerRef = useRef(null);
+
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream);
+            mediaRecorderRef.current = mediaRecorder;
+            audioChunksRef.current = [];
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    audioChunksRef.current.push(event.data);
+                }
+            };
+
+            mediaRecorder.start();
+            setIsRecording(true);
+
+            setRecordingDuration(0);
+            timerRef.current = setInterval(() => {
+                setRecordingDuration(prev => prev + 1);
+            }, 1000);
+
+        } catch (err) {
+            console.error('Error accessing microphone:', err);
+            toast.error('No se puede acceder al micrófono');
+        }
+    };
+
+    const stopRecording = (shouldSend = true) => {
+        if (mediaRecorderRef.current && isRecording) {
+            // Setup onstop handler dynamically based on action
+            mediaRecorderRef.current.onstop = async () => {
+                // Return cleanup
+                mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+                clearInterval(timerRef.current);
+                setIsRecording(false);
+
+                if (shouldSend) {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' }); // Browsers usually record webm
+                    const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, { type: 'audio/webm' });
+
+                    // Upload
+                    const formData = new FormData();
+                    formData.append('file', audioFile);
+
+                    const loadingToast = toast.loading('Enviando audio...');
+                    try {
+                        // 1. Upload
+                        const uploadRes = await api.post('/files/upload-media', formData, {
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'multipart/form-data'
+                            }
+                        });
+
+                        // 2. Send as PTT
+                        await api.post('/whatsapp/send-media', {
+                            phone_number: client.phone,
+                            media_url: uploadRes.data.media_url,
+                            media_type: 'audio',
+                            caption: '',
+                            ptt: true
+                        }, { headers: { 'Authorization': `Bearer ${token}` } });
+
+                        // 3. Optimistic UI
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            direction: 'outbound',
+                            content: '',
+                            media_url: uploadRes.data.media_url,
+                            media_type: 'audio',
+                            sent_at: new Date().toISOString(),
+                            status: 'sent'
+                        }]);
+                        toast.dismiss(loadingToast);
+                    } catch (err) {
+                        console.error('Voice send error:', err);
+                        toast.dismiss(loadingToast);
+                        toast.error('Error enviando audio');
+                    }
+                }
+            };
+            mediaRecorderRef.current.stop();
+        }
+    };
+
+    const formatDuration = (sec) => {
+        const m = Math.floor(sec / 60);
+        const s = sec % 60;
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    };
 
     // ... (keep existing useEffects)
 
@@ -289,6 +387,10 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                                             alt="Media"
                                                             className="max-w-full rounded-lg"
                                                         />
+                                                    ) : msg.media_type === 'audio' ? (
+                                                        <div className="flex items-center gap-2 min-w-[200px]">
+                                                            <audio controls src={msg.media_url} className="h-8 w-full" />
+                                                        </div>
                                                     ) : (
                                                         <div className="flex items-center gap-2 text-sm opacity-70 p-2 bg-black/20 rounded">
                                                             <Image className="w-4 h-4" />
@@ -341,60 +443,100 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                         </div>
                     )}
 
-                    <div className="flex gap-2 items-end">
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            className="hidden"
-                            onChange={handleFileSelect}
-                            accept="image/*,video/*,application/pdf"
-                        />
+                    {isRecording ? (
+                        /* Recording UI Overlay */
+                        <div className="flex items-center gap-4 flex-1 bg-neutral-900 border border-red-500/30 rounded-xl px-4 py-2 animate-pulse">
+                            <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                            <span className="text-red-400 font-mono font-medium min-w-[50px]">
+                                {formatDuration(recordingDuration)}
+                            </span>
+                            <div className="flex-1" /> {/* Spacer */}
 
-                        <div className="flex flex-col gap-2">
                             <button
-                                onClick={() => fileInputRef.current?.click()}
-                                className="p-3 bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white rounded-xl transition-colors"
-                                title="Adjuntar foto/video"
+                                onClick={() => stopRecording(false)}
+                                className="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                                title="Cancelar"
                             >
-                                <Image className="w-5 h-5" />
+                                <Trash2 className="w-5 h-5" />
                             </button>
+
                             <button
-                                onClick={getSmartReply}
-                                disabled={generatingReply || messages.length === 0}
-                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
-                                title="Generar respuesta con IA"
+                                onClick={() => stopRecording(true)}
+                                className="p-2 bg-green-600 hover:bg-green-700 text-white rounded-full transition-colors"
+                                title="Enviar Nota de Voz"
                             >
-                                {generatingReply ? (
-                                    <Loader className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <Sparkles className="w-5 h-5" />
-                                )}
-                            </button>
-                        </div>
-
-                        <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl flex items-center">
-                            <textarea
-                                value={newMessage}
-                                onChange={(e) => setNewMessage(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && handleSend()}
-                                placeholder={pendingMedia ? "Añadir descripción..." : "Escribe un mensaje..."}
-                                className="w-full bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 px-4 py-3 resize-none max-h-[100px] custom-scrollbar"
-                                rows={1}
-                            />
-                        </div>
-
-                        <button
-                            onClick={handleSend}
-                            disabled={sending || (!newMessage.trim() && !pendingMedia)}
-                            className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors self-end h-[48px] w-[48px] flex items-center justify-center shrink-0"
-                        >
-                            {sending ? (
-                                <Loader className="w-5 h-5 animate-spin" />
-                            ) : (
                                 <Send className="w-5 h-5" />
-                            )}
-                        </button>
-                    </div>
+                            </button>
+                        </div>
+                    ) : (
+                        /* Standard Input Area */
+                        <>
+                            <div className="flex gap-2 items-end flex-1">
+                                <input
+                                    type="file"
+                                    ref={fileInputRef}
+                                    className="hidden"
+                                    onChange={handleFileSelect}
+                                    accept="image/*,video/*,application/pdf"
+                                />
+
+                                <div className="flex flex-col gap-2">
+                                    <button
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="p-3 bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white rounded-xl transition-colors"
+                                        title="Adjuntar archivo"
+                                    >
+                                        <Image className="w-5 h-5" />
+                                    </button>
+                                    <button
+                                        onClick={getSmartReply}
+                                        disabled={generatingReply || messages.length === 0}
+                                        className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
+                                        title="Generar respuesta con IA"
+                                    >
+                                        {generatingReply ? (
+                                            <Loader className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                </div>
+
+                                <div className="flex-1 bg-neutral-900 border border-white/10 rounded-xl flex items-center">
+                                    <textarea
+                                        value={newMessage}
+                                        onChange={(e) => setNewMessage(e.target.value)}
+                                        onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && !sending && handleSend()}
+                                        placeholder={pendingMedia ? "Añadir descripción..." : "Escribe un mensaje..."}
+                                        className="w-full bg-transparent border-none text-white placeholder-gray-500 focus:ring-0 px-4 py-3 resize-none max-h-[100px] custom-scrollbar"
+                                        rows={1}
+                                    />
+                                </div>
+
+                                {newMessage.trim() || pendingMedia ? (
+                                    <button
+                                        onClick={handleSend}
+                                        disabled={sending}
+                                        className="bg-purple-600 hover:bg-purple-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-colors self-end h-[48px] w-[48px] flex items-center justify-center shrink-0"
+                                    >
+                                        {sending ? (
+                                            <Loader className="w-5 h-5 animate-spin" />
+                                        ) : (
+                                            <Send className="w-5 h-5" />
+                                        )}
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={startRecording}
+                                        className="bg-neutral-800 hover:bg-neutral-700 text-gray-400 hover:text-white p-3 rounded-xl transition-colors self-end h-[48px] w-[48px] flex items-center justify-center shrink-0"
+                                        title="Grabar nota de voz"
+                                    >
+                                        <Mic className="w-5 h-5" />
+                                    </button>
+                                )}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
         </div>

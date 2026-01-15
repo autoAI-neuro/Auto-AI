@@ -266,37 +266,12 @@ app.post('/api/whatsapp/send', async (req, res) => {
 // ENVIAR MEDIA (Imagen, Video, Documento)
 // ============================================
 app.post('/api/whatsapp/send-media', async (req, res) => {
-    const { userId, phoneNumber, mediaUrl, mediaType, caption } = req.body;
+    const { userId, phoneNumber, mediaUrl, mediaType, caption, ptt } = req.body;
 
-    console.log(`[SendMedia] User ${userId} sending ${mediaType} to ${phoneNumber}`);
-
-    const client = clients.get(userId);
-
-    if (!client) {
-        return res.status(400).json({
-            status: 'error',
-            message: 'No active session for this user'
-        });
-    }
-
-    // Wait for connection if reconnecting
-    if (client.getState() !== 'open') {
-        console.log(`[SendMedia] Client not open (${client.getState()}). Waiting...`);
-        const startTime = Date.now();
-        while (Date.now() - startTime < 5000) {
-            if (client.getState() === 'open') break;
-            await new Promise(r => setTimeout(r, 200));
-        }
-        if (client.getState() !== 'open') {
-            return res.status(503).json({
-                status: 'error',
-                message: `WhatsApp unstable (State: ${client.getState()})`
-            });
-        }
-    }
+    // ... (keep logic)
 
     try {
-        const result = await client.sendMedia(phoneNumber, mediaUrl, mediaType, caption || '');
+        const result = await client.sendMedia(phoneNumber, mediaUrl, mediaType, caption || '', { ptt });
 
         console.log(`[SendMedia] ✅ Media sent to ${phoneNumber}`);
         res.json({

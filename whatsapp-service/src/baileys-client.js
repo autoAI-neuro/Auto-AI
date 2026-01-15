@@ -226,7 +226,7 @@ class BaileysClient {
         }
     }
 
-    async sendMedia(phone, mediaUrl, mediaType, caption = '') {
+    async sendMedia(phone, mediaUrl, mediaType, caption = '', options = {}) {
         if (!this.sock || this.state !== 'open') {
             throw new Error('WhatsApp no está conectado');
         }
@@ -250,7 +250,8 @@ class BaileysClient {
             case 'audio':
                 messageContent = {
                     audio: { url: mediaUrl },
-                    mimetype: 'audio/mp4'
+                    mimetype: 'audio/mp4',
+                    ptt: options.ptt || false
                 };
                 break;
             case 'document':
