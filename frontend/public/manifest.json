@@ -1,0 +1,36 @@
+{
+    "name": "AutoAI - CRM Automotriz",
+    "short_name": "AutoAI",
+    "description": "CRM inteligente para vendedores de autos con WhatsApp integrado",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0a0a0a",
+    "theme_color": "#3b82f6",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "shortcuts": [
+        {
+            "name": "Dashboard",
+            "short_name": "Dashboard",
+            "description": "Ver clientes y conversaciones",
+            "url": "/dashboard",
+            "icons": [
+                {
+                    "src": "/icon-512.png",
+                    "sizes": "512x512"
+                }
+            ]
+        }
+    ]
+}
