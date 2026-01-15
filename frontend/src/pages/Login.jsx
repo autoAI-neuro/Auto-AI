@@ -66,6 +66,7 @@ const Login = () => {
 
             <div className="w-full max-w-md relative z-10 px-6">
                 <div className="mb-12 text-center">
+                    <img src="/logo.svg" alt="AutoAI" className="w-20 h-20 mx-auto mb-4" />
                     <h1 className="text-4xl font-light tracking-tight text-white mb-2">AutoAI</h1>
                     <p className="text-neutral-400 text-sm font-light tracking-wide uppercase">Dealer ManagementOS</p>
                 </div>

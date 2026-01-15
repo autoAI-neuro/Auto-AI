@@ -1,20 +1,18 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- AutoAI Minimalist Logo -->
+  <!-- The "A" shape - clean geometric lines -->
+  <polygon points="24,4 44,44 36,44 24,16 12,44 4,44" fill="url(#grad)"/>
+  
+  <!-- The crossbar - represents the road -->
+  <rect x="12" y="30" width="24" height="4" rx="2" fill="url(#grad)"/>
+  
+  <!-- AI dot - intelligence -->
+  <circle cx="24" cy="24" r="3" fill="white"/>
+  
   <defs>
     <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#3b82f6"/>
-      <stop offset="100%" style="stop-color:#1d4ed8"/>
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
     </linearGradient>
   </defs>
-  
-  <!-- Background circle -->
-  <circle cx="256" cy="256" r="240" fill="#0a0a0a"/>
-  
-  <!-- Minimalist "A" formed by two lines -->
-  <path d="M256 100 L380 400 L340 400 L256 180 L172 400 L132 400 Z" fill="url(#grad)"/>
-  
-  <!-- Horizontal bar of the A -->
-  <rect x="175" y="300" width="162" height="30" rx="5" fill="url(#grad)"/>
-  
-  <!-- AI dot -->
-  <circle cx="256" cy="240" r="20" fill="#fff"/>
 </svg>
