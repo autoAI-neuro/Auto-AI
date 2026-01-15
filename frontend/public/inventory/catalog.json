@@ -5,21 +5,21 @@
             "models": [
                 {
                     "name": "Corolla",
-                    "image": "/inventory/Toyota/Corolla/corolla_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Corolla/corolla_1.jpg",
                     "year": 2024,
                     "price": 25000,
                     "description": "Toyota Corolla - Sedán confiable y económico"
                 },
                 {
                     "name": "Camry",
-                    "image": "/inventory/Toyota/Camry/camry_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Camry/camry_1.jpg",
                     "year": 2024,
                     "price": 32000,
                     "description": "Toyota Camry - Sedán ejecutivo de lujo"
                 },
                 {
                     "name": "RAV4",
-                    "image": "/inventory/Toyota/RAV4/rav4_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/RAV4/rav4_1.jpg",
                     "year": 2024,
                     "price": 38000,
                     "description": "Toyota RAV4 - SUV compacta versátil"
@@ -31,21 +31,21 @@
             "models": [
                 {
                     "name": "Civic",
-                    "image": "/inventory/Honda/Civic/civic_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Civic/civic_1.jpg",
                     "year": 2024,
                     "price": 26000,
                     "description": "Honda Civic - Sedán deportivo y eficiente"
                 },
                 {
                     "name": "Accord",
-                    "image": "/inventory/Honda/Accord/accord_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/Accord/accord_1.jpg",
                     "year": 2024,
                     "price": 35000,
                     "description": "Honda Accord - Sedán premium de alto rendimiento"
                 },
                 {
                     "name": "CR-V",
-                    "image": "/inventory/Honda/CR-V/crv_1.jpg",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Honda/CR-V/crv_1.jpg",
                     "year": 2024,
                     "price": 40000,
                     "description": "Honda CR-V - SUV familiar espaciosa"
