@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2, Car } from 'lucide-react';
+import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2, Car, Calculator } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
 import InventoryModal from './InventoryModal';
+import PaymentCalculator from './PaymentCalculator';
 
 const ConversationView = ({ client, onClose, onSendMessage }) => {
     const { token } = useAuth();
@@ -13,6 +14,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [sending, setSending] = useState(false);
     const [generatingReply, setGeneratingReply] = useState(false);
     const [showInventory, setShowInventory] = useState(false);
+    const [showCalculator, setShowCalculator] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -499,6 +501,13 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                         <Car className="w-5 h-5" />
                                     </button>
                                     <button
+                                        onClick={() => setShowCalculator(true)}
+                                        className="p-3 bg-neutral-800 hover:bg-neutral-700 text-green-400 hover:text-green-300 rounded-xl transition-colors"
+                                        title="Calculadora de Cuotas"
+                                    >
+                                        <Calculator className="w-5 h-5" />
+                                    </button>
+                                    <button
                                         onClick={getSmartReply}
                                         disabled={generatingReply || messages.length === 0}
                                         className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
@@ -578,6 +587,32 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     } catch (error) {
                         console.error(error);
                         toast.error('Error enviando vehículo');
+                    } finally {
+                        setSending(false);
+                    }
+                }}
+            />
+            <PaymentCalculator
+                isOpen={showCalculator}
+                onClose={() => setShowCalculator(false)}
+                onSend={async (message) => {
+                    setSending(true);
+                    try {
+                        await api.post('/whatsapp/send-message', {
+                            phone_number: client.phone,
+                            message: message
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            content: message,
+                            direction: 'outbound',
+                            status: 'sent',
+                            sent_at: new Date().toISOString()
+                        }]);
+                    } catch (error) {
+                        console.error(error);
+                        toast.error('Error enviando cotización');
                     } finally {
                         setSending(false);
                     }
