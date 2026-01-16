@@ -598,7 +598,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                 onSend={async (message) => {
                     setSending(true);
                     try {
-                        await api.post('/whatsapp/send-message', {
+                        await api.post('/whatsapp/send', {
                             phone_number: client.phone,
                             message: message
                         }, { headers: { Authorization: `Bearer ${token}` } });
