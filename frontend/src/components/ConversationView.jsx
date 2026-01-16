@@ -5,6 +5,7 @@ import api from '../config';
 import { useAuth } from '../context/AuthContext';
 import InventoryModal from './InventoryModal';
 import PaymentCalculator from './PaymentCalculator';
+import ToyotaLeaseCalculator from './ToyotaLeaseCalculator';
 
 const ConversationView = ({ client, onClose, onSendMessage }) => {
     const { token } = useAuth();
@@ -15,6 +16,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [generatingReply, setGeneratingReply] = useState(false);
     const [showInventory, setShowInventory] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
+    const [showToyotaCalc, setShowToyotaCalc] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -508,6 +510,13 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                         <Calculator className="w-5 h-5" />
                                     </button>
                                     <button
+                                        onClick={() => setShowToyotaCalc(true)}
+                                        className="p-3 bg-red-900/50 hover:bg-red-800 text-red-400 hover:text-red-300 rounded-xl transition-colors border border-red-500/30"
+                                        title="Toyota Lease Calculator"
+                                    >
+                                        <span className="text-xs font-bold">TFS</span>
+                                    </button>
+                                    <button
                                         onClick={getSmartReply}
                                         disabled={generatingReply || messages.length === 0}
                                         className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
@@ -613,6 +622,32 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     } catch (error) {
                         console.error(error);
                         throw error; // Re-throw so PaymentCalculator can catch it
+                    } finally {
+                        setSending(false);
+                    }
+                }}
+            />
+            <ToyotaLeaseCalculator
+                isOpen={showToyotaCalc}
+                onClose={() => setShowToyotaCalc(false)}
+                onSend={async (message) => {
+                    setSending(true);
+                    try {
+                        await api.post('/whatsapp/send', {
+                            phone_number: client.phone,
+                            message: message
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            content: message,
+                            direction: 'outbound',
+                            status: 'sent',
+                            sent_at: new Date().toISOString()
+                        }]);
+                    } catch (error) {
+                        console.error(error);
+                        throw error;
                     } finally {
                         setSending(false);
                     }
