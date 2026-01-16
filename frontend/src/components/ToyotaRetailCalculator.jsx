@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, Percent, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { TOYOTA_FINANCE_DATA } from '../data/toyotaFinanceData';
+import { TOYOTA_FINANCE_DATA, getCreditTier, getCreditTierNumber } from '../data/toyotaFinanceData';
 
 const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     // State
@@ -387,8 +387,8 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                                     key={t}
                                     onClick={() => setTerm(t)}
                                     className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${term === t
-                                            ? 'bg-green-600 text-white'
-                                            : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
+                                        ? 'bg-green-600 text-white'
+                                        : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
                                         }`}
                                 >
                                     {t}

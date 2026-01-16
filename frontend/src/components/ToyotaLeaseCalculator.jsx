@@ -1,137 +1,176 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, AlertTriangle } from 'lucide-react';
+import { X, Calendar, DollarSign, Star, Send, Car, Search, ChevronDown, Info, Percent } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { TOYOTA_FINANCE_DATA, getCreditTier, calculateLeasePayment } from '../data/toyotaFinanceData';
+import {
+    TOYOTA_FINANCE_DATA,
+    getCreditTier,
+    getCreditTierNumber,
+    getLTVBucket,
+    getMoneyFactor,
+    calculateLeasePayment,
+    findSpecialLeaseProgram
+} from '../data/toyotaFinanceData';
 
 const ToyotaLeaseCalculator = ({ isOpen, onClose, onSend }) => {
     // State
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedModel, setSelectedModel] = useState(null);
+    const [selectedModelCode, setSelectedModelCode] = useState(null);
     const [showModelList, setShowModelList] = useState(false);
     const [creditScore, setCreditScore] = useState(720);
-    const [term, setTerm] = useState(36);
+    const [term, setTerm] = useState(39);
     const [mileage, setMileage] = useState(15000);
     const [downPayment, setDownPayment] = useState(3000);
     const [tradeIn, setTradeIn] = useState(0);
     const [sellingPrice, setSellingPrice] = useState(0);
     const [result, setResult] = useState(null);
 
-    // Get all models as array
+    // Get model list from data
     const modelList = useMemo(() => {
-        return Object.entries(TOYOTA_FINANCE_DATA.models2026).map(([name, data]) => ({
-            name,
+        return Object.entries(TOYOTA_FINANCE_DATA.models).map(([code, data]) => ({
+            code,
             ...data
         }));
     }, []);
 
     // Filtered models based on search
     const filteredModels = useMemo(() => {
-        if (!searchTerm) return modelList.slice(0, 20);
+        if (!searchTerm) return modelList.slice(0, 25);
         return modelList.filter(m =>
-            m.name.toLowerCase().includes(searchTerm.toLowerCase())
-        ).slice(0, 20);
+            m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            m.code.includes(searchTerm)
+        ).slice(0, 25);
     }, [searchTerm, modelList]);
 
-    // Get current credit tier
-    const currentTier = useMemo(() => getCreditTier(creditScore), [creditScore]);
+    // Get selected model data
+    const selectedModel = useMemo(() => {
+        if (!selectedModelCode) return null;
+        return TOYOTA_FINANCE_DATA.models[selectedModelCode];
+    }, [selectedModelCode]);
 
-    // Calculate when inputs change
+    // Get credit tier info
+    const tierInfo = useMemo(() => getCreditTier(creditScore), [creditScore]);
+    const tierNumber = useMemo(() => getCreditTierNumber(creditScore), [creditScore]);
+
+    // Check for special program
+    const specialProgram = useMemo(() => {
+        if (!selectedModelCode) return null;
+        return findSpecialLeaseProgram(selectedModelCode, term);
+    }, [selectedModelCode, term]);
+
+    // Calculate lease
     useEffect(() => {
-        if (!selectedModel || !currentTier) {
+        if (!selectedModel || !tierNumber) {
             setResult(null);
             return;
         }
 
-        // Get residual for selected term
-        let residualPercent = selectedModel.residuals[term] || selectedModel.residuals[36];
+        const price = sellingPrice || selectedModel.mrt;
+        const mrt = selectedModel.mrt;
 
-        // Apply mileage adjustment
-        const mileageAdj = TOYOTA_FINANCE_DATA.mileageOptions.residualAdjustment[mileage] || 0;
-        residualPercent += mileageAdj;
+        // Calculate LTV
+        const ltv = ((price + TOYOTA_FINANCE_DATA.adminFee - downPayment - tradeIn) / price) * 100;
+
+        // Get residual % for term and mileage
+        let residualPercent = selectedModel.residuals?.[term] || selectedModel.residuals?.[36] || 50;
+
+        // Adjust for mileage
+        const mileageAdjustment = TOYOTA_FINANCE_DATA.mileageOptions.residualAdjustment[mileage] || 0;
+        residualPercent += mileageAdjustment;
 
         // Get money factor
-        let moneyFactor = currentTier.moneyFactor;
+        const mfResult = getMoneyFactor(selectedModelCode, tierNumber, ltv, term);
 
-        // Add term adjustment for 52-60 months
-        if (term > 51) {
-            moneyFactor += TOYOTA_FINANCE_DATA.moneyFactorAdjustments.term52to60;
+        if (!mfResult || !mfResult.moneyFactor) {
+            setResult({ error: "LTV muy alto o tier no elegible" });
+            return;
         }
 
-        // Calculate using selling price or MRT
-        const price = sellingPrice || selectedModel.mrt;
+        const { moneyFactor, isSpecial, programName } = mfResult;
 
-        const leaseResult = calculateLeasePayment({
+        // Get bonus if applicable
+        const bonus = selectedModel.bonus || 0;
+
+        // Calculate payment
+        const payment = calculateLeasePayment({
             sellingPrice: price,
-            mrt: selectedModel.mrt,
+            mrt,
             residualPercent,
             moneyFactor,
             term,
             downPayment,
-            tradeIn
-        });
-
-        // Add bonus if applicable
-        const bonus = selectedModel.bonus || 0;
-
-        setResult({
-            ...leaseResult,
-            residualPercent,
-            moneyFactor,
-            apr: moneyFactor * 2400,
-            mrt: selectedModel.mrt,
+            tradeIn,
             bonus
         });
 
-    }, [selectedModel, creditScore, term, mileage, downPayment, tradeIn, sellingPrice, currentTier]);
+        setResult({
+            ...payment,
+            moneyFactor,
+            isSpecial,
+            programName,
+            ltv: Math.round(ltv),
+            bonus,
+            mileage,
+            term
+        });
+
+    }, [selectedModel, selectedModelCode, creditScore, term, mileage, downPayment, tradeIn, sellingPrice, tierNumber]);
 
     // Handle model selection
     const handleSelectModel = (model) => {
-        setSelectedModel(model);
+        setSelectedModelCode(model.code);
         setSellingPrice(model.mrt);
         setShowModelList(false);
         setSearchTerm(model.name);
     };
 
+    // Format money factor as percentage equivalent
+    const mfToAPREquivalent = (mf) => (mf * 2400).toFixed(2);
+
     // Send quote to client
     const handleSendQuote = async () => {
-        if (!result || !selectedModel) return;
+        if (!result || result.error || !selectedModel) return;
 
         const price = sellingPrice || selectedModel.mrt;
-        const mileageLabel = mileage === 12000 ? '12K' : mileage === 15000 ? '15K' : '18K';
 
-        const message = `🚗 *Cotización de Lease - Toyota Financial*
+        const message = `🚗 *Cotización de Lease - Toyota Financial Services*
 
 📋 *Vehículo:* ${selectedModel.name}
 💰 Precio: $${price.toLocaleString()}
-${result.bonus > 0 ? `🎁 Bonus: -$${result.bonus.toLocaleString()}\n` : ''}
-⭐ *Crédito:* ${currentTier.label} (${creditScore})
-📈 APR Efectivo: ${result.apr.toFixed(2)}%
-📊 Residual: ${result.residualPercent}%
+📊 MRT: $${selectedModel.mrt.toLocaleString()}
+${result.bonus > 0 ? `🎁 *Bonus Lease Cash: $${result.bonus.toLocaleString()}*\n` : ''}
+
+⭐ *Crédito:* ${tierInfo.label} - ${tierInfo.description} (${creditScore})
+${result.isSpecial ? `🔥 *PROGRAMA ESPECIAL: ${result.programName}*\n` : ''}
+📈 Money Factor: ${result.moneyFactor.toFixed(5)} (~${mfToAPREquivalent(result.moneyFactor)}% equiv.)
 
 📅 Plazo: ${term} meses
-🛣️ Millas: ${mileageLabel}/año
-📥 Down: $${downPayment.toLocaleString()}
+🛣️ Millas: ${(mileage / 1000).toFixed(0)}K/año
+📥 Down Payment: $${downPayment.toLocaleString()}
 ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
-💵 Admin Fee: $${TOYOTA_FINANCE_DATA.adminFee}
+
+━━━━━━━━━━━━━━━━━━━
+📦 *DESGLOSE:*
+• Cap Cost: $${result.adjustedCapCost.toLocaleString()}
+• Residual: $${result.residualValue.toLocaleString()} (${result.residualPercent}%)
+• Depreciación: $${result.depreciation.toLocaleString()}/mes
+• Cargo financiero: $${result.financeCharge.toLocaleString()}/mes
+• Tax 6%: $${result.monthlyTax.toLocaleString()}/mes
 
 ━━━━━━━━━━━━━━━━━━━
 ✨ *PAGO MENSUAL: $${result.totalMonthlyPayment.toLocaleString()}*
-(Incluye 6% FL Sales Tax)
 ━━━━━━━━━━━━━━━━━━━
 
-📌 *Desglose:*
-• Depreciación: $${result.depreciation.toLocaleString()}/mes
-• Cargo financiero: $${result.financeCharge.toLocaleString()}/mes
-• Valor Residual: $${result.residualValue.toLocaleString()}
+📌 Admin Fee: $${TOYOTA_FINANCE_DATA.adminFee}
+${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósito de seguridad'}
 
-⚠️ _Cotización basada en datos oficiales de Toyota Financial Services. Sujeto a aprobación crediticia. Los términos finales pueden variar._
+⚠️ _Cotización basada en datos oficiales SET Finance (Ene 2026). Sujeto a aprobación crediticia._
 
 ¿Deseas agendar una cita?`;
 
         try {
             await onSend(message);
             onClose();
-            toast.success('Cotización Toyota enviada');
+            toast.success('Cotización de lease enviada');
         } catch (error) {
             console.error(error);
             toast.error('Error enviando cotización');
@@ -143,6 +182,15 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
     const termOptions = [24, 36, 39, 48, 60];
     const mileageOptions = [12000, 15000, 18000];
 
+    // Get tier color
+    const getTierColor = (score) => {
+        if (score >= 720) return "text-green-400";
+        if (score >= 680) return "text-blue-400";
+        if (score >= 650) return "text-yellow-400";
+        if (score >= 600) return "text-orange-400";
+        return "text-red-400";
+    };
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl max-h-[95vh] overflow-y-auto">
@@ -151,8 +199,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                 <div className="p-4 border-b border-white/10 flex justify-between items-center sticky top-0 bg-neutral-900 z-20">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-red-600/20 rounded-lg">
-                            <img src="/inventory/toyota/logo.png" alt="Toyota" className="w-6 h-6" onError={(e) => e.target.style.display = 'none'} />
-                            <Calculator className="w-6 h-6 text-red-500" />
+                            <Car className="w-6 h-6 text-red-500" />
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Toyota Lease Calculator</h2>
@@ -169,7 +216,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                     {/* Model Search */}
                     <div className="relative">
                         <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                            <Car className="w-4 h-4" /> Seleccionar Modelo 2026
+                            <Car className="w-4 h-4" /> Seleccionar Modelo
                         </label>
                         <div className="relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -190,50 +237,68 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                         {/* Dropdown */}
                         {showModelList && (
                             <div className="absolute z-30 w-full mt-1 bg-neutral-800 border border-white/10 rounded-xl shadow-xl max-h-60 overflow-y-auto">
-                                {filteredModels.map((model, idx) => (
-                                    <button
-                                        key={idx}
-                                        onClick={() => handleSelectModel(model)}
-                                        className="w-full px-4 py-3 text-left hover:bg-white/10 flex justify-between items-center border-b border-white/5 last:border-0"
-                                    >
-                                        <span className="text-white text-sm">{model.name}</span>
-                                        <span className="text-gray-400 text-xs">${model.mrt.toLocaleString()}</span>
-                                    </button>
-                                ))}
+                                {filteredModels.map((model, idx) => {
+                                    const hasBonus = model.bonus && model.bonus > 0;
+                                    const hasSpecial = findSpecialLeaseProgram(model.code, term);
+                                    return (
+                                        <button
+                                            key={idx}
+                                            onClick={() => handleSelectModel(model)}
+                                            className="w-full px-4 py-3 text-left hover:bg-white/10 flex justify-between items-center border-b border-white/5 last:border-0"
+                                        >
+                                            <div className="flex items-center gap-2 flex-1">
+                                                <span className="text-gray-500 text-xs font-mono">{model.code}</span>
+                                                <span className="text-white text-sm truncate">{model.name}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {hasBonus && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 bg-green-600 text-white rounded">+${(model.bonus / 1000)}K</span>
+                                                )}
+                                                {hasSpecial && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 bg-red-600 text-white rounded">SPECIAL</span>
+                                                )}
+                                                <span className="text-gray-400 text-xs">${model.mrt.toLocaleString()}</span>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
 
                     {/* Selected Model Info */}
                     {selectedModel && (
-                        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl flex justify-between items-center">
-                            <div>
-                                <p className="text-white font-medium">{selectedModel.name}</p>
-                                <p className="text-xs text-gray-400">MRT: ${selectedModel.mrt.toLocaleString()} • Código: {selectedModel.code}</p>
+                        <div className="p-3 bg-red-900/20 border border-red-500/30 rounded-xl">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <p className="text-white font-medium">{selectedModel.name}</p>
+                                    <p className="text-xs text-gray-400">MRT: ${selectedModel.mrt.toLocaleString()}</p>
+                                </div>
+                                <div className="text-right">
+                                    {specialProgram && (
+                                        <span className="px-3 py-1 bg-red-600 text-white text-xs rounded-full font-medium">
+                                            SPECIAL LEASE
+                                        </span>
+                                    )}
+                                    {selectedModel.bonus && (
+                                        <p className="text-sm text-green-400 mt-1 font-medium">+${selectedModel.bonus.toLocaleString()} Bonus</p>
+                                    )}
+                                </div>
                             </div>
-                            {selectedModel.bonus && (
-                                <span className="px-3 py-1 bg-green-600 text-white text-sm rounded-full font-medium">
-                                    -${selectedModel.bonus.toLocaleString()} Bonus
-                                </span>
-                            )}
                         </div>
                     )}
 
                     {/* Credit Score */}
-                    <div className={`p-4 rounded-xl border ${currentTier ? 'border-white/10' : 'border-red-500/50'} bg-neutral-800/50`}>
+                    <div className="p-4 rounded-xl border border-white/10 bg-neutral-800/50">
                         <div className="flex items-center justify-between mb-3">
                             <label className="text-sm text-gray-300 flex items-center gap-2">
                                 <Star className="w-4 h-4" /> Puntaje Crediticio
                             </label>
                             <div className="flex items-center gap-2">
                                 <span className="text-2xl font-bold text-white">{creditScore}</span>
-                                {currentTier && (
-                                    <span className={`text-sm px-2 py-0.5 rounded-full ${creditScore >= 720 ? 'bg-green-500/20 text-green-400' :
-                                            creditScore >= 680 ? 'bg-blue-500/20 text-blue-400' :
-                                                creditScore >= 650 ? 'bg-yellow-500/20 text-yellow-400' :
-                                                    'bg-orange-500/20 text-orange-400'
-                                        }`}>
-                                        {currentTier.label}
+                                {tierInfo && (
+                                    <span className={`text-sm px-2 py-0.5 rounded-full bg-white/10 ${getTierColor(creditScore)}`}>
+                                        {tierInfo.label} ({tierInfo.description})
                                     </span>
                                 )}
                             </div>
@@ -246,17 +311,18 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                             onChange={(e) => setCreditScore(parseInt(e.target.value))}
                             className="w-full h-2 rounded-full appearance-none cursor-pointer"
                             style={{
-                                background: `linear-gradient(to right, #f97316, #eab308 25%, #3b82f6 60%, #22c55e 100%)`
+                                background: `linear-gradient(to right, #ef4444, #f97316 15%, #eab308 30%, #3b82f6 60%, #22c55e 100%)`
                             }}
                         />
-                        {currentTier && (
-                            <p className="text-xs text-gray-500 mt-2 text-center">
-                                Money Factor: {currentTier.moneyFactor} → APR: {(currentTier.moneyFactor * 2400).toFixed(2)}%
-                            </p>
+                        {result && !result.error && (
+                            <div className="mt-3 flex justify-between text-xs text-gray-400">
+                                <span>Money Factor: <span className="text-white font-mono">{result.moneyFactor.toFixed(5)}</span></span>
+                                <span>≈ {mfToAPREquivalent(result.moneyFactor)}% APR equiv.</span>
+                            </div>
                         )}
                     </div>
 
-                    {/* Selling Price */}
+                    {/* Selling Price & Down Payment */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block">Precio de Venta</label>
@@ -304,9 +370,9 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> Plazo
+                                <Calendar className="w-4 h-4" /> Plazo (meses)
                             </label>
-                            <div className="flex gap-2">
+                            <div className="flex gap-1">
                                 {termOptions.map(t => (
                                     <button
                                         key={t}
@@ -328,12 +394,12 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                                     <button
                                         key={m}
                                         onClick={() => setMileage(m)}
-                                        className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${mileage === m
+                                        className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${mileage === m
                                                 ? 'bg-red-600 text-white'
                                                 : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
                                             }`}
                                     >
-                                        {(m / 1000)}K
+                                        {m / 1000}K
                                     </button>
                                 ))}
                             </div>
@@ -342,14 +408,14 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                 </div>
 
                 {/* Results */}
-                {result && (
+                {result && !result.error && (
                     <div className="mx-6 mb-4 p-5 bg-gradient-to-br from-red-900/30 to-red-800/20 rounded-xl border border-red-500/30">
                         <div className="text-center mb-4">
                             <p className="text-gray-400 text-sm mb-1">Pago Mensual (con 6% Tax)</p>
                             <p className="text-5xl font-bold text-red-400">
                                 ${result.totalMonthlyPayment.toLocaleString()}
                             </p>
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-sm text-gray-400 mt-1">
                                 Base: ${result.basePayment.toLocaleString()} + Tax: ${result.monthlyTax.toLocaleString()}
                             </p>
                         </div>
@@ -357,7 +423,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                         <div className="grid grid-cols-4 gap-3 text-center text-sm">
                             <div>
                                 <p className="text-gray-500">Cap Cost</p>
-                                <p className="text-white font-medium">${result.capCost.toLocaleString()}</p>
+                                <p className="text-white font-medium">${result.adjustedCapCost.toLocaleString()}</p>
                             </div>
                             <div>
                                 <p className="text-gray-500">Residual</p>
@@ -365,21 +431,37 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                             </div>
                             <div>
                                 <p className="text-gray-500">Residual %</p>
-                                <p className="text-red-400 font-medium">{result.residualPercent}%</p>
+                                <p className="text-white font-medium">{result.residualPercent}%</p>
                             </div>
                             <div>
-                                <p className="text-gray-500">APR</p>
-                                <p className="text-red-400 font-medium">{result.apr.toFixed(2)}%</p>
+                                <p className="text-gray-500">MF</p>
+                                <p className={result.isSpecial ? "text-green-400 font-bold" : "text-white font-medium"}>
+                                    {result.moneyFactor.toFixed(5)}
+                                </p>
                             </div>
                         </div>
+
+                        {result.isSpecial && (
+                            <div className="mt-3 text-center">
+                                <span className="inline-block px-3 py-1 bg-green-600/20 text-green-400 rounded-full text-sm">
+                                    🔥 Programa Especial: {result.programName}
+                                </span>
+                            </div>
+                        )}
                     </div>
                 )}
 
-                {/* Disclaimer */}
+                {result && result.error && (
+                    <div className="mx-6 mb-4 p-4 bg-red-900/30 border border-red-500/30 rounded-xl text-center">
+                        <p className="text-red-400">{result.error}</p>
+                    </div>
+                )}
+
+                {/* Info */}
                 <div className="mx-6 mb-4 p-3 bg-amber-900/20 border border-amber-500/20 rounded-xl flex items-start gap-3">
                     <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-200">
-                        Cálculos basados en datos oficiales de <strong>Toyota Financial Services - SET Finance</strong> (Enero 2026).
+                        Cálculos basados en datos oficiales de Toyota Financial Services - SET Finance (Enero 2026).
                         Admin Fee: ${TOYOTA_FINANCE_DATA.adminFee}. Sujeto a aprobación crediticia.
                     </p>
                 </div>
@@ -394,7 +476,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                     </button>
                     <button
                         onClick={handleSendQuote}
-                        disabled={!result}
+                        disabled={!result || result.error}
                         className="flex-1 py-3 bg-red-600 hover:bg-red-700 disabled:bg-gray-700 disabled:cursor-not-allowed text-white rounded-xl flex items-center justify-center gap-2 transition-colors font-medium"
                     >
                         <Send className="w-4 h-4" />
