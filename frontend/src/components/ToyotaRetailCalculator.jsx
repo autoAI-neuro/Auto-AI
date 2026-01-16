@@ -17,8 +17,9 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
 
     // Get all models as array
     const modelList = useMemo(() => {
-        return Object.entries(TOYOTA_FINANCE_DATA.models2026).map(([name, data]) => ({
-            name,
+        return Object.entries(TOYOTA_FINANCE_DATA.models).map(([code, data]) => ({
+            code,
+            name: data.name,
             ...data
         }));
     }, []);
@@ -93,7 +94,8 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
         }
 
         const price = sellingPrice || selectedModel.mrt;
-        const amountFinanced = price - downPayment - tradeIn + TOYOTA_FINANCE_DATA.loanProcessingFee.new;
+        const loanFee = TOYOTA_FINANCE_DATA.loanProcessingFee?.new || 399;
+        const amountFinanced = price - downPayment - tradeIn + loanFee;
 
         // Calculate LTV
         const ltv = (amountFinanced / price) * 100;
@@ -447,7 +449,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                     <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-200">
                         Tasas especiales válidas hasta Feb 2, 2026. Programa sujeto a cambios.
-                        FL/GA Processing Fee: ${TOYOTA_FINANCE_DATA.loanProcessingFee.new} incluido.
+                        FL/GA Processing Fee: $399 incluido.
                     </p>
                 </div>
 
