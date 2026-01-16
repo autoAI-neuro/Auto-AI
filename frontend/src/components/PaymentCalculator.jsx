@@ -130,7 +130,7 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
         );
     };
 
-    const handleSendToClient = () => {
+    const handleSendToClient = async () => {
         if (!result) return;
 
         const selectedFeesList = selectedFees.map(feeId => {
@@ -160,13 +160,18 @@ ${selectedFeesList}
 
 ✨ *Pago Mensual Estimado: $${result.monthlyPayment.toLocaleString()}*
 
-⚠️ _IMPORTANTE: Esta es una cotización APROXIMADA. Los montos finales pueden variar según verificación de crédito, promociones vigentes y términos del financiero. Sujeto a aprobación._
+⚠️ Cotización APROXIMADA. Sujeto a aprobación.
 
-¿Te gustaría agendar una cita para revisar los números exactos?`;
+¿Te gustaría agendar una cita?`;
 
-        onSend(message);
-        onClose();
-        toast.success('Cotización enviada al cliente');
+        try {
+            await onSend(message);
+            onClose();
+            toast.success('Cotización enviada');
+        } catch (error) {
+            console.error('Error sending quote:', error);
+            toast.error('Error enviando cotización');
+        }
     };
 
     if (!isOpen) return null;

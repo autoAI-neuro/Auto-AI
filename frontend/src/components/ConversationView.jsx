@@ -612,7 +612,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                         }]);
                     } catch (error) {
                         console.error(error);
-                        toast.error('Error enviando cotización');
+                        throw error; // Re-throw so PaymentCalculator can catch it
                     } finally {
                         setSending(false);
                     }
