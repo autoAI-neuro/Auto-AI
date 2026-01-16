@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Calculator, DollarSign, Calendar, Percent, Send, Car, Star } from 'lucide-react';
+import { X, Calculator, DollarSign, Calendar, Percent, Send, Car, Star, FileText, Shield, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 // Credit score tiers with corresponding APR ranges
@@ -12,12 +12,27 @@ const CREDIT_TIERS = [
     { min: 300, max: 499, label: 'Muy Bajo', color: 'text-red-400', bgColor: 'bg-red-500/20', aprRange: { min: 20.0, max: 29.9 }, defaultApr: 24.9 },
 ];
 
+// Florida dealer fees (realistic 2025 values)
+const FLORIDA_FEES = [
+    { id: 'salesTax', name: 'Sales Tax (FL 6%)', type: 'percent', value: 6, description: 'Impuesto estatal de Florida', required: true },
+    { id: 'docFee', name: 'Doc Fee / Electronic Filing', value: 799, description: 'Preparación de documentos', required: true },
+    { id: 'tagTitle', name: 'Tag, Title & Registration', value: 495, description: 'DMV fees', required: true },
+    { id: 'dealerFee', name: 'Dealer Fee / Pre-Delivery', value: 999, description: 'Cargo del dealer (máx $1,000 en FL)', required: false },
+    { id: 'gapInsurance', name: 'GAP Insurance', value: 895, description: 'Protección si el vehículo es total loss', required: false },
+    { id: 'extendedWarranty', name: 'Extended Warranty (3yr/36k)', value: 1495, description: 'Garantía extendida básica', required: false },
+    { id: 'extendedWarrantyPremium', name: 'Extended Warranty (5yr/60k)', value: 2495, description: 'Garantía extendida premium', required: false },
+    { id: 'paintProtection', name: 'Paint Protection / Ceramic', value: 699, description: 'Protección de pintura', required: false },
+    { id: 'windowTint', name: 'Window Tint', value: 399, description: 'Polarizado de vidrios', required: false },
+    { id: 'loJack', name: 'LoJack / GPS Tracking', value: 695, description: 'Sistema anti-robo', required: false },
+];
+
 const getCreditTier = (score) => {
     return CREDIT_TIERS.find(tier => score >= tier.min && score <= tier.max) || CREDIT_TIERS[CREDIT_TIERS.length - 1];
 };
 
 const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
     const [creditScore, setCreditScore] = useState(700);
+    const [selectedFees, setSelectedFees] = useState(['salesTax', 'docFee', 'tagTitle']);
     const [formData, setFormData] = useState({
         vehiclePrice: vehicleInfo?.price || 35000,
         downPayment: 5000,
@@ -28,6 +43,22 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
 
     const [result, setResult] = useState(null);
     const currentTier = getCreditTier(creditScore);
+
+    // Calculate total fees
+    const calculateTotalFees = () => {
+        let totalFees = 0;
+        selectedFees.forEach(feeId => {
+            const fee = FLORIDA_FEES.find(f => f.id === feeId);
+            if (fee) {
+                if (fee.type === 'percent') {
+                    totalFees += (formData.vehiclePrice * fee.value) / 100;
+                } else {
+                    totalFees += fee.value;
+                }
+            }
+        });
+        return Math.round(totalFees * 100) / 100;
+    };
 
     // Update APR when credit score changes
     useEffect(() => {
@@ -41,16 +72,20 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
     // Calculate when form changes
     useEffect(() => {
         calculatePayment();
-    }, [formData]);
+    }, [formData, selectedFees]);
 
     const calculatePayment = () => {
         const { vehiclePrice, downPayment, interestRate, loanTermMonths, tradeInValue } = formData;
+        const totalFees = calculateTotalFees();
+
+        // Total amount including fees
+        const totalPrice = vehiclePrice + totalFees;
 
         // Amount to finance
-        const principal = vehiclePrice - downPayment - tradeInValue;
+        const principal = totalPrice - downPayment - tradeInValue;
 
         if (principal <= 0) {
-            setResult({ monthlyPayment: 0, totalPayment: 0, totalInterest: 0, principal: 0 });
+            setResult({ monthlyPayment: 0, totalPayment: 0, totalInterest: 0, principal: 0, totalFees: 0, outTheDoor: 0 });
             return;
         }
 
@@ -74,7 +109,9 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
             monthlyPayment: Math.round(monthlyPayment * 100) / 100,
             totalPayment: Math.round(totalPayment * 100) / 100,
             totalInterest: Math.round(totalInterest * 100) / 100,
-            principal: Math.round(principal * 100) / 100
+            principal: Math.round(principal * 100) / 100,
+            totalFees: totalFees,
+            outTheDoor: Math.round(totalPrice * 100) / 100
         });
     };
 
@@ -85,25 +122,47 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
         }));
     };
 
+    const toggleFee = (feeId) => {
+        setSelectedFees(prev =>
+            prev.includes(feeId)
+                ? prev.filter(id => id !== feeId)
+                : [...prev, feeId]
+        );
+    };
+
     const handleSendToClient = () => {
         if (!result) return;
+
+        const selectedFeesList = selectedFees.map(feeId => {
+            const fee = FLORIDA_FEES.find(f => f.id === feeId);
+            if (!fee) return '';
+            const amount = fee.type === 'percent'
+                ? (formData.vehiclePrice * fee.value) / 100
+                : fee.value;
+            return `  • ${fee.name}: $${Math.round(amount).toLocaleString()}`;
+        }).filter(Boolean).join('\n');
 
         const message = `💰 *Cotización de Financiamiento*
 
 🚗 ${vehicleInfo ? `${vehicleInfo.make} ${vehicleInfo.model} ${vehicleInfo.year}` : 'Vehículo'}
-💵 Precio: $${formData.vehiclePrice.toLocaleString()}
+💵 Precio Base: $${formData.vehiclePrice.toLocaleString()}
 📥 Enganche: $${formData.downPayment.toLocaleString()}
 ${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleString()}\n` : ''}
+📋 *Cargos y Fees:*
+${selectedFeesList}
+💲 Total Fees: $${result.totalFees.toLocaleString()}
+
+🏷️ *Precio Out-The-Door*: $${result.outTheDoor.toLocaleString()}
 📊 *A financiar*: $${result.principal.toLocaleString()}
 📅 Plazo: ${formData.loanTermMonths} meses
 📈 Tasa: ${formData.interestRate}% APR
 ⭐ Crédito: ${currentTier.label} (${creditScore})
 
-✨ *Pago Mensual: $${result.monthlyPayment.toLocaleString()}*
+✨ *Pago Mensual Estimado: $${result.monthlyPayment.toLocaleString()}*
 
-_Basado en puntaje crediticio de ${creditScore} puntos_
+⚠️ _IMPORTANTE: Esta es una cotización APROXIMADA. Los montos finales pueden variar según verificación de crédito, promociones vigentes y términos del financiero. Sujeto a aprobación._
 
-¿Te gustaría continuar con esta opción?`;
+¿Te gustaría agendar una cita para revisar los números exactos?`;
 
         onSend(message);
         onClose();
@@ -116,7 +175,7 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
 
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-            <div className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl max-h-[95vh] overflow-y-auto">
 
                 {/* Header */}
                 <div className="p-4 border-b border-white/10 flex justify-between items-center sticky top-0 bg-neutral-900 z-10">
@@ -126,7 +185,7 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Calculadora de Cuotas</h2>
-                            <p className="text-sm text-gray-400">Cotización de financiamiento</p>
+                            <p className="text-sm text-gray-400">Florida Dealer - Cotización Completa</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -178,27 +237,25 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                         </p>
                     </div>
 
-                    {/* Vehicle Price */}
-                    <div>
-                        <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                            <Car className="w-4 h-4" /> Precio del Vehículo
-                        </label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                            <input
-                                type="number"
-                                value={formData.vehiclePrice}
-                                onChange={(e) => handleChange('vehiclePrice', e.target.value)}
-                                className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-green-500"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Down Payment & Trade-in */}
+                    {/* Vehicle Price & Basic Info */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                                <DollarSign className="w-4 h-4" /> Enganche
+                                <Car className="w-4 h-4" /> Precio del Vehículo
+                            </label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                <input
+                                    type="number"
+                                    value={formData.vehiclePrice}
+                                    onChange={(e) => handleChange('vehiclePrice', e.target.value)}
+                                    className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-green-500"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
+                                <DollarSign className="w-4 h-4" /> Enganche (Down)
                             </label>
                             <div className="relative">
                                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
@@ -210,6 +267,10 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                                 />
                             </div>
                         </div>
+                    </div>
+
+                    {/* Trade-in, APR & Term */}
+                    <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block">Trade-in</label>
                             <div className="relative">
@@ -222,14 +283,9 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                                 />
                             </div>
                         </div>
-                    </div>
-
-                    {/* Interest Rate & Term */}
-                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
                                 <Percent className="w-4 h-4" /> Tasa APR
-                                <span className="text-xs text-gray-500">(ajustable)</span>
                             </label>
                             <div className="relative">
                                 <input
@@ -244,7 +300,7 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                         </div>
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                                <Calendar className="w-4 h-4" /> Plazo (meses)
+                                <Calendar className="w-4 h-4" /> Plazo
                             </label>
                             <select
                                 value={formData.loanTermMonths}
@@ -257,11 +313,66 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                             </select>
                         </div>
                     </div>
+
+                    {/* Florida Dealer Fees Section */}
+                    <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-900/10">
+                        <div className="flex items-center gap-2 mb-4">
+                            <FileText className="w-5 h-5 text-amber-400" />
+                            <h3 className="text-white font-medium">Cargos, Impuestos y Fees (Florida)</h3>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            {FLORIDA_FEES.map(fee => {
+                                const isSelected = selectedFees.includes(fee.id);
+                                const amount = fee.type === 'percent'
+                                    ? Math.round((formData.vehiclePrice * fee.value) / 100)
+                                    : fee.value;
+
+                                return (
+                                    <label
+                                        key={fee.id}
+                                        className={`
+                                            flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all
+                                            ${isSelected
+                                                ? 'bg-amber-500/20 border-amber-500/50'
+                                                : 'bg-neutral-800/50 border-white/5 hover:border-white/20'}
+                                            ${fee.required ? 'opacity-90' : ''}
+                                        `}
+                                    >
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={isSelected}
+                                                onChange={() => toggleFee(fee.id)}
+                                                className="w-4 h-4 rounded border-gray-600 text-amber-500 focus:ring-amber-500 bg-neutral-700"
+                                            />
+                                            <div>
+                                                <span className="text-sm text-white">{fee.name}</span>
+                                                {fee.required && <span className="text-xs text-amber-400 ml-1">*</span>}
+                                            </div>
+                                        </div>
+                                        <span className={`text-sm font-mono ${isSelected ? 'text-amber-400' : 'text-gray-500'}`}>
+                                            ${amount.toLocaleString()}
+                                        </span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-white/10 flex justify-between items-center">
+                            <span className="text-sm text-gray-400">Total Fees Seleccionados:</span>
+                            <span className="text-lg font-bold text-amber-400">${calculateTotalFees().toLocaleString()}</span>
+                        </div>
+
+                        <p className="text-xs text-gray-500 mt-2">
+                            <span className="text-amber-400">*</span> = Cargos típicos incluidos. Precios aproximados segundo trimestre 2025.
+                        </p>
+                    </div>
                 </div>
 
                 {/* Results */}
                 {result && (
-                    <div className="mx-6 mb-6 p-5 bg-gradient-to-br from-green-900/30 to-emerald-900/20 rounded-xl border border-green-500/20">
+                    <div className="mx-6 mb-4 p-5 bg-gradient-to-br from-green-900/30 to-emerald-900/20 rounded-xl border border-green-500/20">
                         <div className="text-center mb-4">
                             <p className="text-gray-400 text-sm mb-1">Pago Mensual Estimado</p>
                             <p className="text-4xl font-bold text-green-400">
@@ -272,22 +383,36 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                        <div className="grid grid-cols-4 gap-3 text-center text-sm">
+                            <div>
+                                <p className="text-gray-500">Precio Base</p>
+                                <p className="text-white font-medium">${formData.vehiclePrice.toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">+ Fees</p>
+                                <p className="text-amber-400 font-medium">${result.totalFees.toLocaleString()}</p>
+                            </div>
+                            <div>
+                                <p className="text-gray-500">Out-The-Door</p>
+                                <p className="text-white font-medium">${result.outTheDoor.toLocaleString()}</p>
+                            </div>
                             <div>
                                 <p className="text-gray-500">A Financiar</p>
-                                <p className="text-white font-medium">${result.principal.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">Total Interés</p>
-                                <p className="text-amber-400 font-medium">${result.totalInterest.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p className="text-gray-500">Total a Pagar</p>
-                                <p className="text-white font-medium">${result.totalPayment.toLocaleString()}</p>
+                                <p className="text-green-400 font-medium">${result.principal.toLocaleString()}</p>
                             </div>
                         </div>
                     </div>
                 )}
+
+                {/* Disclaimer */}
+                <div className="mx-6 mb-4 p-3 bg-red-900/20 border border-red-500/20 rounded-xl flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-red-200">
+                        <strong>IMPORTANTE:</strong> Esta es una cotización APROXIMADA con fines informativos.
+                        Los montos finales pueden variar según verificación de crédito, promociones vigentes,
+                        términos del financiero y condiciones del vehículo. Sujeto a aprobación crediticia.
+                    </p>
+                </div>
 
                 {/* Actions */}
                 <div className="p-4 border-t border-white/10 flex gap-3 sticky bottom-0 bg-neutral-900">
@@ -302,7 +427,7 @@ _Basado en puntaje crediticio de ${creditScore} puntos_
                         className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl flex items-center justify-center gap-2 transition-colors font-medium"
                     >
                         <Send className="w-4 h-4" />
-                        Enviar al Cliente
+                        Enviar Cotización
                     </button>
                 </div>
             </div>
