@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2, Car, Calculator } from 'lucide-react';
+import { X, Send, Image, ArrowLeft, MessageSquare, Loader, Sparkles, Mic, Square, Trash2, Car } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
 import InventoryModal from './InventoryModal';
-import PaymentCalculator from './PaymentCalculator';
 import ToyotaLeaseCalculator from './ToyotaLeaseCalculator';
 import ToyotaRetailCalculator from './ToyotaRetailCalculator';
 
@@ -16,7 +15,6 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [sending, setSending] = useState(false);
     const [generatingReply, setGeneratingReply] = useState(false);
     const [showInventory, setShowInventory] = useState(false);
-    const [showCalculator, setShowCalculator] = useState(false);
     const [showToyotaCalc, setShowToyotaCalc] = useState(false);
     const [showRetailCalc, setShowRetailCalc] = useState(false);
     const messagesEndRef = useRef(null);
@@ -505,25 +503,18 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                         <Car className="w-5 h-5" />
                                     </button>
                                     <button
-                                        onClick={() => setShowCalculator(true)}
-                                        className="p-3 bg-neutral-800 hover:bg-neutral-700 text-green-400 hover:text-green-300 rounded-xl transition-colors"
-                                        title="Calculadora de Cuotas"
-                                    >
-                                        <Calculator className="w-5 h-5" />
-                                    </button>
-                                    <button
                                         onClick={() => setShowToyotaCalc(true)}
                                         className="p-3 bg-red-900/50 hover:bg-red-800 text-red-400 hover:text-red-300 rounded-xl transition-colors border border-red-500/30"
                                         title="Toyota Lease Calculator"
                                     >
-                                        <span className="text-xs font-bold">TFS</span>
+                                        <span className="text-xs font-bold">LEASE</span>
                                     </button>
                                     <button
                                         onClick={() => setShowRetailCalc(true)}
                                         className="p-3 bg-green-900/50 hover:bg-green-800 text-green-400 hover:text-green-300 rounded-xl transition-colors border border-green-500/30"
-                                        title="Toyota Finance (Préstamo)"
+                                        title="Toyota Finance (Compra)"
                                     >
-                                        <span className="text-xs font-bold">APR</span>
+                                        <span className="text-xs font-bold">BUY</span>
                                     </button>
                                     <button
                                         onClick={getSmartReply}
@@ -605,32 +596,6 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                     } catch (error) {
                         console.error(error);
                         toast.error('Error enviando vehículo');
-                    } finally {
-                        setSending(false);
-                    }
-                }}
-            />
-            <PaymentCalculator
-                isOpen={showCalculator}
-                onClose={() => setShowCalculator(false)}
-                onSend={async (message) => {
-                    setSending(true);
-                    try {
-                        await api.post('/whatsapp/send', {
-                            phone_number: client.phone,
-                            message: message
-                        }, { headers: { Authorization: `Bearer ${token}` } });
-
-                        setMessages(prev => [...prev, {
-                            id: Date.now().toString(),
-                            content: message,
-                            direction: 'outbound',
-                            status: 'sent',
-                            sent_at: new Date().toISOString()
-                        }]);
-                    } catch (error) {
-                        console.error(error);
-                        throw error; // Re-throw so PaymentCalculator can catch it
                     } finally {
                         setSending(false);
                     }

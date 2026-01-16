@@ -1,7 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, Percent, TrendingUp } from 'lucide-react';
+import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, Check, TrendingUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { TOYOTA_FINANCE_DATA, getCreditTier, getCreditTierNumber } from '../data/toyotaFinanceData';
+
+// Florida Purchase Fees
+const FLORIDA_PURCHASE_FEES = {
+    // Required fees
+    salesTax: { name: "Sales Tax FL 6%", rate: 0.06, required: true, calculated: true },
+    docFee: { name: "Doc Fee / E-Filing", amount: 799, required: true },
+    tagTitle: { name: "Tag, Title & Registration", amount: 495, required: true },
+    loanProcessing: { name: "FL/GA Loan Processing", amount: 399, required: true },
+
+    // Optional add-ons
+    dealerFee: { name: "Dealer Fee / Pre-Delivery", amount: 999, required: false },
+    gapInsurance: { name: "GAP Insurance", amount: 895, required: false },
+    extWarranty3: { name: "Extended Warranty (3yr/36k)", amount: 1495, required: false },
+    extWarranty5: { name: "Extended Warranty (5yr/60k)", amount: 2495, required: false },
+    paintProtection: { name: "Paint Protection / Ceramic", amount: 699, required: false },
+    windowTint: { name: "Window Tint", amount: 399, required: false },
+    loJack: { name: "LoJack / GPS Tracking", amount: 695, required: false },
+};
 
 const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     // State
@@ -14,6 +32,21 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     const [tradeIn, setTradeIn] = useState(0);
     const [sellingPrice, setSellingPrice] = useState(0);
     const [result, setResult] = useState(null);
+
+    // Included fees state
+    const [includedFees, setIncludedFees] = useState({
+        salesTax: true,
+        docFee: true,
+        tagTitle: true,
+        loanProcessing: true,
+        dealerFee: false,
+        gapInsurance: false,
+        extWarranty3: false,
+        extWarranty5: false,
+        paintProtection: false,
+        windowTint: false,
+        loJack: false,
+    });
 
     // Get all models as array
     const modelList = useMemo(() => {
@@ -32,15 +65,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
         ).slice(0, 20);
     }, [searchTerm, modelList]);
 
-    // Get credit tier (1-4) based on score
-    const getCreditTierNumber = (score) => {
-        if (score >= 720) return 1;
-        if (score >= 680) return 2;
-        if (score >= 650) return 3;
-        if (score >= 600) return 4;
-        return 4;
-    };
-
+    // Get tier info
     const getTierLabel = (score) => {
         if (score >= 740) return { label: "Tier 1+ (Excelente)", color: "text-green-400" };
         if (score >= 720) return { label: "Tier 1 (Muy Bueno)", color: "text-green-400" };
@@ -53,10 +78,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     // Find special APR program for model
     const findSpecialAPR = (modelName) => {
         const programs = TOYOTA_FINANCE_DATA.specialAPRPrograms;
-
-        // Try to find a matching program
         for (const [programName, data] of Object.entries(programs)) {
-            // Check if model name contains key words from program
             const programKey = programName.replace("2026 ", "").replace("2025 ", "").toUpperCase();
             if (modelName.toUpperCase().includes(programKey) ||
                 modelName.toUpperCase().includes(programKey.replace(" ", ""))) {
@@ -69,21 +91,39 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     // Get standard retail rate based on FICO and LTV
     const getStandardRate = (score, ltv) => {
         const rates = TOYOTA_FINANCE_DATA.standardRetailRates;
-
-        // Determine LTV bucket
         let ltvBucket;
         if (ltv <= 93) ltvBucket = rates.ltvLow;
         else if (ltv <= 123) ltvBucket = rates.ltvMid;
-        else if (ltv <= 133) ltvBucket = rates.ltvHigh;
-        else ltvBucket = rates.ltvVeryHigh;
+        else ltvBucket = rates.ltvHigh;
 
-        // Determine FICO bucket
-        if (score >= 740) return ltvBucket["740+"];
-        if (score >= 720) return ltvBucket["720-739"];
-        if (score >= 700) return ltvBucket["700-719"];
-        if (score >= 680) return ltvBucket["680-699"];
-        if (score >= 660) return ltvBucket["660-679"];
-        return 12.99; // Default for <660
+        if (score >= 740) return ltvBucket?.["740+"] || 6.99;
+        if (score >= 720) return ltvBucket?.["720-739"] || 7.49;
+        if (score >= 700) return ltvBucket?.["700-719"] || 8.49;
+        if (score >= 680) return ltvBucket?.["680-699"] || 8.99;
+        if (score >= 660) return ltvBucket?.["660-679"] || 9.99;
+        return 12.99;
+    };
+
+    // Calculate total fees
+    const calculateFees = (price) => {
+        let totalFees = 0;
+        let feeBreakdown = {};
+
+        Object.entries(FLORIDA_PURCHASE_FEES).forEach(([key, fee]) => {
+            if (includedFees[key]) {
+                if (fee.calculated && fee.rate) {
+                    // Sales tax on vehicle price
+                    const amount = Math.round(price * fee.rate);
+                    feeBreakdown[key] = amount;
+                    totalFees += amount;
+                } else if (fee.amount) {
+                    feeBreakdown[key] = fee.amount;
+                    totalFees += fee.amount;
+                }
+            }
+        });
+
+        return { totalFees, feeBreakdown };
     };
 
     // Calculate when inputs change
@@ -94,8 +134,13 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
         }
 
         const price = sellingPrice || selectedModel.mrt;
-        const loanFee = TOYOTA_FINANCE_DATA.loanProcessingFee?.new || 399;
-        const amountFinanced = price - downPayment - tradeIn + loanFee;
+        const { totalFees, feeBreakdown } = calculateFees(price);
+
+        // Bonus if applicable
+        const bonus = selectedModel.bonus || 0;
+
+        // Amount to finance (price + fees - down - trade - bonus)
+        const amountFinanced = price + totalFees - downPayment - tradeIn - bonus;
 
         // Calculate LTV
         const ltv = (amountFinanced / price) * 100;
@@ -112,7 +157,6 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
             const tierKey = `tier${tierNum}`;
             const termRates = specialProgram.rates[tierKey];
             if (termRates) {
-                // Find closest term
                 const availableTerms = [36, 48, 60, 72];
                 const closestTerm = availableTerms.reduce((prev, curr) =>
                     Math.abs(curr - term) < Math.abs(prev - term) ? curr : prev
@@ -125,8 +169,8 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
             }
         }
 
-        // Fall back to standard rate if no special program
-        if (!isSpecialRate) {
+        // Fall back to standard rate
+        if (!isSpecialRate || apr === undefined) {
             apr = getStandardRate(creditScore, ltv);
         }
 
@@ -141,16 +185,16 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
                 (Math.pow(1 + monthlyRate, term) - 1);
         }
 
-        // Total interest
+        // Total payments and interest
         const totalPayments = monthlyPayment * term;
         const totalInterest = totalPayments - amountFinanced;
-
-        // Get bonus if applicable
-        const bonus = selectedModel.bonus || 0;
 
         setResult({
             monthlyPayment: Math.round(monthlyPayment * 100) / 100,
             amountFinanced: Math.round(amountFinanced),
+            price: Math.round(price),
+            totalFees: Math.round(totalFees),
+            feeBreakdown,
             apr,
             isSpecialRate,
             programName,
@@ -160,7 +204,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
             bonus
         });
 
-    }, [selectedModel, creditScore, term, downPayment, tradeIn, sellingPrice]);
+    }, [selectedModel, creditScore, term, downPayment, tradeIn, sellingPrice, includedFees]);
 
     // Handle model selection
     const handleSelectModel = (model) => {
@@ -170,6 +214,19 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
         setSearchTerm(model.name);
     };
 
+    // Toggle fee
+    const toggleFee = (feeKey) => {
+        if (FLORIDA_PURCHASE_FEES[feeKey]?.required) return;
+        // Don't allow both warranties at once
+        if (feeKey === 'extWarranty3' && includedFees.extWarranty5) {
+            setIncludedFees(prev => ({ ...prev, extWarranty5: false, extWarranty3: true }));
+        } else if (feeKey === 'extWarranty5' && includedFees.extWarranty3) {
+            setIncludedFees(prev => ({ ...prev, extWarranty3: false, extWarranty5: true }));
+        } else {
+            setIncludedFees(prev => ({ ...prev, [feeKey]: !prev[feeKey] }));
+        }
+    };
+
     // Send quote to client
     const handleSendQuote = async () => {
         if (!result || !selectedModel) return;
@@ -177,20 +234,34 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
         const price = sellingPrice || selectedModel.mrt;
         const tierInfo = getTierLabel(creditScore);
 
+        let feesDetail = '';
+        Object.entries(result.feeBreakdown).forEach(([key, amount]) => {
+            const fee = FLORIDA_PURCHASE_FEES[key];
+            if (fee) {
+                feesDetail += `• ${fee.name}: $${amount.toLocaleString()}\n`;
+            }
+        });
+
         const message = `🚗 *Cotización de Financiamiento - Toyota Financial*
 
 📋 *Vehículo:* ${selectedModel.name}
 💰 Precio: $${price.toLocaleString()}
-${result.bonus > 0 ? `🎁 Bonus APR Cash: $${result.bonus.toLocaleString()}\n` : ''}
+${result.bonus > 0 ? `🎁 *Bonus APR Cash: $${result.bonus.toLocaleString()}*\n` : ''}
 ⭐ *Crédito:* ${tierInfo.label} (${creditScore})
 ${result.isSpecialRate ? `🔥 *TASA ESPECIAL: ${result.apr}% APR*` : `📈 Tasa: ${result.apr}% APR`}
 
 📅 Plazo: ${term} meses
 📥 Down Payment: $${downPayment.toLocaleString()}
 ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
-💵 A Financiar: $${result.amountFinanced.toLocaleString()}
 
 ━━━━━━━━━━━━━━━━━━━
+📋 *CARGOS Y FEES FLORIDA:*
+${feesDetail}
+📦 *Total Fees: $${result.totalFees.toLocaleString()}*
+━━━━━━━━━━━━━━━━━━━
+
+💵 *A FINANCIAR: $${result.amountFinanced.toLocaleString()}*
+
 ✨ *PAGO MENSUAL: $${result.monthlyPayment.toLocaleString()}*
 ━━━━━━━━━━━━━━━━━━━
 
@@ -199,11 +270,11 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
 • Interés total: $${result.totalInterest.toLocaleString()}
 • LTV: ${result.ltv}%
 
-🏆 *AL FINAL DEL PRÉSTAMO, EL CARRO ES TUYO*
+🏆 *AL FINAL DE ${term} MESES, ¡EL CARRO ES TUYO!*
 
-⚠️ _Cotización basada en datos de Toyota Financial Services. Sujeto a aprobación crediticia. Los términos finales pueden variar._
+⚠️ _Cotización basada en Toyota Financial Services Florida. Sujeto a aprobación crediticia._
 
-¿Deseas agendar una cita para revisar?`;
+¿Deseas agendar una cita?`;
 
         try {
             await onSend(message);
@@ -220,6 +291,10 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
     const termOptions = [36, 48, 60, 72, 75];
     const tierInfo = getTierLabel(creditScore);
 
+    // Separate required and optional fees
+    const requiredFees = Object.entries(FLORIDA_PURCHASE_FEES).filter(([_, f]) => f.required);
+    const optionalFees = Object.entries(FLORIDA_PURCHASE_FEES).filter(([_, f]) => !f.required);
+
     return (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-white/10 shadow-2xl max-h-[95vh] overflow-y-auto">
@@ -232,7 +307,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Toyota Finance Calculator</h2>
-                            <p className="text-xs text-gray-400">Préstamo Retail • APR Especiales Ene 2026</p>
+                            <p className="text-xs text-gray-400">Compra Florida • APR Especiales Ene 2026</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -240,12 +315,12 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                     </button>
                 </div>
 
-                <div className="p-6 space-y-5">
+                <div className="p-5 space-y-4">
 
                     {/* Model Search */}
                     <div className="relative">
                         <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
-                            <Car className="w-4 h-4" /> Seleccionar Modelo 2026
+                            <Car className="w-4 h-4" /> Seleccionar Modelo
                         </label>
                         <div className="relative">
                             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -302,7 +377,7 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                                     </span>
                                 )}
                                 {selectedModel.bonus && (
-                                    <p className="text-xs text-green-400 mt-1">+${selectedModel.bonus} Bonus Cash</p>
+                                    <p className="text-xs text-green-400 mt-1">+${selectedModel.bonus.toLocaleString()} Bonus</p>
                                 )}
                             </div>
                         </div>
@@ -398,11 +473,64 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                             ))}
                         </div>
                     </div>
+
+                    {/* Florida Purchase Fees */}
+                    <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-900/10">
+                        <p className="text-sm font-medium text-amber-400 mb-3 flex items-center gap-2">
+                            📋 Cargos, Impuestos y Fees (Florida)
+                        </p>
+
+                        {/* Required Fees */}
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                            {requiredFees.map(([key, fee]) => (
+                                <div
+                                    key={key}
+                                    className="flex items-center justify-between p-2 rounded-lg bg-amber-600/30 text-white border border-amber-500/50"
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-4 h-4 rounded bg-amber-500 flex items-center justify-center">
+                                            <Check className="w-3 h-3 text-black" />
+                                        </div>
+                                        <span className="text-xs">{fee.name} {fee.required && '*'}</span>
+                                    </div>
+                                    <span className="text-xs font-medium">
+                                        {fee.calculated ? `~$${result?.feeBreakdown?.[key]?.toLocaleString() || '---'}` : `$${fee.amount}`}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Optional Fees */}
+                        <p className="text-xs text-gray-400 mb-2">Opcionales:</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {optionalFees.map(([key, fee]) => (
+                                <button
+                                    key={key}
+                                    onClick={() => toggleFee(key)}
+                                    className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${includedFees[key]
+                                            ? 'bg-purple-600/30 text-white border border-purple-500/50'
+                                            : 'bg-neutral-800 text-gray-400 border border-transparent hover:bg-neutral-700'
+                                        }`}
+                                >
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-4 h-4 rounded flex items-center justify-center ${includedFees[key] ? 'bg-purple-500' : 'bg-neutral-700'
+                                            }`}>
+                                            {includedFees[key] && <Check className="w-3 h-3 text-black" />}
+                                        </div>
+                                        <span className="text-xs">{fee.name}</span>
+                                    </div>
+                                    <span className="text-xs font-medium">${fee.amount.toLocaleString()}</span>
+                                </button>
+                            ))}
+                        </div>
+
+                        <p className="text-[10px] text-gray-500 mt-3">* = Cargos típicos incluidos. Precios aproximados Ene 2026.</p>
+                    </div>
                 </div>
 
                 {/* Results */}
                 {result && (
-                    <div className="mx-6 mb-4 p-5 bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-xl border border-green-500/30">
+                    <div className="mx-5 mb-4 p-5 bg-gradient-to-br from-green-900/30 to-green-800/20 rounded-xl border border-green-500/30">
                         <div className="text-center mb-4">
                             <p className="text-gray-400 text-sm mb-1">Pago Mensual</p>
                             <p className="text-5xl font-bold text-green-400">
@@ -415,11 +543,20 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                             )}
                         </div>
 
-                        <div className="grid grid-cols-4 gap-3 text-center text-sm">
-                            <div>
-                                <p className="text-gray-500">A Financiar</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                            <div className="p-3 bg-black/20 rounded-lg">
+                                <p className="text-gray-500 text-xs mb-1">Precio + Fees</p>
+                                <p className="text-white font-medium">
+                                    ${result.price.toLocaleString()} + ${result.totalFees.toLocaleString()}
+                                </p>
+                            </div>
+                            <div className="p-3 bg-black/20 rounded-lg">
+                                <p className="text-gray-500 text-xs mb-1">A Financiar</p>
                                 <p className="text-white font-medium">${result.amountFinanced.toLocaleString()}</p>
                             </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-3 text-center text-sm">
                             <div>
                                 <p className="text-gray-500">Total</p>
                                 <p className="text-white font-medium">${result.totalPayments.toLocaleString()}</p>
@@ -434,6 +571,10 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                                     {result.apr}%
                                 </p>
                             </div>
+                            <div>
+                                <p className="text-gray-500">LTV</p>
+                                <p className="text-white font-medium">{result.ltv}%</p>
+                            </div>
                         </div>
 
                         <div className="mt-4 pt-3 border-t border-white/10 text-center">
@@ -445,11 +586,11 @@ ${tradeIn > 0 ? `🔄 Trade-in: $${tradeIn.toLocaleString()}\n` : ''}
                 )}
 
                 {/* Disclaimer */}
-                <div className="mx-6 mb-4 p-3 bg-amber-900/20 border border-amber-500/20 rounded-xl flex items-start gap-3">
+                <div className="mx-5 mb-4 p-3 bg-amber-900/20 border border-amber-500/20 rounded-xl flex items-start gap-3">
                     <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-200">
-                        Tasas especiales válidas hasta Feb 2, 2026. Programa sujeto a cambios.
-                        FL/GA Processing Fee: $399 incluido.
+                        Tasas especiales válidas hasta Feb 2, 2026. Sales Tax 6% incluido en total fees.
+                        Todos los cargos son aproximados y pueden variar.
                     </p>
                 </div>
 
