@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import InventoryModal from './InventoryModal';
 import PaymentCalculator from './PaymentCalculator';
 import ToyotaLeaseCalculator from './ToyotaLeaseCalculator';
+import ToyotaRetailCalculator from './ToyotaRetailCalculator';
 
 const ConversationView = ({ client, onClose, onSendMessage }) => {
     const { token } = useAuth();
@@ -17,6 +18,7 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
     const [showInventory, setShowInventory] = useState(false);
     const [showCalculator, setShowCalculator] = useState(false);
     const [showToyotaCalc, setShowToyotaCalc] = useState(false);
+    const [showRetailCalc, setShowRetailCalc] = useState(false);
     const messagesEndRef = useRef(null);
 
     useEffect(() => {
@@ -517,6 +519,13 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
                                         <span className="text-xs font-bold">TFS</span>
                                     </button>
                                     <button
+                                        onClick={() => setShowRetailCalc(true)}
+                                        className="p-3 bg-green-900/50 hover:bg-green-800 text-green-400 hover:text-green-300 rounded-xl transition-colors border border-green-500/30"
+                                        title="Toyota Finance (Préstamo)"
+                                    >
+                                        <span className="text-xs font-bold">APR</span>
+                                    </button>
+                                    <button
                                         onClick={getSmartReply}
                                         disabled={generatingReply || messages.length === 0}
                                         className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 disabled:from-gray-700 disabled:to-gray-700 disabled:cursor-not-allowed text-white p-3 rounded-xl transition-all"
@@ -630,6 +639,32 @@ const ConversationView = ({ client, onClose, onSendMessage }) => {
             <ToyotaLeaseCalculator
                 isOpen={showToyotaCalc}
                 onClose={() => setShowToyotaCalc(false)}
+                onSend={async (message) => {
+                    setSending(true);
+                    try {
+                        await api.post('/whatsapp/send', {
+                            phone_number: client.phone,
+                            message: message
+                        }, { headers: { Authorization: `Bearer ${token}` } });
+
+                        setMessages(prev => [...prev, {
+                            id: Date.now().toString(),
+                            content: message,
+                            direction: 'outbound',
+                            status: 'sent',
+                            sent_at: new Date().toISOString()
+                        }]);
+                    } catch (error) {
+                        console.error(error);
+                        throw error;
+                    } finally {
+                        setSending(false);
+                    }
+                }}
+            />
+            <ToyotaRetailCalculator
+                isOpen={showRetailCalc}
+                onClose={() => setShowRetailCalc(false)}
                 onSend={async (message) => {
                     setSending(true);
                     try {
