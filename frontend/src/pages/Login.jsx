@@ -40,12 +40,17 @@ const Login = () => {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black">
             {/* Logo */}
-            <div className="mb-10">
+            {/* Logo - Zoomed to fill width visually */}
+            <div className="mb-2 w-full max-w-sm mx-auto overflow-hidden relative h-32 flex items-center justify-center">
                 <img
                     src="/logo.png"
                     alt="AUTO AI"
-                    className="w-72 mx-auto"
-                    style={{ mixBlendMode: 'screen' }}
+                    className="absolute w-[150%] max-w-none"
+                    style={{
+                        mixBlendMode: 'screen',
+                        left: '50%',
+                        transform: 'translateX(-50%)'
+                    }}
                 />
             </div>
 
