@@ -40,7 +40,6 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
                             src="/logo.png"
                             alt="AUTO AI"
                             className="h-10"
-                            style={{ mixBlendMode: 'screen' }}
                         />
                     </div>
 
