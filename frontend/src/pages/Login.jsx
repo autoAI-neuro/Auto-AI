@@ -65,8 +65,13 @@ const Login = () => {
             />
 
             <div className="w-full max-w-md relative z-10 px-6">
-                <div className="mb-12 text-center">
-                    <img src="/logo.png" alt="AUTO AI" className="h-24 mx-auto mb-2" />
+                <div className="mb-8 text-center">
+                    <img
+                        src="/logo.png"
+                        alt="AUTO AI"
+                        className="w-64 mx-auto"
+                        style={{ filter: 'drop-shadow(0 0 20px rgba(212, 175, 55, 0.3))' }}
+                    />
                 </div>
 
                 <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/5 rounded-2xl p-8 shadow-2xl ring-1 ring-white/5 mx-auto">
