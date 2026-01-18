@@ -45,6 +45,9 @@ const Login = () => {
                     src="/logo.png"
                     alt="AUTO AI"
                     className="w-72 mx-auto"
+                    style={{
+                        filter: 'invert(1) hue-rotate(180deg)',
+                    }}
                 />
             </div>
 

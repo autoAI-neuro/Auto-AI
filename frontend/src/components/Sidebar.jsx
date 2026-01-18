@@ -36,7 +36,12 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
                 <div className="flex flex-col h-full p-4">
                     {/* Logo/Header */}
                     <div className="flex items-center justify-center py-4 mb-6">
-                        <img src="/logo.png" alt="AUTO AI" className="h-12" />
+                        <img
+                            src="/logo.png"
+                            alt="AUTO AI"
+                            className="h-10"
+                            style={{ filter: 'invert(1) hue-rotate(180deg)' }}
+                        />
                     </div>
 
                     {/* Navigation */}
