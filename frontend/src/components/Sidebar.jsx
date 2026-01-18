@@ -35,9 +35,8 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
             `}>
                 <div className="flex flex-col h-full p-4">
                     {/* Logo/Header */}
-                    <div className="flex items-center gap-3 px-4 py-6 mb-6">
-                        <img src="/logo.svg" alt="AutoAI" className="w-10 h-10" />
-                        <h1 className="text-xl font-light text-white tracking-wide">AutoAI</h1>
+                    <div className="flex items-center justify-center py-4 mb-6">
+                        <img src="/logo.png" alt="AUTO AI" className="h-12" />
                     </div>
 
                     {/* Navigation */}
