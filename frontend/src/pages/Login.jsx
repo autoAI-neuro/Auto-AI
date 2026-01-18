@@ -39,12 +39,12 @@ const Login = () => {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black">
-            {/* Logo */}
-            <div className="mb-2">
+            {/* Logo - scaled larger to compensate for transparent padding */}
+            <div className="mb-2 w-full max-w-sm mx-auto overflow-visible">
                 <img
                     src="/logo.png"
                     alt="AUTO AI"
-                    className="max-w-sm w-full mx-auto"
+                    className="w-[140%] max-w-none -ml-[20%]"
                     style={{ mixBlendMode: 'screen' }}
                 />
             </div>
