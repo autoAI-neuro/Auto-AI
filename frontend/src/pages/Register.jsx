@@ -73,11 +73,11 @@ const Register = () => {
             <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-amber-900/10 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-yellow-900/10 rounded-full blur-[120px] pointer-events-none" />
 
-            {/* Mouse follower glow */}
+            {/* Mouse follower glow - Softer intensity */}
             <div
                 className="pointer-events-none fixed inset-0 z-30 transition-opacity duration-300"
                 style={{
-                    background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(212, 175, 55, 0.15), transparent 40%)`
+                    background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(212, 175, 55, 0.05), transparent 40%)`
                 }}
             />
 
