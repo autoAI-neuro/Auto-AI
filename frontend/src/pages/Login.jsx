@@ -38,13 +38,13 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex flex-col items-center justify-center bg-black">
-            {/* Logo with transparent background */}
+        <div className="min-h-screen flex flex-col items-center justify-center" style={{ backgroundColor: '#0d1117' }}>
+            {/* Logo */}
             <div className="mb-4">
                 <img
                     src="/logo.png"
                     alt="AUTO AI"
-                    className="w-full max-w-sm mx-auto"
+                    className="w-full max-w-md mx-auto"
                 />
             </div>
 
