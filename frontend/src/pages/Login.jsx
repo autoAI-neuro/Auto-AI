@@ -45,6 +45,7 @@ const Login = () => {
                     src="/logo.png"
                     alt="AUTO AI"
                     className="w-72 mx-auto"
+                    style={{ mixBlendMode: 'screen' }}
                 />
             </div>
 
