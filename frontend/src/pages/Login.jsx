@@ -40,7 +40,7 @@ const Login = () => {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black">
             {/* Logo */}
-            <div className="mb-6">
+            <div className="mb-4">
                 <img
                     src="/logo.png"
                     alt="AUTO AI"
