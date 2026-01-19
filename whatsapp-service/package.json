@@ -2,10 +2,9 @@
     "name": "whatsapp-service-baileys",
     "version": "2.2.0",
     "description": "Lightweight WhatsApp Service using Baileys",
-    "type": "module",
     "main": "src/index.js",
     "scripts": {
-        "start": "node server.js",
+        "start": "node src/index.js",
         "dev": "nodemon server.js"
     },
     "dependencies": {

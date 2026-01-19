@@ -1,6 +1,5 @@
-import 'dotenv/config';
 import express from 'express';
-import makeWASocket, { useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
+import { makeWASocket, useMultiFileAuthState, DisconnectReason, Browsers } from '@whiskeysockets/baileys';
 import cors from 'cors';
 import qrcode from 'qrcode';
 import fs from 'fs';

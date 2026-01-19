@@ -70,39 +70,25 @@ const Register = () => {
     return (
         <div ref={containerRef} className="min-h-screen flex flex-col items-center justify-center bg-black relative overflow-hidden selection:bg-white/20">
             {/* Ambient background glow */}
-            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-amber-900/10 rounded-full blur-[120px] pointer-events-none" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-yellow-900/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-900/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-900/10 rounded-full blur-[120px] pointer-events-none" />
 
-            {/* Mouse follower glow - Softer intensity */}
+            {/* Mouse follower glow */}
             <div
-                className="pointer-events-none fixed inset-0 z-30 transition-opacity duration-300"
+                className="glow-point"
                 style={{
-                    background: `radial-gradient(600px circle at ${mousePos.x}px ${mousePos.y}px, rgba(212, 175, 55, 0.05), transparent 40%)`
+                    left: `${mousePos.x}px`,
+                    top: `${mousePos.y}px`
                 }}
             />
 
             <div className="w-full max-w-md relative z-10 px-6">
-                <div className="mb-2 w-full max-w-sm mx-auto overflow-hidden relative h-32 flex items-center justify-center">
-                    <img
-                        src="/logo.png"
-                        alt="AUTO AI"
-                        className="absolute w-[150%] max-w-none"
-                        style={{
-                            mixBlendMode: 'screen',
-                            left: '50%',
-                            transform: 'translateX(-50%)'
-                        }}
-                    />
+                <div className="mb-12 text-center">
+                    <h1 className="text-4xl font-light tracking-tight text-white mb-2">AutoAI</h1>
+                    <p className="text-neutral-400 text-sm font-light tracking-wide uppercase">Dealer ManagementOS</p>
                 </div>
 
-                <div
-                    className="w-full max-w-sm mx-auto p-8 rounded-xl"
-                    style={{
-                        background: 'linear-gradient(145deg, rgba(30,30,30,0.9) 0%, rgba(15,15,15,0.95) 100%)',
-                        border: '1px solid rgba(212, 175, 55, 0.3)',
-                        boxShadow: '0 0 30px rgba(212, 175, 55, 0.1), inset 0 1px 0 rgba(255,255,255,0.05)'
-                    }}
-                >
+                <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/5 rounded-2xl p-8 shadow-2xl ring-1 ring-white/5 mx-auto">
                     {error && (
                         <div className="mb-6 p-3 bg-red-900/20 border border-red-500/20 text-red-200 text-xs rounded-lg text-center">
                             {error}
@@ -116,8 +102,7 @@ const Register = () => {
                                 name="name"
                                 placeholder="Nombre Completo"
                                 required
-                                className="w-full px-4 py-3 rounded-lg text-white text-sm placeholder-neutral-500 outline-none transition-all duration-300"
-                                style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(212, 175, 55, 0.4)' }}
+                                className="input-elegant"
                                 onChange={handleChange}
                                 value={formData.name}
                                 autoComplete="name"
@@ -127,8 +112,7 @@ const Register = () => {
                                 name="email"
                                 placeholder="Email"
                                 required
-                                className="w-full px-4 py-3 rounded-lg text-white text-sm placeholder-neutral-500 outline-none transition-all duration-300"
-                                style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(212, 175, 55, 0.4)' }}
+                                className="input-elegant"
                                 onChange={handleChange}
                                 value={formData.email}
                                 autoComplete="email"
@@ -139,8 +123,7 @@ const Register = () => {
                                 placeholder="Contraseña"
                                 required
                                 minLength={8}
-                                className="w-full px-4 py-3 rounded-lg text-white text-sm placeholder-neutral-500 outline-none transition-all duration-300"
-                                style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(212, 175, 55, 0.4)' }}
+                                className="input-elegant"
                                 onChange={handleChange}
                                 value={formData.password}
                                 autoComplete="new-password"
@@ -151,8 +134,7 @@ const Register = () => {
                                 placeholder="Confirmar Contraseña"
                                 required
                                 minLength={8}
-                                className="w-full px-4 py-3 rounded-lg text-white text-sm placeholder-neutral-500 outline-none transition-all duration-300"
-                                style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(212, 175, 55, 0.4)' }}
+                                className="input-elegant"
                                 onChange={handleChange}
                                 value={formData.confirmPassword}
                                 autoComplete="new-password"
@@ -163,16 +145,13 @@ const Register = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full py-3 px-4 rounded-lg bg-white text-black font-medium text-sm flex items-center justify-center gap-2 hover:bg-neutral-100 transition-colors disabled:opacity-50"
+                                className="btn-elegant w-full group relative overflow-hidden"
                             >
-                                {loading ? (
-                                    <Loader className="animate-spin w-4 h-4" />
-                                ) : (
-                                    <>
-                                        Crear Cuenta
-                                        <ArrowRight className="w-4 h-4" />
-                                    </>
-                                )}
+                                <span className="relative z-10 flex items-center justify-center gap-2">
+                                    {loading ? <Loader className="animate-spin w-4 h-4" /> : 'Crear Cuenta'}
+                                    {!loading && <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />}
+                                </span>
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700" />
                             </button>
                         </div>
                     </form>

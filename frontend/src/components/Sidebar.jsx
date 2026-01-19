@@ -35,17 +35,12 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
             `}>
                 <div className="flex flex-col h-full p-4">
                     {/* Logo/Header */}
-                    {/* Logo/Header - Zoomed Premium Style */}
-                    <div className="mb-6 w-full h-20 relative overflow-hidden flex items-center justify-center">
+                    <div className="flex items-center justify-center py-4 mb-6">
                         <img
                             src="/logo.png"
                             alt="AUTO AI"
-                            className="absolute w-[180%] max-w-none"
-                            style={{
-                                mixBlendMode: 'screen',
-                                left: '50%',
-                                transform: 'translateX(-50%)'
-                            }}
+                            className="h-10"
+                            style={{ mixBlendMode: 'screen' }}
                         />
                     </div>
 
