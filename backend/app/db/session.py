@@ -12,8 +12,11 @@ if DATABASE_URL:
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     engine = create_engine(
         DATABASE_URL,
-        pool_recycle=3600,
-        pool_pre_ping=True
+        pool_recycle=1800,       # Recycle connections every 30 mins to avoid stale ones
+        pool_pre_ping=True,      # Check connection aliveness before using
+        pool_size=10,            # Keep 10 connections open
+        max_overflow=20,         # Allow 20 more during burst
+        pool_timeout=30          # Fail if no connection available after 30s
     )
 else:
     # Local development - SQLite
