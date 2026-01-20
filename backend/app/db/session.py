@@ -14,8 +14,8 @@ if DATABASE_URL:
         DATABASE_URL,
         pool_recycle=1800,       # Recycle connections every 30 mins to avoid stale ones
         pool_pre_ping=True,      # Check connection aliveness before using
-        pool_size=10,            # Keep 10 connections open
-        max_overflow=20,         # Allow 20 more during burst
+        pool_size=3,             # Keep only 3 connections open (Railway limit)
+        max_overflow=5,          # Allow 5 more during burst (total max: 8)
         pool_timeout=30          # Fail if no connection available after 30s
     )
 else:
