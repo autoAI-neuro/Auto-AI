@@ -16,6 +16,11 @@ const ClientsPage = () => {
     const [editingClient, setEditingClient] = useState(null);
     const [importing, setImporting] = useState(false);
 
+    // Selection and messaging
+    const [selectedClients, setSelectedClients] = useState([]);
+    const [message, setMessage] = useState('');
+    const [sending, setSending] = useState(false);
+
     const LIMIT = 50;
 
     const loadClients = async () => {
@@ -137,6 +142,57 @@ const ClientsPage = () => {
         setEditingClient(null);
     };
 
+    // Selection functions
+    const toggleSelectClient = (clientId) => {
+        setSelectedClients(prev =>
+            prev.includes(clientId)
+                ? prev.filter(id => id !== clientId)
+                : [...prev, clientId]
+        );
+    };
+
+    const selectAllVisible = () => {
+        if (selectedClients.length === clients.length) {
+            setSelectedClients([]);
+        } else {
+            setSelectedClients(clients.map(c => c.id));
+        }
+    };
+
+    // Bulk message send
+    const sendBulkMessage = async () => {
+        if (selectedClients.length === 0) {
+            alert('Selecciona al menos un cliente');
+            return;
+        }
+        if (!message.trim()) {
+            alert('Escribe un mensaje');
+            return;
+        }
+
+        setSending(true);
+        try {
+            const selectedPhones = clients
+                .filter(c => selectedClients.includes(c.id))
+                .map(c => c.phone);
+
+            await api.post('/whatsapp/bulk-send', {
+                phone_numbers: selectedPhones,
+                message: message
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            alert(`Mensaje enviado a ${selectedPhones.length} clientes`);
+            setMessage('');
+            setSelectedClients([]);
+        } catch (err) {
+            console.error('Bulk send error:', err);
+            alert('Error: ' + (err.response?.data?.detail || err.message));
+        }
+        setSending(false);
+    };
+
     const statusColors = {
         new: '#22c55e',
         contacted: '#3b82f6',
@@ -239,6 +295,70 @@ const ClientsPage = () => {
                 </select>
             </div>
 
+            {/* Bulk Message Panel */}
+            {selectedClients.length > 0 && (
+                <div style={{
+                    padding: '16px',
+                    background: 'linear-gradient(135deg, #1e4620 0%, #0f2910 100%)',
+                    borderRadius: '12px',
+                    border: '1px solid #22c55e40',
+                    marginBottom: '24px'
+                }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                        <span style={{ color: '#22c55e', fontWeight: '600' }}>
+                            ✅ {selectedClients.length} clientes seleccionados
+                        </span>
+                        <button
+                            onClick={() => setSelectedClients([])}
+                            style={{
+                                padding: '4px 12px',
+                                background: 'transparent',
+                                border: '1px solid #ef4444',
+                                borderRadius: '6px',
+                                color: '#ef4444',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                            }}
+                        >
+                            Deseleccionar todos
+                        </button>
+                    </div>
+                    <textarea
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                        placeholder="Escribe el mensaje para enviar a los clientes seleccionados... Usa {nombre} para personalizar."
+                        style={{
+                            width: '100%',
+                            padding: '12px',
+                            background: '#0f172a',
+                            border: '1px solid #334155',
+                            borderRadius: '8px',
+                            color: '#fff',
+                            fontSize: '14px',
+                            minHeight: '80px',
+                            resize: 'vertical'
+                        }}
+                    />
+                    <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
+                        <button
+                            onClick={sendBulkMessage}
+                            disabled={sending || !message.trim()}
+                            style={{
+                                padding: '10px 24px',
+                                background: sending ? '#475569' : 'linear-gradient(135deg, #22c55e 0%, #16a34a 100%)',
+                                border: 'none',
+                                borderRadius: '8px',
+                                color: '#fff',
+                                fontWeight: '600',
+                                cursor: sending ? 'not-allowed' : 'pointer'
+                            }}
+                        >
+                            {sending ? 'Enviando...' : `📤 Enviar a ${selectedClients.length} clientes`}
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* Client Table */}
             <div style={{
                 background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)',
@@ -258,6 +378,14 @@ const ClientsPage = () => {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ borderBottom: '1px solid #334155' }}>
+                                <th style={{ padding: '16px', textAlign: 'center', width: '50px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedClients.length === clients.length && clients.length > 0}
+                                        onChange={selectAllVisible}
+                                        style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                                    />
+                                </th>
                                 <th style={{ padding: '16px', textAlign: 'left', color: '#9ca3af', fontWeight: '500' }}>Nombre</th>
                                 <th style={{ padding: '16px', textAlign: 'left', color: '#9ca3af', fontWeight: '500' }}>Teléfono</th>
                                 <th style={{ padding: '16px', textAlign: 'left', color: '#9ca3af', fontWeight: '500' }}>Email</th>
@@ -268,7 +396,21 @@ const ClientsPage = () => {
                         </thead>
                         <tbody>
                             {clients.map((client) => (
-                                <tr key={client.id} style={{ borderBottom: '1px solid #1e293b' }}>
+                                <tr
+                                    key={client.id}
+                                    style={{
+                                        borderBottom: '1px solid #1e293b',
+                                        background: selectedClients.includes(client.id) ? '#22c55e10' : 'transparent'
+                                    }}
+                                >
+                                    <td style={{ padding: '16px', textAlign: 'center' }}>
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedClients.includes(client.id)}
+                                            onChange={() => toggleSelectClient(client.id)}
+                                            style={{ cursor: 'pointer', transform: 'scale(1.2)' }}
+                                        />
+                                    </td>
                                     <td style={{ padding: '16px', color: '#fff' }}>
                                         <div style={{ fontWeight: '500' }}>{client.name} {client.last_name || ''}</div>
                                     </td>
