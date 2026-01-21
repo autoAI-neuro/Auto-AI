@@ -39,15 +39,7 @@ class ClientUpdate(BaseModel):
     car_year: Optional[int] = None
     interest_rate: Optional[float] = None
 
-class ClientResponse(ClientBase):
-    id: str
-    user_id: str
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    document_path: Optional[str] = None
 
-    class Config:
-        orm_mode = True
 
 class TagSchema(BaseModel):
     id: str

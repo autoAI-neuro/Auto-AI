@@ -51,28 +51,33 @@ def get_clients(
     # Get client IDs for tag fetching
     client_ids = [c.id for c in clients]
     
-    # Fetch tags efficiently
+    # Fetch tags efficiently (Defensive: prevent crash if table missing)
     if client_ids:
-        # Get all client-tag associations
-        associations = db.query(ClientTag).filter(ClientTag.client_id.in_(client_ids)).all()
-        
-        # Get all tag details
-        tag_ids = [a.tag_id for a in associations]
-        if tag_ids:
-            tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
-            tag_map = {t.id: t for t in tags}
+        try:
+            # Get all client-tag associations
+            associations = db.query(ClientTag).filter(ClientTag.client_id.in_(client_ids)).all()
             
-            # Map client_id -> list of tags
-            client_tags_map = {}
-            for assoc in associations:
-                if assoc.client_id not in client_tags_map:
-                    client_tags_map[assoc.client_id] = []
-                if assoc.tag_id in tag_map:
-                    client_tags_map[assoc.client_id].append(tag_map[assoc.tag_id])
-            
-            # Assign to client objects (won't persist to DB, just for response)
-            for client in clients:
-                client.active_tags = client_tags_map.get(client.id, [])
+            # Get all tag details
+            tag_ids = [a.tag_id for a in associations]
+            if tag_ids:
+                tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+                tag_map = {t.id: t for t in tags}
+                
+                # Map client_id -> list of tags
+                client_tags_map = {}
+                for assoc in associations:
+                    if assoc.client_id not in client_tags_map:
+                        client_tags_map[assoc.client_id] = []
+                    if assoc.tag_id in tag_map:
+                        client_tags_map[assoc.client_id].append(tag_map[assoc.tag_id])
+                
+                # Assign to client objects
+                for client in clients:
+                    client.active_tags = client_tags_map.get(client.id, [])
+        except Exception as e:
+            print(f"Warning: Failed to load tags: {e}")
+            # Continue without tags
+            pass
     
     return {
         "clients": clients,
