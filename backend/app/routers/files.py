@@ -24,165 +24,135 @@ def log_debug(msg):
 router = APIRouter(prefix="/files", tags=["files"])
 
 @router.post("/import-clients")
-async def import_clients(
+def import_clients(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Import clients from CSV/Excel file"""
-    import os
-    import json
-    # Debug removed, using actual authenticated user
-
+    """Import clients from CSV/Excel file (Bulk mode)"""
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     allowed_extensions = {'.csv', '.xlsx', '.xls'}
     ext = "." + file.filename.split('.')[-1].lower() if '.' in file.filename else ''
     
     if ext not in allowed_extensions:
-        raise HTTPException(status_code=400, detail=f"Unsupported file format. Use: {', '.join(allowed_extensions)}")
-    # Create debug log list
-    debug_logs = []
-    def log_capture(msg):
-        timestamp = datetime.datetime.now().strftime("%H:%M:%S")
-        debug_logs.append(f"{timestamp} - {msg}")
-        print(f"DEBUG_IMPORT: {msg}") 
+        raise HTTPException(status_code=400, detail=f"Invalid file. Use: {', '.join(allowed_extensions)}")
 
     count = 0
     errors = []
-
+    
     try:
-        log_capture("Starting AI import process...")
-        log_capture(f"CWD: {os.getcwd()}")
-        log_capture(f"DB Path: {os.path.abspath('app.db')}")
+        # Read file synchronously (safe in 'def' route running in threadpool)
+        content = file.file.read()
         
-        # Check existing clients
-        total_clients = db.query(Client).count()
-        user_clients = db.query(Client).filter(Client.user_id == current_user.id).count()
-        log_capture(f"Total Clients in DB: {total_clients}")
-        log_capture(f"Clients for user {current_user.id}: {user_clients}")
-
-        content = await file.read()
-        log_capture(f"File read. Size: {len(content)} bytes")
-        
-        # Read file to string just for context (or DataFrame first)
+        # Load DataFrame
         if ext == '.csv':
             df = pd.read_csv(io.BytesIO(content), dtype=str)
         else:
             df = pd.read_excel(io.BytesIO(content), dtype=str)
         
-        # Convert first 10 rows to CSV string for the AI
-        csv_preview = df.head(15).to_csv(index=False)
-        log_capture(f"Preview generated for AI (Rows: {len(df)})")
-
-        if not os.getenv("OPENAI_API_KEY"):
-            raise HTTPException(status_code=500, detail="OPENAI_API_KEY not configured in environment")
-
-        client = OpenAI()
-
-        prompt = f"""
-        You are a data extraction expert. I have a raw CSV/Excel export of clients.
-        I need you to extract the client data into a strict JSON format.
+        df = df.fillna('')  # Handle NaNs
         
-        The known columns I need are:
-        - name (string, required)
-        - phone (string, required, include country code if possible, default to +1 if US, or just digits)
-        - email (string, optional)
-        - address (string, optional)
-        - birth_date (YYYY-MM-DD, optional)
-        - purchase_date (YYYY-MM-DD, optional)
-        - car_make (string, optional)
-        - car_model (string, optional)
-        - car_year (int, optional)
-        - notes (string, optional)
+        if df.empty:
+            return {"imported_count": 0, "errors": ["File is empty"]}
 
-        Here is the data snippet:
-        {csv_preview}
-
-        INSTRUCTIONS:
-        1. Identify the header row likely containing "Name", "Phone", etc.
-        2. Extract each row as a JSON object.
-        3. Normalize column names to the keys above.
-        4. If a field is missing, set it to null.
-        5. Return ONLY a JSON object with a key "clients" containing the list of objects. No markdown formatting.
+        # 1. AI Column Mapping
+        headers = list(df.columns)
+        prompt = f"""
+        Map these CSV headers to my database columns.
+        CSV Headers: {json.dumps(headers)}
+        
+        Target Columns:
+        - name (Required. If multiple, choose the one with full name)
+        - phone (Required)
+        - email
+        - address
+        - notes (or description/comments)
+        - car_make
+        - car_model
+        - car_year
+        
+        Return JSON Key-Value pair: {{"target_column": "csv_header_name"}}
+        Only include found mappings. ignore others.
         """
-
-        log_capture("Sending to OpenAI...")
+        
         completion = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are a helpful data extraction assistant. Output valid JSON only."},
+                {"role": "system", "content": "You are a data mapping assistant. Return strict JSON."},
                 {"role": "user", "content": prompt}
             ],
             response_format={ "type": "json_object" }
         )
         
-        response_content = completion.choices[0].message.content
-        log_capture("AI Response received.")
+        mapping = json.loads(completion.choices[0].message.content)
+        print(f"[Import] Column Mapping: {mapping}")
         
-        data = json.loads(response_content)
-        ai_clients = data.get("clients", [])
-        log_capture(f"AI identified {len(ai_clients)} candidates.")
+        # Validate critical columns
+        if 'name' not in mapping or 'phone' not in mapping:
+            # Fallback: exact match try
+            lower_headers = {h.lower(): h for h in headers}
+            if 'name' not in mapping and 'name' in lower_headers: mapping['name'] = lower_headers['name']
+            if 'name' not in mapping and 'nombre' in lower_headers: mapping['name'] = lower_headers['nombre']
+            if 'phone' not in mapping and 'phone' in lower_headers: mapping['phone'] = lower_headers['phone']
+            if 'phone' not in mapping and 'telefono' in lower_headers: mapping['phone'] = lower_headers['telefono']
+            
+            if 'name' not in mapping or 'phone' not in mapping:
+                 return {"imported_count": 0, "errors": [f"Could not find Name/Phone columns. Headers: {headers}"]}
 
-        for i, c in enumerate(ai_clients):
+        # 2. Process Rows
+        for index, row in df.iterrows():
             try:
-                name = c.get('name')
-                phone = c.get('phone')
+                # Extract data using mapping
+                name = str(row[mapping['name']]).strip()
+                phone_raw = str(row[mapping['phone']]).strip()
                 
-                if not name or not phone:
-                    log_capture(f"AI Row {i} SKIP: Missing name/phone.")
+                if not name or not phone_raw:
+                    continue
+                    
+                # Clean Phone
+                phone_clean = ''.join(filter(lambda x: x.isdigit() or x == '+', phone_raw))
+                if len(phone_clean) < 7: # Basic validation
                     continue
 
-                phone_clean = ''.join(filter(lambda x: x.isdigit() or x == '+', str(phone)))
-
-                # Handle dates safely
-                b_date = None
-                if c.get('birth_date'):
-                    try: b_date = datetime.datetime.strptime(c['birth_date'], '%Y-%m-%d').date()
-                    except: pass
-                
-                p_date = None
-                if c.get('purchase_date'):
-                    try: p_date = datetime.datetime.strptime(c['purchase_date'], '%Y-%m-%d').date()
-                    except: pass
-
+                # Check Duplicate
+                existing = db.query(Client).filter(Client.user_id == current_user.id, Client.phone == phone_clean).first()
+                if existing:
+                    continue
+                    
+                # Create Client
                 new_client = Client(
                     user_id=current_user.id,
-                    name=str(name),
-                    last_name=None, # AI usually puts full name in 'name'
+                    name=name,
                     phone=phone_clean,
-                    email=c.get('email'),
-                    address=c.get('address'),
-                    birth_date=b_date,
-                    purchase_date=p_date,
-                    car_make=c.get('car_make'),
-                    car_model=c.get('car_model'),
-                    car_year=c.get('car_year'),
-                    notes=c.get('notes') or f"AI Imported {datetime.date.today()}",
+                    email=str(row[mapping.get('email', '')]).strip() if 'email' in mapping else None,
+                    address=str(row[mapping.get('address', '')]).strip() if 'address' in mapping else None,
+                    car_make=str(row[mapping.get('car_make', '')]).strip() if 'car_make' in mapping else None,
+                    car_model=str(row[mapping.get('car_model', '')]).strip() if 'car_model' in mapping else None,
+                    car_year=str(row[mapping.get('car_year', '')]).strip() if 'car_year' in mapping else None,
+                    notes=str(row[mapping.get('notes', '')]).strip() if 'notes' in mapping else f"Imported {datetime.date.today()}",
                     status="imported",
                     created_at=datetime.datetime.utcnow()
                 )
+                db.add(new_client)
+                count += 1
+                
+                # Batch commit every 50 to avoid memory issues
+                if count % 50 == 0:
+                    db.commit()
 
-                existing = db.query(Client).filter(Client.user_id == current_user.id, Client.phone == phone_clean).first()
-                if not existing:
-                    db.add(new_client)
-                    count += 1
-                else:
-                    log_capture(f"Row {i} SKIP: Duplicate phone {phone_clean}")
-            
             except Exception as row_e:
-                 errors.append(f"AI Row {i}: {row_e}")
+                errors.append(f"Row {index}: {str(row_e)}")
 
-        db.commit()
-        log_capture(f"AI Import finished. Count: {count}")
+        db.commit() # Final commit
 
     except Exception as e:
-        log_capture(f"CRITICAL ERROR: {str(e)}")
-        log_capture(traceback.format_exc())
-        errors.append(str(e))
+        print(f"Import Error: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
     
     return {
         "imported_count": count,
-        "errors": errors,
-        "debug_info": debug_logs
+        "errors": errors[:10] # Return first 10 errors
     }
 
 @router.get("/export-backup")
