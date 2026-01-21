@@ -119,6 +119,16 @@ def import_clients(
                 if existing:
                     continue
                     
+                # Helper to clean integers
+                def safe_int(val):
+                    if pd.isna(val) or val is None: return None
+                    s = str(val).strip()
+                    if not s: return None
+                    try:
+                        return int(float(s))
+                    except:
+                        return None
+
                 # Create Client
                 new_client = Client(
                     user_id=current_user.id,
@@ -128,7 +138,7 @@ def import_clients(
                     address=str(row[mapping.get('address', '')]).strip() if 'address' in mapping else None,
                     car_make=str(row[mapping.get('car_make', '')]).strip() if 'car_make' in mapping else None,
                     car_model=str(row[mapping.get('car_model', '')]).strip() if 'car_model' in mapping else None,
-                    car_year=str(row[mapping.get('car_year', '')]).strip() if 'car_year' in mapping else None,
+                    car_year=safe_int(row[mapping.get('car_year')]) if 'car_year' in mapping else None,
                     notes=str(row[mapping.get('notes', '')]).strip() if 'notes' in mapping else f"Imported {datetime.date.today()}",
                     status="imported",
                     created_at=datetime.datetime.utcnow()
