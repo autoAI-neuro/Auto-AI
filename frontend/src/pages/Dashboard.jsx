@@ -475,7 +475,16 @@ const Dashboard = () => {
                                         <Users className="w-5 h-5 text-neutral-500" />
                                         Clientes
                                     </h2>
-                                    <span className="text-sm text-neutral-500">{stats.totalClients} total</span>
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={selectAllClients}
+                                            className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
+                                        >
+                                            <CheckCircle className="w-3 h-3" />
+                                            {selectedClients.length === clients.length && clients.length > 0 ? 'Deseleccionar' : 'Seleccionar Todo'}
+                                        </button>
+                                        <span className="text-sm text-neutral-500">{stats.totalClients} total</span>
+                                    </div>
                                 </div>
 
                                 {/* Search Bar */}
