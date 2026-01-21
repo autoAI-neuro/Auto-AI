@@ -7,7 +7,6 @@ from app.models import User, Client
 import pandas as pd
 import io
 import datetime
-import datetime
 import traceback
 import os
 import json
@@ -22,6 +21,29 @@ def log_debug(msg):
         print(f"FAILED TO LOG: {e}")
 
 router = APIRouter(prefix="/files", tags=["files"])
+
+# Helper functions defined at module level to avoid redefinition
+def safe_date(val):
+    if pd.isna(val) or val is None: return None
+    s = str(val).strip()
+    if not s: return None
+    try:
+        # Try pandas first (handles most formats automatically)
+        dt = pd.to_datetime(s, errors='coerce')
+        if pd.notnull(dt):
+            return dt.date() # Return python date object
+        return None
+    except:
+        return None
+
+def safe_int(val):
+    if pd.isna(val) or val is None: return None
+    s = str(val).strip()
+    if not s: return None
+    try:
+        return int(float(s))
+    except:
+        return None
 
 @router.post("/import-clients")
 def import_clients(
@@ -70,6 +92,8 @@ def import_clients(
         - car_make
         - car_model
         - car_year
+        - birth_date (Format: YYYY-MM-DD or similar)
+        - purchase_date (Date of vehicle purchase)
         
         Return JSON Key-Value pair: {{"target_column": "csv_header_name"}}
         Only include found mappings. ignore others.
@@ -117,17 +141,23 @@ def import_clients(
                 # Check Duplicate
                 existing = db.query(Client).filter(Client.user_id == current_user.id, Client.phone == phone_clean).first()
                 if existing:
-                    continue
+                    # Update missing info if found in import
+                    updated = False
+                    if not existing.birth_date and 'birth_date' in mapping:
+                         bdate = safe_date(row[mapping.get('birth_date')])
+                         if bdate: 
+                             existing.birth_date = bdate
+                             updated = True
                     
-                # Helper to clean integers
-                def safe_int(val):
-                    if pd.isna(val) or val is None: return None
-                    s = str(val).strip()
-                    if not s: return None
-                    try:
-                        return int(float(s))
-                    except:
-                        return None
+                    if not existing.purchase_date and 'purchase_date' in mapping:
+                         pdate = safe_date(row[mapping.get('purchase_date')])
+                         if pdate: 
+                             existing.purchase_date = pdate
+                             updated = True
+                    
+                    if updated:
+                        count += 1
+                    continue
 
                 # Create Client
                 new_client = Client(
@@ -141,6 +171,8 @@ def import_clients(
                     car_year=safe_int(row[mapping.get('car_year')]) if 'car_year' in mapping else None,
                     notes=str(row[mapping.get('notes', '')]).strip() if 'notes' in mapping else f"Imported {datetime.date.today()}",
                     status="imported",
+                    birth_date=safe_date(row[mapping.get('birth_date')]) if 'birth_date' in mapping else None,
+                    purchase_date=safe_date(row[mapping.get('purchase_date')]) if 'purchase_date' in mapping else None,
                     created_at=datetime.datetime.utcnow()
                 )
                 db.add(new_client)
@@ -173,7 +205,6 @@ async def export_backup(
     """Download all my clients as CSV"""
     clients = db.query(Client).filter(Client.user_id == current_user.id).all()
     
-    output = io.StringIO()
     writer = pd.DataFrame([
         {
             "ID": c.id,
@@ -342,4 +373,3 @@ async def serve_media(filename: str):
         open(file_path, 'rb'),
         media_type=media_type
     )
-
