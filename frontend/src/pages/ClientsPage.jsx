@@ -110,10 +110,31 @@ const ClientsPage = () => {
         }
     };
 
-    const handleSave = () => {
+    const handleFormSubmit = async (formData) => {
+        try {
+            if (editingClient) {
+                // Update existing client
+                await api.put(`/clients/${editingClient.id}`, formData, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            } else {
+                // Create new client
+                await api.post('/clients', formData, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+            }
+            setShowForm(false);
+            setEditingClient(null);
+            loadClients();
+        } catch (err) {
+            console.error('Error saving client:', err);
+            alert('Error: ' + (err.response?.data?.detail || err.message));
+        }
+    };
+
+    const closeForm = () => {
         setShowForm(false);
         setEditingClient(null);
-        loadClients();
     };
 
     const statusColors = {
@@ -349,53 +370,13 @@ const ClientsPage = () => {
                 </div>
             )}
 
-            {/* Client Form Modal */}
+            {/* Client Form Modal - ClientForm has its own modal wrapper */}
             {showForm && (
-                <div style={{
-                    position: 'fixed',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    background: 'rgba(0,0,0,0.8)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    zIndex: 1000
-                }}>
-                    <div style={{
-                        background: '#1e293b',
-                        borderRadius: '16px',
-                        padding: '24px',
-                        maxWidth: '600px',
-                        width: '90%',
-                        maxHeight: '90vh',
-                        overflow: 'auto'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                            <h2 style={{ color: '#fff', margin: 0 }}>
-                                {editingClient ? 'Editar Cliente' : 'Nuevo Cliente'}
-                            </h2>
-                            <button
-                                onClick={() => { setShowForm(false); setEditingClient(null); }}
-                                style={{
-                                    background: 'transparent',
-                                    border: 'none',
-                                    color: '#9ca3af',
-                                    fontSize: '24px',
-                                    cursor: 'pointer'
-                                }}
-                            >
-                                ×
-                            </button>
-                        </div>
-                        <ClientForm
-                            client={editingClient}
-                            onSave={handleSave}
-                            onCancel={() => { setShowForm(false); setEditingClient(null); }}
-                        />
-                    </div>
-                </div>
+                <ClientForm
+                    initialData={editingClient || {}}
+                    onClose={closeForm}
+                    onSubmit={handleFormSubmit}
+                />
             )}
         </div>
     );
