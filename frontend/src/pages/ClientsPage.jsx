@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../config';
 import ClientForm from '../components/ClientForm';
 import Sidebar from '../components/Sidebar';
+import TagSelector from '../components/TagSelector';
 
 const ClientsPage = () => {
     const navigate = useNavigate();
@@ -253,7 +254,7 @@ const ClientsPage = () => {
                                         <th className="px-6 py-4 text-left text-sm font-medium text-neutral-400">Teléfono</th>
                                         <th className="px-6 py-4 text-left text-sm font-medium text-neutral-400 hidden md:table-cell">Email</th>
                                         <th className="px-6 py-4 text-left text-sm font-medium text-neutral-400">Estado</th>
-                                        <th className="px-6 py-4 text-left text-sm font-medium text-neutral-400 hidden lg:table-cell">Vehículo</th>
+                                        <th className="px-6 py-4 text-left text-sm font-medium text-neutral-400">Etiquetas</th>
                                         <th className="px-6 py-4 text-center text-sm font-medium text-neutral-400">Acciones</th>
                                     </tr>
                                 </thead>
@@ -277,10 +278,8 @@ const ClientsPage = () => {
                                                     {statusLabels[client.status] || client.status}
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 text-neutral-500 hidden lg:table-cell">
-                                                {client.car_make && client.car_model
-                                                    ? `${client.car_make} ${client.car_model} ${client.car_year || ''}`
-                                                    : '-'}
+                                            <td className="px-6 py-4">
+                                                <TagSelector clientId={client.id} />
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-center gap-2">
@@ -315,8 +314,8 @@ const ClientsPage = () => {
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                             disabled={page === 1}
                             className={`px-4 py-2 rounded-xl transition-colors ${page === 1
-                                    ? 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
-                                    : 'bg-neutral-800 text-white hover:bg-neutral-700'
+                                ? 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
+                                : 'bg-neutral-800 text-white hover:bg-neutral-700'
                                 }`}
                         >
                             ← Anterior
@@ -328,8 +327,8 @@ const ClientsPage = () => {
                             onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                             disabled={page === totalPages}
                             className={`px-4 py-2 rounded-xl transition-colors ${page === totalPages
-                                    ? 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
-                                    : 'bg-neutral-800 text-white hover:bg-neutral-700'
+                                ? 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
+                                : 'bg-neutral-800 text-white hover:bg-neutral-700'
                                 }`}
                         >
                             Siguiente →

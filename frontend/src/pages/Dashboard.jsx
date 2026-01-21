@@ -532,9 +532,21 @@ const Dashboard = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Tags */}
-                                                <div className="flex-1 px-2" onClick={(e) => e.stopPropagation()}>
-                                                    <TagSelector clientId={client.id} />
+
+                                                {/* Tags display only (no editing) */}
+                                                <div className="flex-1 px-2 flex flex-wrap gap-1">
+                                                    {(clientTagsMap[client.id] || []).map(tagId => {
+                                                        const tag = availableTags.find(t => t.id === tagId);
+                                                        return tag ? (
+                                                            <span
+                                                                key={tagId}
+                                                                className="px-2 py-0.5 rounded-full text-xs"
+                                                                style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                                                            >
+                                                                {tag.name}
+                                                            </span>
+                                                        ) : null;
+                                                    })}
                                                 </div>
 
                                                 <div className="flex items-center gap-2">
