@@ -14,7 +14,7 @@ def get_clients(
     page: int = 1,
     limit: int = 50,
     search: Optional[str] = None,
-    status: Optional[str] = None,
+    tag_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -33,6 +33,10 @@ def get_clients(
     # Apply status filter
     if status:
         query = query.filter(Client.status == status)
+
+    # Apply tag filter
+    if tag_id:
+        query = query.join(ClientTag).filter(ClientTag.tag_id == tag_id)
     
     # Get total count before pagination
     total = query.count()

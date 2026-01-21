@@ -65,9 +65,13 @@ const Dashboard = () => {
     });
     const [showMediaUploader, setShowMediaUploader] = useState(false);
     const [availableTags, setAvailableTags] = useState([]);
-    const [activeTagFilter, setActiveTagFilter] = useState(null); // null = all, or tag_id
     const [clientTagsMap, setClientTagsMap] = useState({}); // clientId -> [tagIds]
     const [conversationClient, setConversationClient] = useState(null); // Client for conversation view
+
+    // Pagination & Filter State
+    const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 1 });
+    const [filters, setFilters] = useState({ search: '', tagId: null });
+    const [debouncedSearch, setDebouncedSearch] = useState('');
 
     useEffect(() => {
         if (userId) {
@@ -95,24 +99,46 @@ const Dashboard = () => {
         }
     };
 
+    // Debounce Search
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(filters.search);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, [filters.search]);
+
+    // Reload when filters/page change
+    useEffect(() => {
+        if (userId) {
+            loadClients();
+        }
+    }, [userId, pagination.page, debouncedSearch, filters.tagId]);
+
     const loadClients = async () => {
         try {
             const response = await api.get('/clients', {
+                params: {
+                    page: pagination.page,
+                    limit: pagination.limit,
+                    search: debouncedSearch,
+                    tag_id: filters.tagId
+                },
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            // Handle new paginated response format
-            const clientsData = response.data.clients || response.data || [];
-            setClients(clientsData);
-            setStats(s => ({ ...s, totalClients: response.data.total || clientsData.length || 0 }));
+
+            const data = response.data;
+            setClients(data.clients || []);
+            setPagination(prev => ({
+                ...prev,
+                total: data.total,
+                pages: data.pages,
+                page: data.page // Sync with backend in case of correction
+            }));
+
+            setStats(s => ({ ...s, totalClients: data.total }));
         } catch (err) {
             console.error('Error loading clients:', err);
             setClients([]);
-            if (err.response?.status === 401) {
-                // Token invalid
-                console.log("Auth error");
-            } else {
-                showNotification("Error al cargar clientes", "error");
-            }
         }
     };
 
@@ -127,30 +153,16 @@ const Dashboard = () => {
         }
     };
 
-    // Select all clients that have a specific tag
-    const selectClientsByTag = async (tagId) => {
-        if (!tagId) {
-            // "Todos" selected - clear filter
-            setActiveTagFilter(null);
-            return;
-        }
+    const handleTagFilter = (tagId) => {
+        const newTagId = filters.tagId === tagId ? null : tagId;
+        setFilters(prev => ({ ...prev, tagId: newTagId }));
+        setPagination(prev => ({ ...prev, page: 1 })); // Reset to page 1
+        setSelectedClients([]); // Clear selection to avoid confusion
+    };
 
-        setActiveTagFilter(tagId);
-
-        try {
-            // Get clients with this tag
-            const response = await api.get(`/tags/${tagId}/clients`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const clientsWithTag = response.data;
-            const clientIds = clientsWithTag.map(c => c.id);
-            setSelectedClients(clientIds);
-
-            const tag = availableTags.find(t => t.id === tagId);
-            showNotification(`${clientIds.length} clientes con "${tag?.name}" seleccionados`, 'success');
-        } catch (err) {
-            console.error('Error selecting by tag:', err);
-            showNotification('Error al filtrar por etiqueta', 'error');
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= pagination.pages) {
+            setPagination(prev => ({ ...prev, page: newPage }));
         }
     };
 
@@ -435,13 +447,12 @@ const Dashboard = () => {
                                 {/* Search Bar */}
                                 <input
                                     type="text"
+                                    value={filters.search}
                                     placeholder="🔍 Buscar cliente..."
                                     className="w-full px-4 py-2 bg-neutral-800 border border-white/10 rounded-lg text-white placeholder-neutral-500 text-sm mb-4 focus:outline-none focus:border-white/30"
                                     onChange={(e) => {
-                                        const term = e.target.value.toLowerCase();
-                                        if (!term) {
-                                            loadClients();
-                                        }
+                                        setFilters(prev => ({ ...prev, search: e.target.value }));
+                                        setPagination(prev => ({ ...prev, page: 1 })); // Reset to first page on search
                                     }}
                                 />
 
@@ -460,35 +471,27 @@ const Dashboard = () => {
                                 {/* Tag Filter Bar */}
                                 <div className="flex flex-wrap gap-2 mb-4">
                                     <button
-                                        onClick={() => { selectClientsByTag(null); setSelectedClients([]); }}
-                                        className={`px-3 py-1 text-xs rounded-full transition-all ${activeTagFilter === null && selectedClients.length === 0
+                                        onClick={() => handleTagFilter(null)}
+                                        className={`px-3 py-1 text-xs rounded-full transition-all ${filters.tagId === null
                                             ? 'bg-white text-black font-medium'
                                             : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
                                             }`}
                                     >
-                                        Limpiar
+                                        Todos
                                     </button>
-                                    <button
-                                        onClick={() => { setActiveTagFilter(null); setSelectedClients(clients.map(c => c.id)); showNotification(`${clients.length} clientes seleccionados`, 'success'); }}
-                                        className={`px-3 py-1 text-xs rounded-full transition-all ${selectedClients.length === clients.length && clients.length > 0
-                                            ? 'bg-green-600 text-white font-medium'
-                                            : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
-                                            }`}
-                                    >
-                                        ✓ Seleccionar Todos
-                                    </button>
-                                    <span className="border-l border-neutral-700 mx-1"></span>
+
                                     {availableTags.map(tag => (
                                         <button
                                             key={tag.id}
-                                            onClick={() => selectClientsByTag(tag.id)}
-                                            className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${activeTagFilter === tag.id
+                                            onClick={() => handleTagFilter(tag.id)}
+                                            className={`px-3 py-1 text-xs rounded-full transition-all flex items-center gap-1 ${filters.tagId === tag.id
                                                 ? 'ring-2 ring-white font-medium'
                                                 : 'hover:opacity-80'
                                                 }`}
                                             style={{
                                                 backgroundColor: tag.color,
-                                                color: 'white'
+                                                color: 'white',
+                                                filter: filters.tagId === tag.id ? 'brightness(1.2)' : 'brightness(0.8)'
                                             }}
                                         >
                                             {tag.icon} {tag.name}
@@ -573,6 +576,28 @@ const Dashboard = () => {
                                             </div>
                                         ))
                                     )}
+                                </div>
+
+
+                                {/* Pagination Controls */}
+                                <div className="mt-4 flex items-center justify-between border-t border-white/5 pt-4">
+                                    <button
+                                        onClick={() => handlePageChange(pagination.page - 1)}
+                                        disabled={pagination.page <= 1}
+                                        className={`text-xs px-3 py-1 rounded-lg transition-colors ${pagination.page <= 1 ? 'text-neutral-600' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+                                    >
+                                        Anterior
+                                    </button>
+                                    <span className="text-xs text-neutral-500">
+                                        Página {pagination.page} de {pagination.pages}
+                                    </span>
+                                    <button
+                                        onClick={() => handlePageChange(pagination.page + 1)}
+                                        disabled={pagination.page >= pagination.pages}
+                                        className={`text-xs px-3 py-1 rounded-lg transition-colors ${pagination.page >= pagination.pages ? 'text-neutral-600' : 'text-neutral-400 hover:text-white hover:bg-neutral-800'}`}
+                                    >
+                                        Siguiente
+                                    </button>
                                 </div>
                             </div>
 
@@ -664,7 +689,7 @@ const Dashboard = () => {
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </div >
                 );
             case 'analytics':
                 return <AnalyticsView />;
