@@ -304,8 +304,14 @@ def logout_whatsapp(
     except httpx.HTTPStatusError as e:
          raise HTTPException(status_code=e.response.status_code, detail=f"WhatsApp service error: {str(e)}")
 
+class BulkMessageFilters(BaseModel):
+    tag_id: str = None
+    status: str = None
+    search: str = None
+
 class BulkMessageRequest(BaseModel):
-    phones: List[str]
+    phones: List[str] = []
+    filters: BulkMessageFilters = None
     message: str
 
 @router.post("/send-bulk")
@@ -315,7 +321,39 @@ def send_bulk_messages(
     db: Session = Depends(get_db)
 ):
     """Send WhatsApp message to multiple clients"""
-    print(f"[SendBulk] User {current_user.id} attempting bulk send. whatsapp_linked={current_user.whatsapp_linked}")
+    
+    target_phones = []
+    
+    # CASE A: Standard list of phones provided
+    if request.phones:
+        target_phones = request.phones
+        
+    # CASE B: Filters provided (Server-side selection)
+    elif request.filters:
+        print(f"[SendBulk] Resolving filters: {request.filters}")
+        from app.models import Client, ClientTag
+        
+        query = db.query(Client).filter(Client.user_id == current_user.id)
+        
+        # Apply filters (Same logic as get_clients)
+        if request.filters.search:
+            term = f"%{request.filters.search}%"
+            query = query.filter((Client.name.ilike(term)) | (Client.phone.ilike(term)))
+            
+        if request.filters.status:
+            query = query.filter(Client.status == request.filters.status)
+            
+        if request.filters.tag_id:
+            query = query.join(ClientTag).filter(ClientTag.tag_id == request.filters.tag_id)
+            
+        clients = query.all()
+        target_phones = [c.phone for c in clients if c.phone]
+        print(f"[SendBulk] Resolved {len(target_phones)} clients from filters")
+        
+    if not target_phones:
+        raise HTTPException(status_code=400, detail="No valid recipients found")
+
+    print(f"[SendBulk] Sending to {len(target_phones)} recipients. User: {current_user.id}")
     
     # Smart check: verify with Node if DB says not linked
     if not current_user.whatsapp_linked:
@@ -334,7 +372,7 @@ def send_bulk_messages(
             raise HTTPException(status_code=400, detail="WhatsApp not linked")
     
     results = {
-        "total": len(request.phones),
+        "total": len(target_phones),
         "sent": 0,
         "failed": 0,
         "errors": []
@@ -343,7 +381,7 @@ def send_bulk_messages(
     url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
     
     with httpx.Client(trust_env=False) as client:
-        for phone in request.phones:
+        for phone in target_phones:
             try:
                 payload = {
                     "userId": str(current_user.id),

@@ -58,6 +58,7 @@ const Dashboard = () => {
     const [editingClient, setEditingClient] = useState(null);
     const [newClient, setNewClient] = useState({ name: '', phone: '' }); // Kept for fallback, but ClientForm handles its own state
     const [notification, setNotification] = useState(null);
+    const [selectAllGlobal, setSelectAllGlobal] = useState(false); // New: Select all pages
     const [stats, setStats] = useState({
         totalClients: 0,
         messagesSent: 0,
@@ -158,6 +159,7 @@ const Dashboard = () => {
         setFilters(prev => ({ ...prev, tagId: newTagId }));
         setPagination(prev => ({ ...prev, page: 1 })); // Reset to page 1
         setSelectedClients([]); // Clear selection to avoid confusion
+        setSelectAllGlobal(false);
     };
 
     const handlePageChange = (newPage) => {
@@ -277,17 +279,32 @@ const Dashboard = () => {
     };
 
     const toggleSelectClient = (id) => {
-        if (selectedClients.includes(id)) {
-            setSelectedClients(selectedClients.filter(cid => cid !== id));
+        if (selectAllGlobal) {
+            setSelectAllGlobal(false);
+            setSelectedClients([]);
         } else {
-            setSelectedClients([...selectedClients, id]);
+            if (selectedClients.includes(id)) {
+                setSelectedClients(selectedClients.filter(cid => cid !== id));
+            } else {
+                setSelectedClients([...selectedClients, id]);
+            }
         }
     };
 
     const selectAllClients = () => {
-        if (selectedClients.length === clients.length) {
+        if (selectAllGlobal) {
+            // Deselect all
+            setSelectAllGlobal(false);
             setSelectedClients([]);
+        } else if (selectedClients.length === clients.length) {
+            // If all on page are selected, offer to select ALL pages
+            if (pagination.total > clients.length) {
+                setSelectAllGlobal(true);
+            } else {
+                setSelectedClients([]);
+            }
         } else {
+            // Select all on current page
             setSelectedClients(clients.map(c => c.id));
         }
     };
@@ -297,31 +314,48 @@ const Dashboard = () => {
             showNotification('Escribe un mensaje', 'error');
             return;
         }
-        if (selectedClients.length === 0) {
+        if (selectedClients.length === 0 && !selectAllGlobal) {
             showNotification('Selecciona al menos un cliente', 'error');
             return;
         }
 
         setSending(true);
         try {
-            const selectedPhones = clients
-                .filter(c => selectedClients.includes(c.id))
-                .map(c => c.phone);
+            // Case A: Select All Global (Server-side filtering)
+            if (selectAllGlobal) {
+                await api.post('/whatsapp/send-bulk', {
+                    filters: {
+                        search: debouncedSearch,
+                        tag_id: filters.tagId,
+                        status: null // Add status if we implement status filter UI
+                    },
+                    message: message
+                }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setStats(s => ({ ...s, messagesSent: s.messagesSent + pagination.total })); // Approximate
+                showNotification(`¡Mensaje masivo enviado a ${pagination.total} clientes!`, 'success');
 
-            await api.post('/whatsapp/send-bulk', {
-                phones: selectedPhones,
-                message: message
-            }, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            } else {
+                // Case B: Manual Selection (Client-side phones)
+                const selectedPhones = clients
+                    .filter(c => selectedClients.includes(c.id))
+                    .map(c => c.phone);
 
-            setStats(s => ({
-                ...s,
-                messagesSent: s.messagesSent + selectedClients.length
-            }));
-            showNotification(`¡Mensaje enviado a ${selectedClients.length} clientes!`, 'success');
+                await api.post('/whatsapp/send-bulk', {
+                    phones: selectedPhones,
+                    message: message
+                }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                setStats(s => ({ ...s, messagesSent: s.messagesSent + selectedClients.length }));
+                showNotification(`¡Mensaje enviado a ${selectedClients.length} clientes!`, 'success');
+            }
+
             setMessage('');
             setSelectedClients([]);
+            setSelectAllGlobal(false);
         } catch (err) {
             console.error('Error sending message:', err);
             showNotification('Error al enviar mensajes', 'error');
@@ -612,20 +646,35 @@ const Dashboard = () => {
                                     {/* Selected count */}
                                     <div className="flex items-center justify-between text-sm">
                                         <span className="text-neutral-400">
-                                            {selectedClients.length > 0
-                                                ? `${selectedClients.length} cliente${selectedClients.length > 1 ? 's' : ''} seleccionado${selectedClients.length > 1 ? 's' : ''} `
-                                                : 'Ningún cliente seleccionado'
+                                            {selectAllGlobal
+                                                ? `Todos los ${pagination.total} clientes seleccionados`
+                                                : selectedClients.length > 0
+                                                    ? `${selectedClients.length} cliente${selectedClients.length > 1 ? 's' : ''} seleccionado${selectedClients.length > 1 ? 's' : ''} `
+                                                    : 'Ningún cliente seleccionado'
                                             }
                                         </span>
-                                        {selectedClients.length > 0 && (
+                                        {(selectedClients.length > 0 || selectAllGlobal) && (
                                             <button
-                                                onClick={() => setSelectedClients([])}
+                                                onClick={() => { setSelectedClients([]); setSelectAllGlobal(false); }}
                                                 className="text-neutral-500 hover:text-white text-xs"
                                             >
                                                 Limpiar
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Global Select Alert */}
+                                    {!selectAllGlobal && selectedClients.length === clients.length && clients.length > 0 && pagination.total > clients.length && (
+                                        <div className="bg-blue-900/20 border border-blue-500/20 p-2 rounded text-xs text-blue-300 flex justify-between items-center">
+                                            <span>Solo {clients.length} seleccionados de esta página.</span>
+                                            <button
+                                                onClick={() => setSelectAllGlobal(true)}
+                                                className="underline hover:text-white font-medium"
+                                            >
+                                                Seleccionar los {pagination.total}?
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Message textarea */}
                                     <textarea
@@ -658,8 +707,8 @@ const Dashboard = () => {
                                     {/* Send button */}
                                     <button
                                         onClick={sendMessage}
-                                        disabled={sending || selectedClients.length === 0 || !message.trim()}
-                                        className={`w - full py - 3.5 rounded - xl font - medium flex items - center justify - center gap - 2 transition - all ${sending || selectedClients.length === 0 || !message.trim()
+                                        disabled={sending || (!selectAllGlobal && selectedClients.length === 0) || !message.trim()}
+                                        className={`w - full py - 3.5 rounded - xl font - medium flex items - center justify - center gap - 2 transition - all ${sending || (!selectAllGlobal && selectedClients.length === 0) || !message.trim()
                                             ? 'bg-neutral-800 text-neutral-500 cursor-not-allowed'
                                             : 'bg-white text-black hover:bg-neutral-200'
                                             } `}
