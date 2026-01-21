@@ -100,8 +100,10 @@ const Dashboard = () => {
             const response = await api.get('/clients', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            setClients(response.data || []);
-            setStats(s => ({ ...s, totalClients: response.data?.length || 0 }));
+            // Handle new paginated response format
+            const clientsData = response.data.clients || response.data || [];
+            setClients(clientsData);
+            setStats(s => ({ ...s, totalClients: response.data.total || clientsData.length || 0 }));
         } catch (err) {
             console.error('Error loading clients:', err);
             setClients([]);
