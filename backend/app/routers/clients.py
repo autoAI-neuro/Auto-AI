@@ -173,3 +173,26 @@ def delete_client(
     # Success
     return {"message": "Client deleted"}
 
+
+@router.get("/calendar-events")
+def get_calendar_events(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all clients with dates for calendar (Lightweight)"""
+    clients = db.query(Client.id, Client.name, Client.phone, Client.birth_date, Client.purchase_date).filter(
+        Client.user_id == current_user.id,
+        (Client.birth_date.isnot(None)) | (Client.purchase_date.isnot(None))
+    ).all()
+    
+    # Convert Row objects to dicts
+    return [
+        {
+            "id": c.id,
+            "name": c.name,
+            "phone": c.phone,
+            "birth_date": c.birth_date.isoformat() if c.birth_date else None,
+            "purchase_date": c.purchase_date.isoformat() if c.purchase_date else None
+        }
+        for c in clients
+    ]

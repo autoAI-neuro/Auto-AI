@@ -1,10 +1,31 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Gift, Clock, Zap, X, Send, MessageSquare } from 'lucide-react';
+import api from '../config';
+import { useAuth } from '../context/AuthContext';
 
-const CalendarView = ({ clients, onQuickSend }) => {
+const CalendarView = ({ onQuickSend }) => {
+    const { token } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedEvent, setSelectedEvent] = useState(null); // For modal
     const [sending, setSending] = useState(false);
+    const [calendarClients, setCalendarClients] = useState([]);
+
+    // Fetch calendar-specific data (all clients with dates)
+    useEffect(() => {
+        const loadCalendarData = async () => {
+            if (!token) return;
+            try {
+                const response = await api.get('/clients/calendar-events', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setCalendarClients(response.data);
+                console.log("Calendar events loaded:", response.data.length);
+            } catch (e) {
+                console.error("Error loading calendar data", e);
+            }
+        };
+        loadCalendarData();
+    }, [token]);
 
     // Templates
     const templates = {
@@ -41,7 +62,8 @@ const CalendarView = ({ clients, onQuickSend }) => {
         const currentMonth = currentDate.getMonth();
         const currentYear = currentDate.getFullYear();
 
-        clients.forEach(client => {
+        // Use calendarClients instead of props.clients
+        calendarClients.forEach(client => {
             // 1. Birthday (Every year)
             if (client.birth_date) {
                 // Be careful with timezone/dates from string. 
@@ -65,17 +87,35 @@ const CalendarView = ({ clients, onQuickSend }) => {
             if (client.purchase_date) {
                 const pDate = new Date(client.purchase_date);
                 // Calculate target dates
-                const purchaseMonth = pDate.getMonth();
-                const purchaseDay = pDate.getDate();
-                const purchaseYear = pDate.getFullYear();
+                // Note: pDate from string might vary by timezone, but "YYYY-MM-DD" parsing usually works if consistent.
+                // Better to parse parts manually to avoid TZ issues if just YYYY-MM-DD
+                const [pY, pM, pD] = client.purchase_date.split('-').map(Number);
 
-                // 6 Month Check (One time? Or every 6 months? Assuming one time for now based on request "seguimiento 6 meses")
-                // Date 6 months after purchase
-                const followUpDate = new Date(purchaseYear, purchaseMonth + 6, purchaseDay);
+                // 6 Month Check
+                // Target: pM + 6. 
+                // We need to compare specific dates.
+                // Let's create date objects for comparison using UTC to avoid shifts
+                // Actually, logic:
+                // If Purchase is Jan (0), 6mo follow up is July (6).
+                // If Purchase is July (6), 6mo follow up is Jan (0) next year.
 
-                if (followUpDate.getMonth() === currentMonth && followUpDate.getFullYear() === currentYear) {
+                let target6MoMonth = (pM - 1 + 6) % 12;
+                let target6MoYear = pY + Math.floor((pM - 1 + 6) / 12);
+
+                // If current view matches 6mo target
+                // BUT, user asked for reminder "of 6 months". Usually means 6 months AFTER purchase.
+                // We show it if it falls in CURRENT view month.
+                // We ignore the year for "recurring"? No, 6 month is one time.
+                // So checking if target matches current view.
+
+                //Wait, "recordatorios de cumpleaños de 6 meses". 
+                // Logic: 
+                // followUpDate = purchaseDate + 6 months.
+                // if followUpDate.month == currentMonth && followUpDate.year == currentYear -> SHOW
+
+                if (target6MoMonth === currentMonth && target6MoYear === currentYear) {
                     list.push({
-                        day: followUpDate.getDate(),
+                        day: pD,
                         type: 'followup',
                         label: `Seguimiento 6 meses: ${client.name}`,
                         color: 'text-blue-400',
@@ -86,13 +126,16 @@ const CalendarView = ({ clients, onQuickSend }) => {
                 }
 
                 // 1 Year Upgrade (Anniversary)
-                // If current month matches purchase month, and year > purchase year
-                if (purchaseMonth === currentMonth && currentYear > purchaseYear) {
-                    // It's an anniversary
+                // Every year on purchase month? Or just 1 year?
+                // "recordatorios (...) de 12 meses". Could be annual anniversary.
+                // Let's assume Annual Anniversary for now, or just 1st year.
+                // Usually "Upgrade" implies 2-3 years, but user said 12 months.
+                // If we treat it as "Anniversary", we show it every year on the purchase month.
+                if (pM - 1 === currentMonth && currentYear > pY) {
                     list.push({
-                        day: purchaseDay,
+                        day: pD,
                         type: 'upgrade',
-                        label: `Aniversario/Upgrade: ${client.name}`,
+                        label: `Aniversario (${currentYear - pY} años): ${client.name}`,
                         color: 'text-yellow-400',
                         bgColor: 'bg-yellow-500/20',
                         icon: Zap,
@@ -102,7 +145,7 @@ const CalendarView = ({ clients, onQuickSend }) => {
             }
         });
         return list;
-    }, [clients, currentDate]);
+    }, [calendarClients, currentDate]);
 
     const handleEventClick = (event) => {
         // Prepare template
@@ -204,7 +247,7 @@ const CalendarView = ({ clients, onQuickSend }) => {
                     <div className="w-2 h-2 rounded-full bg-blue-400"></div> Seguimiento (6m)
                 </div>
                 <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full bg-yellow-400"></div> Upgrade (1a)
+                    <div className="w-2 h-2 rounded-full bg-yellow-400"></div> Aniversario
                 </div>
             </div>
 
