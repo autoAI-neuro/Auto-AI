@@ -52,7 +52,7 @@ class SendMessageRequest(BaseModel):
     client_id: str = None
 
 @router.post("/init")
-async def initialize_whatsapp(
+def initialize_whatsapp(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -64,9 +64,9 @@ async def initialize_whatsapp(
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/init/{current_user.id}"
         print(f"[Backend] Calling URL: {url}")
         
-        # Use simple AsyncClient without proxies parameter (not supported in newer httpx)
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(url)
+        # Use simple Sync Client
+        with httpx.Client(timeout=60.0) as client:
+            response = client.post(url)
             print(f"[Backend] Response status: {response.status_code}")
             response.raise_for_status()
             return response.json()
@@ -78,15 +78,15 @@ async def initialize_whatsapp(
         raise HTTPException(status_code=500, detail=f"Cannot connect to WhatsApp service @ {url}: {str(e)}")
 
 @router.get("/status")
-async def get_whatsapp_status(
+def get_whatsapp_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Get WhatsApp connection status and QR code"""
     try:
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
-        async with httpx.AsyncClient(trust_env=False) as client:
-            response = await client.get(url, timeout=10.0)
+        with httpx.Client(trust_env=False) as client:
+            response = client.get(url, timeout=10.0)
             response.raise_for_status()
             data = response.json()
             print(f"[Backend] Status from Node for {current_user.id}: {data}")
@@ -96,10 +96,10 @@ async def get_whatsapp_status(
         if current_user.whatsapp_linked and node_status in ['not_initialized', 'disconnected', 'error']:
             print(f"[Backend] Auto-restoring session for {current_user.id}")
             init_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/init/{current_user.id}"
-            async with httpx.AsyncClient(trust_env=False) as client:
+            with httpx.Client(trust_env=False) as client:
                 # Fire and forget (or wait briefly)
                 try:
-                    await client.post(init_url, timeout=5.0)
+                    client.post(init_url, timeout=5.0)
                     data['status'] = 'initializing'
                     data['message'] = 'Restoring session...'
                 except Exception as e:
@@ -119,7 +119,7 @@ async def get_whatsapp_status(
 
 
 
-async def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None, client_id: str = None):
+def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None, client_id: str = None):
     """
     Internal helper to send messages via Node service and save to DB.
     Used by:
@@ -137,8 +137,8 @@ async def send_message_internal(db: Session, user_id: str, phone: str, message: 
     
     # Send to Node Service
     print(f"[SendInternal] Sending to {phone} for {user_id}")
-    async with httpx.AsyncClient(trust_env=False) as client:
-        response = await client.post(url, json=payload, timeout=30.0)
+    with httpx.Client(trust_env=False) as client:
+        response = client.post(url, json=payload, timeout=30.0)
         response.raise_for_status()
         result = response.json()
         
@@ -155,7 +155,7 @@ async def send_message_internal(db: Session, user_id: str, phone: str, message: 
 
 
 @router.post("/send")
-async def send_whatsapp_message(
+def send_whatsapp_message(
     request: SendMessageRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -175,7 +175,7 @@ async def send_whatsapp_message(
          raise HTTPException(status_code=400, detail="WhatsApp not linked")
 
     try:
-        return await send_message_internal(
+        return send_message_internal(
             db, 
             str(current_user.id), 
             request.phone_number, 
@@ -191,7 +191,7 @@ async def send_whatsapp_message(
          raise HTTPException(status_code=e.response.status_code, detail=error_detail)
 
 @router.post("/webhook")
-async def whatsapp_webhook(
+def whatsapp_webhook(
     payload: dict,
     db: Session = Depends(get_db)
 ):
@@ -283,15 +283,15 @@ async def whatsapp_webhook(
     return {"status": "processed"}
 
 @router.post("/logout")
-async def logout_whatsapp(
+def logout_whatsapp(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Disconnect WhatsApp session"""
     try:
         url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/logout/{current_user.id}"
-        async with httpx.AsyncClient(trust_env=False) as client:
-            response = await client.post(url, timeout=10.0)
+        with httpx.Client(trust_env=False) as client:
+            response = client.post(url, timeout=10.0)
             response.raise_for_status()
         
         # Update database
@@ -309,7 +309,7 @@ class BulkMessageRequest(BaseModel):
     message: str
 
 @router.post("/send-bulk")
-async def send_bulk_messages(
+def send_bulk_messages(
     request: BulkMessageRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -321,8 +321,8 @@ async def send_bulk_messages(
     if not current_user.whatsapp_linked:
         try:
             check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
-            async with httpx.AsyncClient(trust_env=False) as client:
-                check_resp = await client.get(check_url, timeout=5.0)
+            with httpx.Client(trust_env=False) as client:
+                check_resp = client.get(check_url, timeout=5.0)
                 node_status = check_resp.json().get('status')
                 if node_status == 'connected':
                     current_user.whatsapp_linked = True
@@ -342,7 +342,7 @@ async def send_bulk_messages(
     
     url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
     
-    async with httpx.AsyncClient(trust_env=False) as client:
+    with httpx.Client(trust_env=False) as client:
         for phone in request.phones:
             try:
                 payload = {
@@ -350,7 +350,7 @@ async def send_bulk_messages(
                     "phoneNumber": phone,
                     "message": request.message
                 }
-                response = await client.post(url, json=payload, timeout=30.0)
+                response = client.post(url, json=payload, timeout=30.0)
                 response.raise_for_status()
                 results["sent"] += 1
             except Exception as e:
@@ -368,7 +368,7 @@ class SendMediaRequest(BaseModel):
     caption: str = ""
 
 @router.post("/send-media")
-async def send_whatsapp_media(
+def send_whatsapp_media(
     request: SendMediaRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -380,8 +380,8 @@ async def send_whatsapp_media(
     if not current_user.whatsapp_linked:
         try:
             check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
-            async with httpx.AsyncClient(trust_env=False) as client:
-                check_resp = await client.get(check_url, timeout=5.0)
+            with httpx.Client(trust_env=False) as client:
+                check_resp = client.get(check_url, timeout=5.0)
                 node_status = check_resp.json().get('status')
                 if node_status == 'connected':
                     current_user.whatsapp_linked = True
@@ -400,8 +400,8 @@ async def send_whatsapp_media(
             "mediaType": request.media_type,
             "caption": request.caption
         }
-        async with httpx.AsyncClient(trust_env=False) as client:
-            response = await client.post(url, json=payload, timeout=60.0)  # Longer timeout for media
+        with httpx.Client(trust_env=False) as client:
+            response = client.post(url, json=payload, timeout=60.0)  # Longer timeout for media
             response.raise_for_status()
             print(f"[SendMedia] SUCCESS for {current_user.id}")
             return response.json()

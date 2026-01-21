@@ -42,7 +42,7 @@ class AutomationResponse(BaseModel):
 # CRUD ENDPOINTS
 # ============================================
 @router.post("/", response_model=AutomationResponse)
-async def create_automation(
+def create_automation(
     automation_in: AutomationCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -78,7 +78,7 @@ async def create_automation(
 
 
 @router.get("/", response_model=List[AutomationResponse])
-async def get_automations(
+def get_automations(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -87,7 +87,7 @@ async def get_automations(
 
 
 @router.delete("/{automation_id}")
-async def delete_automation(
+def delete_automation(
     automation_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -107,7 +107,7 @@ async def delete_automation(
 
 
 @router.put("/{automation_id}/toggle")
-async def toggle_automation(
+def toggle_automation(
     automation_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -149,8 +149,9 @@ def trigger_automations(db: Session, user_id: str, trigger_type: str, trigger_va
         return
     
     # 2. Execute actions for each matched automation
-    import asyncio
+    # 2. Execute actions for each matched automation
     from app.routers.whatsapp_web import send_message_internal # We will need to refactor send logic to be reusable
+    
     
     for auto in automations:
         print(f"[Automation] Executing rule: {auto.name}")
@@ -159,7 +160,7 @@ def trigger_automations(db: Session, user_id: str, trigger_type: str, trigger_va
 
 
 
-async def execute_action(db: Session, user_id: str, action: AutomationAction, context: dict):
+def execute_action(db: Session, user_id: str, action: AutomationAction, context: dict):
     """Execute a single action"""
     try:
         if action.action_type == "SEND_MESSAGE":
@@ -178,11 +179,7 @@ async def execute_action(db: Session, user_id: str, action: AutomationAction, co
             
             # Use the internal helper to send
             from app.routers.whatsapp_web import send_message_internal
-            await send_message_internal(db, user_id, client_phone, final_message)
-            
-            # Use the internal helper to send
-            from app.routers.whatsapp_web import send_message_internal
-            await send_message_internal(db, user_id, client_phone, final_message)
+            send_message_internal(db, user_id, client_phone, final_message)
             
         elif action.action_type == "WAIT":
              delay_minutes = int(action.action_payload.get("delay_minutes", 0))
@@ -202,14 +199,14 @@ async def execute_action(db: Session, user_id: str, action: AutomationAction, co
                      print(f"[Automation] Scheduling next action {next_action.id} in {delay_minutes} mins")
                      # We need a wrapper to execute action from scheduler context
                      # Since we can't pass DB session easily, the scheduled job needs to create its own session
-                     await schedule_action_execution(execute_action_job, run_date, args=[user_id, next_action.id, context])
+                     schedule_action_execution(execute_action_job, run_date, args=[user_id, next_action.id, context])
                  else:
                      print("[Automation] Wait finished, but no further actions.")
 
     except Exception as e:
         print(f"[Automation] Error executing action {action.id}: {e}")
 
-async def execute_action_job(user_id: str, action_id: str, context: dict):
+def execute_action_job(user_id: str, action_id: str, context: dict):
     """Wrapper for scheduled execution that manages DB session"""
     from app.db.session import SessionLocal
     from app.models import AutomationAction
@@ -219,7 +216,7 @@ async def execute_action_job(user_id: str, action_id: str, context: dict):
         action = db.query(AutomationAction).filter(AutomationAction.id == action_id).first()
         if action:
             print(f"[Scheduler] Executing deferred action {action_id}")
-            await execute_action(db, user_id, action, context)
+            execute_action(db, user_id, action, context)
         else:
             print(f"[Scheduler] Action {action_id} not found (might have been deleted)")
     except Exception as e:

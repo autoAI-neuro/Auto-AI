@@ -4,13 +4,13 @@ from datetime import datetime
 from typing import List, Optional
 from app.db.session import get_db
 from app.deps import get_current_user
-from app.models import Client, User
+from app.models import Client, User, Tag, ClientTag
 from app.schemas.crm import ClientCreate, ClientUpdate, ClientResponse
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
 @router.get("")
-async def get_clients(
+def get_clients(
     page: int = 1,
     limit: int = 50,
     search: Optional[str] = None,
@@ -44,6 +44,32 @@ async def get_clients(
     # Calculate total pages
     pages = (total + limit - 1) // limit if total > 0 else 1
     
+    # Get client IDs for tag fetching
+    client_ids = [c.id for c in clients]
+    
+    # Fetch tags efficiently
+    if client_ids:
+        # Get all client-tag associations
+        associations = db.query(ClientTag).filter(ClientTag.client_id.in_(client_ids)).all()
+        
+        # Get all tag details
+        tag_ids = [a.tag_id for a in associations]
+        if tag_ids:
+            tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+            tag_map = {t.id: t for t in tags}
+            
+            # Map client_id -> list of tags
+            client_tags_map = {}
+            for assoc in associations:
+                if assoc.client_id not in client_tags_map:
+                    client_tags_map[assoc.client_id] = []
+                if assoc.tag_id in tag_map:
+                    client_tags_map[assoc.client_id].append(tag_map[assoc.tag_id])
+            
+            # Assign to client objects (won't persist to DB, just for response)
+            for client in clients:
+                client.active_tags = client_tags_map.get(client.id, [])
+    
     return {
         "clients": clients,
         "total": total,
@@ -53,7 +79,7 @@ async def get_clients(
     }
 
 @router.post("", response_model=ClientResponse)
-async def create_client(
+def create_client(
     client_in: ClientCreate, 
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -91,7 +117,7 @@ async def create_client(
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.put("/{client_id}", response_model=ClientResponse)
-async def update_client(
+def update_client(
     client_id: str,
     client_in: ClientUpdate,
     current_user: User = Depends(get_current_user),
@@ -116,7 +142,7 @@ async def update_client(
     return client
 
 @router.delete("/{client_id}")
-async def delete_client(
+def delete_client(
     client_id: str, 
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

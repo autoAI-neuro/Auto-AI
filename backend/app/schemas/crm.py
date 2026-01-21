@@ -48,3 +48,24 @@ class ClientResponse(ClientBase):
 
     class Config:
         orm_mode = True
+
+class TagSchema(BaseModel):
+    id: str
+    name: str
+    color: str
+    icon: Optional[str]
+    is_default: bool
+    
+    class Config:
+        orm_mode = True
+
+class ClientResponse(ClientBase):
+    id: str
+    user_id: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+    document_path: Optional[str] = None
+    active_tags: List[TagSchema] = []
+
+    class Config:
+        orm_mode = True

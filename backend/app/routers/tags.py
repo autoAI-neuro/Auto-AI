@@ -63,7 +63,7 @@ def ensure_default_tags(user_id: str, db: Session):
 # GET ALL TAGS
 # ============================================
 @router.get("", response_model=List[TagResponse])
-async def get_tags(
+def get_tags(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -79,7 +79,7 @@ async def get_tags(
 # CREATE CUSTOM TAG
 # ============================================
 @router.post("", response_model=TagResponse)
-async def create_tag(
+def create_tag(
     tag_in: TagCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -107,7 +107,7 @@ async def create_tag(
 # UPDATE TAG
 # ============================================
 @router.put("/{tag_id}", response_model=TagResponse)
-async def update_tag(
+def update_tag(
     tag_id: str,
     tag_in: TagUpdate,
     current_user: User = Depends(get_current_user),
@@ -135,7 +135,7 @@ async def update_tag(
 # DELETE TAG
 # ============================================
 @router.delete("/{tag_id}")
-async def delete_tag(
+def delete_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -158,7 +158,7 @@ async def delete_tag(
 # ASSIGN TAG TO CLIENT
 # ============================================
 @router.post("/client/{client_id}/assign")
-async def assign_tag_to_client(
+def assign_tag_to_client(
     client_id: str,
     assign: ClientTagAssign,
     current_user: User = Depends(get_current_user),
@@ -224,7 +224,7 @@ async def assign_tag_to_client(
 # REMOVE TAG FROM CLIENT
 # ============================================
 @router.delete("/client/{client_id}/remove/{tag_id}")
-async def remove_tag_from_client(
+def remove_tag_from_client(
     client_id: str,
     tag_id: str,
     current_user: User = Depends(get_current_user),
@@ -256,7 +256,7 @@ async def remove_tag_from_client(
 # GET CLIENT'S TAGS
 # ============================================
 @router.get("/client/{client_id}", response_model=List[TagResponse])
-async def get_client_tags(
+def get_client_tags(
     client_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -289,7 +289,7 @@ async def get_client_tags(
 # GET CLIENTS BY TAG
 # ============================================
 @router.get("/{tag_id}/clients")
-async def get_clients_by_tag(
+def get_clients_by_tag(
     tag_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)

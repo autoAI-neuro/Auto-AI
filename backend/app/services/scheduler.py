@@ -20,7 +20,7 @@ def start_scheduler():
         scheduler.start()
         print("[Scheduler] Started AsyncIOScheduler")
 
-async def schedule_action_execution(action_func, run_date, args=None):
+def schedule_action_execution(action_func, run_date, args=None):
     """
     Schedule a function to run at a specific date.
     

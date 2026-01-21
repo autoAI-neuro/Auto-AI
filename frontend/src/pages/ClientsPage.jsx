@@ -23,6 +23,19 @@ const ClientsPage = () => {
 
     const LIMIT = 50;
 
+    const [availableTags, setAvailableTags] = useState([]);
+
+    const loadTags = async () => {
+        try {
+            const response = await api.get('/tags', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setAvailableTags(response.data);
+        } catch (err) {
+            console.error('Error loading tags:', err);
+        }
+    };
+
     const loadClients = async () => {
         setLoading(true);
         try {
@@ -42,12 +55,16 @@ const ClientsPage = () => {
             setTotal(response.data.total || 0);
         } catch (err) {
             console.error('Error loading clients:', err);
+        } finally {
+            setLoading(false);
         }
-        setLoading(false);
     };
 
     useEffect(() => {
-        if (token) loadClients();
+        if (token) {
+            loadTags();
+            loadClients();
+        }
     }, [token, page, statusFilter]);
 
     useEffect(() => {
@@ -100,6 +117,7 @@ const ClientsPage = () => {
             link.remove();
         } catch (err) {
             console.error('Export error:', err);
+            alert('Error al exportar');
         }
     };
 
@@ -131,7 +149,7 @@ const ClientsPage = () => {
             loadClients();
         } catch (err) {
             console.error('Error saving client:', err);
-            alert('Error: ' + (err.response?.data?.detail || err.message));
+            alert('Error al guardar cliente');
         }
     };
 
@@ -279,7 +297,11 @@ const ClientsPage = () => {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4">
-                                                <TagSelector clientId={client.id} />
+                                                <TagSelector
+                                                    clientId={client.id}
+                                                    initialTags={client.active_tags || []}
+                                                    availableTags={availableTags}
+                                                />
                                             </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex justify-center gap-2">

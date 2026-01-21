@@ -4,42 +4,15 @@ import toast from 'react-hot-toast';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
 
-const TagSelector = ({ clientId, onTagsChange }) => {
+const TagSelector = ({ clientId, initialTags = [], availableTags = [], onTagsChange }) => {
     const { token } = useAuth();
-    const [allTags, setAllTags] = useState([]);
-    const [clientTags, setClientTags] = useState([]);
+    const [clientTags, setClientTags] = useState(initialTags);
     const [showDropdown, setShowDropdown] = useState(false);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        loadTags();
-        if (clientId) {
-            loadClientTags();
-        }
-    }, [clientId]);
-
-    const loadTags = async () => {
-        try {
-            const response = await api.get('/tags', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setAllTags(response.data);
-        } catch (err) {
-            console.error('Error loading tags:', err);
-        }
-    };
-
-    const loadClientTags = async () => {
-        if (!clientId) return;
-        try {
-            const response = await api.get(`/tags/client/${clientId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            setClientTags(response.data);
-        } catch (err) {
-            console.error('Error loading client tags:', err);
-        }
-    };
+        setClientTags(initialTags);
+    }, [initialTags]);
 
     const assignTag = async (tagId) => {
         setLoading(true);
@@ -48,8 +21,14 @@ const TagSelector = ({ clientId, onTagsChange }) => {
                 { tag_id: tagId },
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
-            await loadClientTags();
-            onTagsChange?.();
+
+            // Update local state
+            const tagToAdd = availableTags.find(t => t.id === tagId);
+            if (tagToAdd) {
+                const newTags = [...clientTags, tagToAdd];
+                setClientTags(newTags);
+                onTagsChange?.(newTags);
+            }
             toast.success('Etiqueta asignada');
         } catch (err) {
             console.error('Error assigning tag:', err);
@@ -65,8 +44,11 @@ const TagSelector = ({ clientId, onTagsChange }) => {
             await api.delete(`/tags/client/${clientId}/remove/${tagId}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
-            await loadClientTags();
-            onTagsChange?.();
+
+            // Update local state
+            const newTags = clientTags.filter(t => t.id !== tagId);
+            setClientTags(newTags);
+            onTagsChange?.(newTags);
             toast.success('Etiqueta removida');
         } catch (err) {
             console.error('Error removing tag:', err);
@@ -122,7 +104,7 @@ const TagSelector = ({ clientId, onTagsChange }) => {
             {/* Dropdown */}
             {showDropdown && (
                 <div className="absolute z-50 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1">
-                    {allTags.map(tag => (
+                    {availableTags.map(tag => (
                         <button
                             key={tag.id}
                             onClick={() => toggleTag(tag)}

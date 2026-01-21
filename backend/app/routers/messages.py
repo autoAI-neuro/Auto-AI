@@ -43,7 +43,7 @@ class ConversationSummary(BaseModel):
 # GET CONVERSATION WITH CLIENT
 # ============================================
 @router.get("/conversation/{client_id}", response_model=List[MessageResponse])
-async def get_conversation(
+def get_conversation(
     client_id: str,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
@@ -72,7 +72,7 @@ async def get_conversation(
 # GET CONVERSATION BY PHONE
 # ============================================
 @router.get("/conversation/phone/{phone}", response_model=List[MessageResponse])
-async def get_conversation_by_phone(
+def get_conversation_by_phone(
     phone: str,
     limit: int = 50,
     current_user: User = Depends(get_current_user),
@@ -91,7 +91,7 @@ async def get_conversation_by_phone(
 # GET ALL CONVERSATIONS (INBOX)
 # ============================================
 @router.get("/inbox")
-async def get_inbox(
+def get_inbox(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -143,7 +143,7 @@ async def get_inbox(
 # SEARCH MESSAGES
 # ============================================
 @router.get("/search")
-async def search_messages(
+def search_messages(
     q: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
