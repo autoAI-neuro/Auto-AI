@@ -14,6 +14,7 @@ def get_clients(
     page: int = 1,
     limit: int = 50,
     search: Optional[str] = None,
+    status: Optional[str] = None,
     tag_id: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
