@@ -420,65 +420,30 @@ const Dashboard = () => {
                 return <SettingsView user={{ email: 'raysanchezsolutions@gmail.com' }} />; // Mock user for now or useAuth hook user
             default:
                 return (
-                    <div className="space-y-8 animate-slideIn">
-                        {/* Stats Cards */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/10 rounded-xl p-5">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <Users className="w-5 h-5 text-blue-400" />
-                                    <span className="text-neutral-400 text-sm">Clientes</span>
-                                </div>
-                                <p className="text-3xl font-light text-white">{stats.totalClients}</p>
-                            </div>
-                            <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/10 rounded-xl p-5">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <MessageSquare className="w-5 h-5 text-green-400" />
-                                    <span className="text-neutral-400 text-sm">Mensajes Enviados</span>
-                                </div>
-                                <p className="text-3xl font-light text-white">{stats.messagesSent}</p>
-                            </div>
-                            <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/10 rounded-xl p-5">
-                                <div className="flex items-center gap-3 mb-2">
-                                    <CheckCircle className="w-5 h-5 text-purple-400" />
-                                    <span className="text-neutral-400 text-sm">Tasa de Éxito</span>
-                                </div>
-                                <p className="text-3xl font-light text-white">{stats.successRate}%</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[600px]">
+                    <div className="space-y-6 animate-slideIn">
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-[650px]">
                             {/* Clients List */}
                             <div className="backdrop-blur-xl bg-neutral-900/30 border border-white/10 rounded-xl p-6 flex flex-col h-full">
-                                <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center justify-between mb-4">
                                     <h2 className="text-lg font-light text-white flex items-center gap-2">
                                         <Users className="w-5 h-5 text-neutral-500" />
                                         Clientes
                                     </h2>
-                                    <div className="flex items-center gap-2">
-                                        <label className="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-1.5 rounded-lg transition-colors cursor-pointer border border-white/5">
-                                            <Upload className="w-3 h-3" />
-                                            Importar
-                                            <input type="file" accept=".csv, .xlsx, .xls" className="hidden" onChange={handleImport} />
-                                        </label>
-                                        <button
-                                            onClick={handleExport}
-                                            className="flex items-center gap-1 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-xs px-3 py-1.5 rounded-lg transition-colors border border-white/5"
-                                        >
-                                            <Download className="w-3 h-3" />
-                                            Exportar
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setEditingClient(null);
-                                                setShowAddClient(true);
-                                            }}
-                                            className="flex items-center gap-1 bg-white text-black hover:bg-neutral-200 text-xs px-3 py-1.5 rounded-lg transition-colors font-medium ml-2"
-                                        >
-                                            <Plus className="w-3 h-3" />
-                                            Nuevo Cliente
-                                        </button>
-                                    </div>
+                                    <span className="text-sm text-neutral-500">{stats.totalClients} total</span>
                                 </div>
+
+                                {/* Search Bar */}
+                                <input
+                                    type="text"
+                                    placeholder="🔍 Buscar cliente..."
+                                    className="w-full px-4 py-2 bg-neutral-800 border border-white/10 rounded-lg text-white placeholder-neutral-500 text-sm mb-4 focus:outline-none focus:border-white/30"
+                                    onChange={(e) => {
+                                        const term = e.target.value.toLowerCase();
+                                        if (!term) {
+                                            loadClients();
+                                        }
+                                    }}
+                                />
 
                                 {/* Add/Edit Client Form Modal */}
                                 {showAddClient && (
