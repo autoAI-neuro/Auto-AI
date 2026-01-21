@@ -9,14 +9,48 @@ from app.schemas.crm import ClientCreate, ClientUpdate, ClientResponse
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
-@router.get("", response_model=List[ClientResponse])
+@router.get("")
 async def get_clients(
+    page: int = 1,
+    limit: int = 50,
+    search: Optional[str] = None,
+    status: Optional[str] = None,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Get all clients for the current user"""
-    clients = db.query(Client).filter(Client.user_id == current_user.id).all()
-    return clients
+    """Get paginated clients for the current user"""
+    # Base query
+    query = db.query(Client).filter(Client.user_id == current_user.id)
+    
+    # Apply search filter (name or phone)
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            (Client.name.ilike(search_term)) | 
+            (Client.phone.ilike(search_term))
+        )
+    
+    # Apply status filter
+    if status:
+        query = query.filter(Client.status == status)
+    
+    # Get total count before pagination
+    total = query.count()
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    clients = query.order_by(Client.created_at.desc()).offset(offset).limit(limit).all()
+    
+    # Calculate total pages
+    pages = (total + limit - 1) // limit if total > 0 else 1
+    
+    return {
+        "clients": clients,
+        "total": total,
+        "page": page,
+        "pages": pages,
+        "limit": limit
+    }
 
 @router.post("", response_model=ClientResponse)
 async def create_client(

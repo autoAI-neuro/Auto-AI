@@ -6,6 +6,7 @@ import Register from './pages/Register';
 import Login from './pages/Login';
 import Onboarding from './pages/Onboarding';
 import Dashboard from './pages/Dashboard';
+import ClientsPage from './pages/ClientsPage';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -50,6 +51,12 @@ function App() {
           <Route path="/dashboard" element={
             <ProtectedRoute>
               <Dashboard />
+            </ProtectedRoute>
+          } />
+
+          <Route path="/clients" element={
+            <ProtectedRoute>
+              <ClientsPage />
             </ProtectedRoute>
           } />
 

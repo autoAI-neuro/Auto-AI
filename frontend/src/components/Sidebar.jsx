@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     LayoutDashboard,
     Calendar,
@@ -6,12 +7,16 @@ import {
     LogOut,
     Menu,
     PieChart,
-    Zap
+    Zap,
+    Users
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) => {
+    const navigate = useNavigate();
+
     const menuItems = [
         { id: 'dashboard', label: 'Panel Principal', icon: LayoutDashboard },
+        { id: 'clients', label: 'Clientes', icon: Users, link: '/clients' },
         { id: 'analytics', label: 'Analíticas', icon: PieChart },
         { id: 'automations', label: 'Automatizaciones', icon: Zap },
         { id: 'calendar', label: 'Calendario', icon: Calendar },
@@ -53,7 +58,11 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
                                 <button
                                     key={item.id}
                                     onClick={() => {
-                                        onTabChange(item.id);
+                                        if (item.link) {
+                                            navigate(item.link);
+                                        } else {
+                                            onTabChange(item.id);
+                                        }
                                         // On mobile, close sidebar after content click if desired
                                         if (window.innerWidth < 1024) toggleSidebar();
                                     }}
