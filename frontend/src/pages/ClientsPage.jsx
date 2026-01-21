@@ -1,10 +1,10 @@
-import { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
+import { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../config';
 import ClientForm from '../components/ClientForm';
 
 const ClientsPage = () => {
-    const { user: authUser, token } = useContext(AuthContext);
+    const { token } = useAuth();
     const [clients, setClients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
