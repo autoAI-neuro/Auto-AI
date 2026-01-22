@@ -280,10 +280,14 @@ const CalendarView = ({ onQuickSend }) => {
                             </button>
                         </div>
 
-                        <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/5">
-                            <p className="text-sm text-neutral-300 italic">
-                                "{selectedEvent.message}"
-                            </p>
+                        <div className="mb-6">
+                            <label className="block text-xs font-medium text-neutral-500 mb-2 uppercase tracking-wide">Editar Mensaje:</label>
+                            <textarea
+                                value={selectedEvent.message}
+                                onChange={(e) => setSelectedEvent({ ...selectedEvent, message: e.target.value })}
+                                className="w-full bg-neutral-950/50 border border-white/10 rounded-xl p-4 text-sm text-neutral-200 focus:outline-none focus:border-blue-500/50 transition-colors resize-none h-32 placeholder-neutral-600"
+                                placeholder="Escribe tu mensaje aquí..."
+                            />
                         </div>
 
                         <div className="flex gap-3">
