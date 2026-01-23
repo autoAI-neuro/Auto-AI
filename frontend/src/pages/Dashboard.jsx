@@ -293,19 +293,18 @@ const Dashboard = () => {
 
     const selectAllClients = () => {
         if (selectAllGlobal) {
-            // Deselect all
+            // Deselect Global
             setSelectAllGlobal(false);
             setSelectedClients([]);
-        } else if (selectedClients.length === clients.length) {
-            // If all on page are selected, offer to select ALL pages
-            if (pagination.total > clients.length) {
-                setSelectAllGlobal(true);
-            } else {
-                setSelectedClients([]);
-            }
         } else {
-            // Select all on current page
-            setSelectedClients(clients.map(c => c.id));
+            // Toggle Page Selection
+            if (selectedClients.length === clients.length && clients.length > 0) {
+                // Deselect Page
+                setSelectedClients([]);
+            } else {
+                // Select Page
+                setSelectedClients(clients.map(c => c.id));
+            }
         }
     };
 
@@ -498,6 +497,35 @@ const Dashboard = () => {
                                         setPagination(prev => ({ ...prev, page: 1 })); // Reset to first page on search
                                     }}
                                 />
+
+                                {/* SELECTION BANNER (Gmail Style) */}
+                                {(selectedClients.length > 0 || selectAllGlobal) && (
+                                    <div className="mb-4 text-xs font-medium text-center">
+                                        {selectAllGlobal ? (
+                                            <div className="bg-blue-500/20 text-blue-200 p-2 rounded-lg border border-blue-500/30 flex items-center justify-center gap-2">
+                                                <span>✅ Se han seleccionado los <b>{pagination.total}</b> clientes de toda la base de datos.</span>
+                                                <button
+                                                    onClick={() => { setSelectAllGlobal(false); setSelectedClients([]); }}
+                                                    className="underline hover:text-white"
+                                                >
+                                                    Borrar selección
+                                                </button>
+                                            </div>
+                                        ) : (
+                                            selectedClients.length === clients.length && pagination.total > clients.length && (
+                                                <div className="bg-neutral-800 text-neutral-300 p-2 rounded-lg border border-white/10 flex items-center justify-center gap-2">
+                                                    <span>Has seleccionado los {clients.length} clientes de esta página.</span>
+                                                    <button
+                                                        onClick={() => setSelectAllGlobal(true)}
+                                                        className="text-blue-400 hover:text-blue-300 underline font-bold"
+                                                    >
+                                                        Seleccionar los {pagination.total} clientes
+                                                    </button>
+                                                </div>
+                                            )
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Add/Edit Client Form Modal */}
                                 {showAddClient && (
