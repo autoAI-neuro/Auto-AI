@@ -304,10 +304,12 @@ def logout_whatsapp(
     except httpx.HTTPStatusError as e:
          raise HTTPException(status_code=e.response.status_code, detail=f"WhatsApp service error: {str(e)}")
 
+from typing import Optional
+
 class BulkMessageFilters(BaseModel):
-    tag_id: str = None
-    status: str = None
-    search: str = None
+    tag_id: Optional[str] = None
+    status: Optional[str] = None
+    search: Optional[str] = None
 
 from fastapi import BackgroundTasks
 
