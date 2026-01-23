@@ -413,7 +413,11 @@ const Dashboard = () => {
 
         } catch (err) {
             console.error('Error sending media:', err);
-            const errorMsg = err.response?.data?.detail || 'Error al iniciar envío masivo';
+            let errorMsg = 'Error al iniciar envío masivo';
+            if (err.response?.data?.detail) {
+                const detail = err.response.data.detail;
+                errorMsg = typeof detail === 'string' ? detail : JSON.stringify(detail);
+            }
             showNotification(errorMsg, 'error');
         } finally {
             setSending(false);
