@@ -579,73 +579,75 @@ const Dashboard = () => {
                                             <p className="text-xs mt-1">Agrega tu primer cliente</p>
                                         </div>
                                     ) : (
-                                        clients.map(client => (
-                                            <div
-                                                key={client.id}
-                                                onClick={() => toggleSelectClient(client.id)}
-                                                className={`flex items - center justify - between p - 3 rounded - lg border cursor - pointer transition - all ${selectedClients.includes(client.id)
-                                                    ? 'bg-blue-500/10 border-blue-500/30'
-                                                    : 'bg-neutral-800/30 border-transparent hover:border-white/10'
-                                                    } `}
-                                            >
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w - 5 h - 5 rounded - md border flex items - center justify - center ${selectedClients.includes(client.id)
-                                                        ? 'bg-blue-500 border-blue-500'
-                                                        : 'border-neutral-600'
-                                                        } `}>
-                                                        {selectedClients.includes(client.id) && (
-                                                            <CheckCircle className="w-3 h-3 text-white" />
-                                                        )}
+                                        clients.map(client => {
+                                            const isSelected = selectAllGlobal || selectedClients.includes(client.id);
+                                            return (
+                                                <div
+                                                    key={client.id}
+                                                    onClick={() => toggleSelectClient(client.id)}
+                                                    className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${isSelected
+                                                        ? 'bg-blue-500/10 border-blue-500/30'
+                                                        : 'bg-neutral-800/30 border-transparent hover:border-white/10'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className={`w-5 h-5 rounded-md border flex items-center justify-center ${isSelected
+                                                            ? 'bg-blue-500 border-blue-500'
+                                                            : 'border-neutral-600'
+                                                            }`}>
+                                                            {isSelected && (
+                                                                <CheckCircle className="w-3 h-3 text-white" />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-white text-sm">{client.name}</p>
+                                                            <p className="text-neutral-500 text-xs flex items-center gap-1">
+                                                                <Phone className="w-3 h-3" />
+                                                                {client.phone}
+                                                            </p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-white text-sm">{client.name}</p>
-                                                        <p className="text-neutral-500 text-xs flex items-center gap-1">
-                                                            <Phone className="w-3 h-3" />
-                                                            {client.phone}
-                                                        </p>
+
+
+                                                    {/* Tags display only (no editing) */}
+                                                    <div className="flex-1 px-2 flex flex-wrap gap-1">
+                                                        {(clientTagsMap[client.id] || []).map(tagId => {
+                                                            const tag = availableTags.find(t => t.id === tagId);
+                                                            return tag ? (
+                                                                <span
+                                                                    key={tagId}
+                                                                    className="px-2 py-0.5 rounded-full text-xs"
+                                                                    style={{ backgroundColor: tag.color + '30', color: tag.color }}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ) : null;
+                                                        })}
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); setConversationClient(client); }}
+                                                            className="text-neutral-600 hover:text-purple-400 transition-colors"
+                                                            title="Ver conversación"
+                                                        >
+                                                            <MessageSquare className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleEditClick(client); }}
+                                                            className="text-neutral-600 hover:text-blue-400 transition-colors"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
+                                                            className="text-neutral-600 hover:text-red-400 transition-colors"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     </div>
                                                 </div>
-
-
-                                                {/* Tags display only (no editing) */}
-                                                <div className="flex-1 px-2 flex flex-wrap gap-1">
-                                                    {(clientTagsMap[client.id] || []).map(tagId => {
-                                                        const tag = availableTags.find(t => t.id === tagId);
-                                                        return tag ? (
-                                                            <span
-                                                                key={tagId}
-                                                                className="px-2 py-0.5 rounded-full text-xs"
-                                                                style={{ backgroundColor: tag.color + '30', color: tag.color }}
-                                                            >
-                                                                {tag.name}
-                                                            </span>
-                                                        ) : null;
-                                                    })}
-                                                </div>
-
-                                                <div className="flex items-center gap-2">
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); setConversationClient(client); }}
-                                                        className="text-neutral-600 hover:text-purple-400 transition-colors"
-                                                        title="Ver conversación"
-                                                    >
-                                                        <MessageSquare className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleEditClick(client); }}
-                                                        className="text-neutral-600 hover:text-blue-400 transition-colors"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteClient(client.id); }}
-                                                        className="text-neutral-600 hover:text-red-400 transition-colors"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))
+                                            ))
                                     )}
                                 </div>
 
