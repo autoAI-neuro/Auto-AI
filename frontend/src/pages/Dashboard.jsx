@@ -364,8 +364,9 @@ const Dashboard = () => {
     };
 
     // Send media to selected clients
+    // Send media to selected clients
     const handleSendMedia = async (mediaData) => {
-        if (selectedClients.length === 0) {
+        if (selectedClients.length === 0 && !selectAllGlobal) {
             showNotification('Selecciona al menos un cliente', 'error');
             return;
         }
@@ -374,36 +375,45 @@ const Dashboard = () => {
         setShowMediaUploader(false);
 
         try {
-            const selectedPhones = clients
-                .filter(c => selectedClients.includes(c.id))
-                .map(c => c.phone);
-
-            let successCount = 0;
-            for (const phone of selectedPhones) {
-                try {
-                    await api.post('/whatsapp/send-media', {
-                        phone_number: phone,
-                        media_url: mediaData.media_url,
-                        media_type: mediaData.media_type,
-                        caption: mediaData.caption
-                    }, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    successCount++;
-                } catch (err) {
-                    console.error(`Error sending media to ${phone}:`, err);
-                }
-            }
-
-            if (successCount > 0) {
-                showNotification(`¡Media enviada a ${successCount} clientes!`, 'success');
-                setSelectedClients([]);
+            // Updated to use the robust backend queue
+            // Case A: Select All Global
+            if (selectAllGlobal) {
+                await api.post('/whatsapp/send-bulk', {
+                    filters: {
+                        search: debouncedSearch,
+                        tag_id: filters.tagId,
+                        status: null
+                    },
+                    media_url: mediaData.media_url,
+                    media_type: mediaData.media_type,
+                    caption: mediaData.caption
+                }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                showNotification(`¡Enviando media a ${pagination.total} clientes en segundo plano!`, 'success');
             } else {
-                showNotification('Error al enviar media', 'error');
+                // Case B: Manual Selection
+                const selectedPhones = clients
+                    .filter(c => selectedClients.includes(c.id))
+                    .map(c => c.phone);
+
+                await api.post('/whatsapp/send-bulk', {
+                    phones: selectedPhones,
+                    media_url: mediaData.media_url,
+                    media_type: mediaData.media_type,
+                    caption: mediaData.caption
+                }, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                showNotification(`¡Enviando media a ${selectedClients.length} clientes en segundo plano!`, 'success');
             }
+
+            setSelectedClients([]);
+            setSelectAllGlobal(false);
+
         } catch (err) {
             console.error('Error sending media:', err);
-            showNotification('Error al enviar media', 'error');
+            showNotification('Error al iniciar envío masivo', 'error');
         } finally {
             setSending(false);
         }

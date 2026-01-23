@@ -309,18 +309,74 @@ class BulkMessageFilters(BaseModel):
     status: str = None
     search: str = None
 
+from fastapi import BackgroundTasks
+
 class BulkMessageRequest(BaseModel):
     phones: List[str] = []
     filters: BulkMessageFilters = None
-    message: str
+    message: str = "" # Optional if sending media only
+    media_url: str = None
+    media_type: str = None # image, video, document
+    caption: str = None
+
+def process_bulk_send(
+    target_phones: List[str], 
+    message: str, 
+    user_id: str, 
+    media_url: str = None, 
+    media_type: str = None, 
+    caption: str = None
+):
+    """
+    Background task to process bulk sending.
+    This runs after the response is returned to the client.
+    """
+    WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005")
+    print(f"[BulkWorker] Starting bulk send to {len(target_phones)} recipients for user {user_id}")
+    
+    success_count = 0
+    fail_count = 0
+    
+    with httpx.Client(trust_env=False, timeout=60.0) as client:
+        for phone in target_phones:
+            try:
+                # 1. Send Text if present
+                if message:
+                    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
+                    payload = {
+                        "userId": user_id,
+                        "phoneNumber": phone,
+                        "message": message
+                    }
+                    client.post(url, json=payload).raise_for_status()
+                
+                # 2. Send Media if present
+                if media_url and media_type:
+                    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send-media"
+                    payload = {
+                        "userId": user_id,
+                        "phoneNumber": phone,
+                        "mediaUrl": media_url,
+                        "mediaType": media_type,
+                        "caption": caption or ""
+                    }
+                    client.post(url, json=payload).raise_for_status()
+                
+                success_count += 1
+            except Exception as e:
+                print(f"[BulkWorker] Error sending to {phone}: {e}")
+                fail_count += 1
+                
+    print(f"[BulkWorker] Completed. Success: {success_count}, Failed: {fail_count}")
 
 @router.post("/send-bulk")
 def send_bulk_messages(
     request: BulkMessageRequest,
+    background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Send WhatsApp message to multiple clients"""
+    """Send WhatsApp message (text or media) to multiple clients via Background Task"""
     
     target_phones = []
     
@@ -352,51 +408,28 @@ def send_bulk_messages(
         
     if not target_phones:
         raise HTTPException(status_code=400, detail="No valid recipients found")
+    
+    if not request.message and not request.media_url:
+         raise HTTPException(status_code=400, detail="Must provide either message or media_url")
 
-    print(f"[SendBulk] Sending to {len(target_phones)} recipients. User: {current_user.id}")
+    print(f"[SendBulk] Queuing {len(target_phones)} messages. User: {current_user.id}")
     
-    # Smart check: verify with Node if DB says not linked
-    if not current_user.whatsapp_linked:
-        try:
-            check_url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/status/{current_user.id}"
-            with httpx.Client(trust_env=False) as client:
-                check_resp = client.get(check_url, timeout=5.0)
-                node_status = check_resp.json().get('status')
-                if node_status == 'connected':
-                    current_user.whatsapp_linked = True
-                    db.commit()
-                    print(f"[SendBulk] Updated DB whatsapp_linked=True for {current_user.id}")
-                else:
-                    raise HTTPException(status_code=400, detail=f"WhatsApp not linked (status: {node_status})")
-        except httpx.RequestError as e:
-            raise HTTPException(status_code=400, detail="WhatsApp not linked")
+    # Add to background queue
+    background_tasks.add_task(
+        process_bulk_send,
+        target_phones=target_phones,
+        message=request.message,
+        user_id=str(current_user.id),
+        media_url=request.media_url,
+        media_type=request.media_type,
+        caption=request.caption
+    )
     
-    results = {
-        "total": len(target_phones),
-        "sent": 0,
-        "failed": 0,
-        "errors": []
+    return {
+        "status": "queued",
+        "message": f"Sending to {len(target_phones)} recipients in background",
+        "count": len(target_phones)
     }
-    
-    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
-    
-    with httpx.Client(trust_env=False) as client:
-        for phone in target_phones:
-            try:
-                payload = {
-                    "userId": str(current_user.id),
-                    "phoneNumber": phone,
-                    "message": request.message
-                }
-                response = client.post(url, json=payload, timeout=30.0)
-                response.raise_for_status()
-                results["sent"] += 1
-            except Exception as e:
-                print(f"[Backend] Error sending to {phone}: {e}")
-                results["failed"] += 1
-                results["errors"].append({"phone": phone, "error": str(e)})
-                
-    return results
 
 
 class SendMediaRequest(BaseModel):
