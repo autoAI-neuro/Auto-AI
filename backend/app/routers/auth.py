@@ -32,10 +32,11 @@ def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(ge
     <a href="{link}">Click aquí para resetear</a>
     """
     
-    if send_email(user.email, subject, body):
+    success, error_msg = send_email(user.email, subject, body)
+    if success:
         return {"message": f"DEBUG: Correo ENVIADO a {user.email}"}
     else:
-        return {"message": "DEBUG: Falla al enviar correo (SMTP Error)"}
+        return {"message": f"DEBUG: Falla al enviar: {error_msg}"}
 
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):

@@ -36,7 +36,8 @@ def send_bulk_email(
         # Helper footer
         footer = f"<br><br><small>Enviado por {current_user.name} vía AutoAI</small>"
         
-        if send_email(client.email, subject, personalized_body + footer, reply_to=current_user.email):
+        success, _ = send_email(client.email, subject, personalized_body + footer, reply_to=current_user.email)
+        if success:
             success_count += 1
         else:
             fail_count += 1

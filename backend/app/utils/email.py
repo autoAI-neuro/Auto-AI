@@ -38,7 +38,8 @@ def send_email(to_email: str, subject: str, body: str, reply_to: str = None):
         server.quit()
         
         print(f"[Email] Sent successfully to {to_email}")
-        return True
+        return True, "Sent successfully"
     except Exception as e:
-        print(f"[Email] Failed to send email to {to_email}: {str(e)}")
-        return False
+        error_msg = str(e)
+        print(f"[Email] Failed to send email to {to_email}: {error_msg}")
+        return False, error_msg
