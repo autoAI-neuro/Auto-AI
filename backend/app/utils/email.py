@@ -6,7 +6,7 @@ import os
 # Configuration
 # En un entorno real, estos deberían ir en .env
 SMTP_SERVER = "smtp.gmail.com"
-SMTP_PORT = 587
+SMTP_PORT = 465
 SMTP_USER = "autoai.neuro@gmail.com"
 SMTP_PASSWORD = "gbqq gppo ebia kggj" # App Password
 
@@ -27,9 +27,9 @@ def send_email(to_email: str, subject: str, body: str, reply_to: str = None):
             
         msg.attach(MIMEText(body, 'html'))
         
-        # Connect to server
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10)
-        server.starttls()
+        # Connect to server (SSL)
+        server = smtplib.SMTP_SSL(SMTP_SERVER, SMTP_PORT, timeout=10)
+        # server.starttls() # Not needed for SSL
         server.login(SMTP_USER, SMTP_PASSWORD)
         
         # Send
