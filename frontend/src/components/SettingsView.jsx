@@ -1,5 +1,6 @@
 import React from 'react';
 import { Settings, User, Lock, Globe, Bell } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const SettingsView = ({ user }) => {
     return (
@@ -60,7 +61,10 @@ const SettingsView = ({ user }) => {
                 </div>
 
                 <div className="space-y-4">
-                    <button className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-white/5">
+                    <button
+                        onClick={() => toast('Función de cambio de contraseña próximamente. Contacte soporte.', { icon: '🔒' })}
+                        className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-white rounded-lg text-sm transition-colors border border-white/5"
+                    >
                         Cambiar Contraseña
                     </button>
                     <div className="flex items-center gap-2 text-xs text-neutral-500">

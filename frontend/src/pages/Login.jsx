@@ -103,6 +103,16 @@ const Login = () => {
                         />
                     </div>
 
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            onClick={() => alert("Por favor contacte a soporte para restablecer su contraseña.")}
+                            className="text-xs text-amber-500/80 hover:text-amber-400 transition-colors"
+                        >
+                            ¿Has olvidado tu contraseña?
+                        </button>
+                    </div>
+
                     <div className="pt-2">
                         <button
                             type="submit"

@@ -65,7 +65,14 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
                                         if (item.link) {
                                             navigate(item.link);
                                         } else {
-                                            onTabChange(item.id);
+                                            // Handle navigation from other pages (like Clients) back to Dashboard tabs
+                                            if (window.location.pathname !== '/' && window.location.pathname !== '/dashboard') {
+                                                navigate(`/?tab=${item.id}`);
+                                                // We also call onTabChange just in case we are actually on dashboard but path is weird
+                                                onTabChange(item.id);
+                                            } else {
+                                                onTabChange(item.id);
+                                            }
                                         }
                                         // On mobile, close sidebar after content click if desired
                                         if (window.innerWidth < 1024) toggleSidebar();

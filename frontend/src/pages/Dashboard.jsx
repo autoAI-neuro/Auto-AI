@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import api, { whatsappApi } from '../config';
 import { jwtDecode } from "jwt-decode";
@@ -35,6 +35,7 @@ import AutomationsPage from './AutomationsPage';
 const Dashboard = () => {
     const { token, logout } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Helper to get userId
     const userId = useMemo(() => {
@@ -47,6 +48,28 @@ const Dashboard = () => {
             return null;
         }
     }, [token]);
+
+    const userData = useMemo(() => {
+        if (!token) return null;
+        try {
+            const decoded = jwtDecode(token);
+            return {
+                email: decoded.sub || decoded.email,
+                role: decoded.role || 'Administrador'
+            };
+        } catch (e) {
+            return null;
+        }
+    }, [token]);
+
+    // Sync tab with URL
+    useEffect(() => {
+        const params = new URLSearchParams(location.search);
+        const tab = params.get('tab');
+        if (tab && ['dashboard', 'clients', 'analytics', 'automations', 'calendar', 'settings'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [location.search]);
 
     // State
     const [clients, setClients] = useState([]);
@@ -477,7 +500,7 @@ const Dashboard = () => {
             case 'calendar':
                 return <CalendarView clients={clients} onQuickSend={handleQuickSend} />;
             case 'settings':
-                return <SettingsView user={{ email: 'raysanchezsolutions@gmail.com' }} />; // Mock user for now or useAuth hook user
+                return <SettingsView user={userData} />;
             default:
                 return (
                     <div className="space-y-6 animate-slideIn">
