@@ -339,6 +339,9 @@ def process_bulk_send(
     success_count = 0
     fail_count = 0
     
+    import time
+    import random
+
     with httpx.Client(trust_env=False, timeout=60.0) as client:
         for phone in target_phones:
             try:
@@ -365,6 +368,10 @@ def process_bulk_send(
                     client.post(url, json=payload).raise_for_status()
                 
                 success_count += 1
+                
+                # Rate limit / Stability delay
+                time.sleep(random.uniform(0.5, 1.5))
+                
             except Exception as e:
                 print(f"[BulkWorker] Error sending to {phone}: {e}")
                 fail_count += 1
