@@ -67,7 +67,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
                                         } else {
                                             // Handle navigation from other pages (like Clients) back to Dashboard tabs
                                             if (window.location.pathname !== '/' && window.location.pathname !== '/dashboard') {
-                                                navigate(`/?tab=${item.id}`);
+                                                navigate(`/dashboard?tab=${item.id}`);
                                                 // We also call onTabChange just in case we are actually on dashboard but path is weird
                                                 onTabChange(item.id);
                                             } else {

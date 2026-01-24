@@ -28,6 +28,15 @@ const SettingsView = ({ user }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
+                        <label className="text-sm text-neutral-400">Nombre</label>
+                        <input
+                            type="text"
+                            disabled
+                            value={user?.name || "Usuario"}
+                            className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white opacity-60 cursor-not-allowed"
+                        />
+                    </div>
+                    <div className="space-y-2">
                         <label className="text-sm text-neutral-400">Email</label>
                         <input
                             type="email"

@@ -54,7 +54,8 @@ const Dashboard = () => {
         try {
             const decoded = jwtDecode(token);
             return {
-                email: decoded.sub || decoded.email,
+                email: decoded.email || decoded.sub, // Prioritize email claim
+                name: decoded.name || 'Usuario', // Get name if available
                 role: decoded.role || 'Administrador'
             };
         } catch (e) {

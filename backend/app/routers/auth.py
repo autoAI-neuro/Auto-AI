@@ -36,7 +36,11 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
         print(f"[DEBUG] User created successfully: {new_user.id}")
         
         # 3. Auto-login (Generate Token)
-        access_token = create_access_token(data={"sub": str(new_user.id)})
+        access_token = create_access_token(data={
+            "sub": str(new_user.id),
+            "email": new_user.email,
+            "name": new_user.name
+        })
         print(f"[DEBUG] Token generated for user: {new_user.id}")
         
         return {"access_token": access_token, "token_type": "bearer"}
@@ -72,7 +76,11 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
             )
         
         # 3. Generate token
-        access_token = create_access_token(data={"sub": str(user.id)})
+        access_token = create_access_token(data={
+            "sub": str(user.id),
+            "email": user.email,
+            "name": user.name
+        })
         print(f"[DEBUG] Login successful for user: {user.id}")
         
         return {"access_token": access_token, "token_type": "bearer"}
