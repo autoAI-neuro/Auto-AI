@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from app.deps import get_current_user
 from sqlalchemy.orm import Session
 from app.db.session import get_db
@@ -6,8 +6,38 @@ from app.models import User
 from app.schemas.auth import UserCreate, UserLogin, Token, UserOut
 from app.auth import get_password_hash, create_access_token
 from app.db.base import Base
+from app.utils.email import send_email
+from datetime import timedelta
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+
+@router.post("/forgot-password")
+def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Don't reveal if user exists
+        return {"message": "Si el correo existe, recibirás instrucciones."}
+    
+    # Generate reset token (valid for 15 mins)
+    reset_token = create_access_token(
+        data={"sub": str(user.id), "purpose": "reset"},
+        expires_delta=timedelta(minutes=15)
+    )
+    
+    link = f"https://auto-ai-beta.vercel.app/reset-password?token={reset_token}"
+    
+    subject = "Recuperación de Contraseña - AutoAI"
+    body = f"""
+    <h1>Recuperar Contraseña</h1>
+    <p>Hola {user.name},</p>
+    <p>Has solicitado restablecer tu contraseña. Haz click en el siguiente enlace:</p>
+    <a href="{link}">Restablecer Contraseña</a>
+    <p>Este enlace expira en 15 minutos.</p>
+    <p>Si no fuiste tú, ignora este mensaje.</p>
+    """
+    
+    send_email(user.email, subject, body)
+    return {"message": "Si el correo existe, recibirás instrucciones."}
 
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):

@@ -106,7 +106,17 @@ const Login = () => {
                     <div className="flex justify-end">
                         <button
                             type="button"
-                            onClick={() => alert("Por favor contacte a soporte para restablecer su contraseña.")}
+                            onClick={async () => {
+                                const email = prompt("Ingresa tu email para restablecer la contraseña:");
+                                if (email) {
+                                    try {
+                                        await api.post('/auth/forgot-password', { email });
+                                        alert("Si el correo existe, recibirás instrucciones revisa tu bandeja.");
+                                    } catch (e) {
+                                        alert("Error al solicitar recuperación.");
+                                    }
+                                }
+                            }}
                             className="text-xs text-amber-500/80 hover:text-amber-400 transition-colors"
                         >
                             ¿Has olvidado tu contraseña?
