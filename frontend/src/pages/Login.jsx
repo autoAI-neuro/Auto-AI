@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, Link } from 'react-router-dom';
 import api from '../config';
 import { ArrowRight, Loader } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -109,12 +110,14 @@ const Login = () => {
                             onClick={async () => {
                                 const email = prompt("Ingresa tu email para restablecer la contraseña:");
                                 if (email) {
-                                    try {
-                                        const res = await api.post('/auth/forgot-password', { email });
-                                        alert(res.data.message); // Show DEBUG message
-                                    } catch (e) {
-                                        alert(e.response?.data?.message || "Error al solicitar recuperación.");
-                                    }
+                                    toast.promise(
+                                        api.post('/auth/forgot-password', { email }),
+                                        {
+                                            loading: 'Verificando y enviando...',
+                                            success: (res) => res.data.message,
+                                            error: (err) => err.response?.data?.message || "Error al conectar con el servidor."
+                                        }
+                                    );
                                 }
                             }}
                             className="text-xs text-amber-500/80 hover:text-amber-400 transition-colors"
