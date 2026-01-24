@@ -15,10 +15,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        # Don't reveal if user exists
-        return {"message": "Si el correo existe, recibirás instrucciones."}
+        return {"message": f"DEBUG: Usuario no encontrado con email '{email}'"}
     
-    # Generate reset token (valid for 15 mins)
+    # Generate reset token
     reset_token = create_access_token(
         data={"sub": str(user.id), "purpose": "reset"},
         expires_delta=timedelta(minutes=15)
@@ -30,14 +29,13 @@ def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(ge
     body = f"""
     <h1>Recuperar Contraseña</h1>
     <p>Hola {user.name},</p>
-    <p>Has solicitado restablecer tu contraseña. Haz click en el siguiente enlace:</p>
-    <a href="{link}">Restablecer Contraseña</a>
-    <p>Este enlace expira en 15 minutos.</p>
-    <p>Si no fuiste tú, ignora este mensaje.</p>
+    <a href="{link}">Click aquí para resetear</a>
     """
     
-    send_email(user.email, subject, body)
-    return {"message": "Si el correo existe, recibirás instrucciones."}
+    if send_email(user.email, subject, body):
+        return {"message": f"DEBUG: Correo ENVIADO a {user.email}"}
+    else:
+        return {"message": "DEBUG: Falla al enviar correo (SMTP Error)"}
 
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):

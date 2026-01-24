@@ -110,10 +110,10 @@ const Login = () => {
                                 const email = prompt("Ingresa tu email para restablecer la contraseña:");
                                 if (email) {
                                     try {
-                                        await api.post('/auth/forgot-password', { email });
-                                        alert("Si el correo existe, recibirás instrucciones revisa tu bandeja.");
+                                        const res = await api.post('/auth/forgot-password', { email });
+                                        alert(res.data.message); // Show DEBUG message
                                     } catch (e) {
-                                        alert("Error al solicitar recuperación.");
+                                        alert(e.response?.data?.message || "Error al solicitar recuperación.");
                                     }
                                 }
                             }}
