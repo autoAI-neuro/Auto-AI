@@ -73,7 +73,7 @@ def reset_password(
         
         # Find the user
         print(f"[Reset Password] Finding user with id={user_id}")
-        user = db.query(User).filter(User.id == int(user_id)).first()
+        user = db.query(User).filter(User.id == user_id).first()
         if not user:
             print(f"[Reset Password] User not found")
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
