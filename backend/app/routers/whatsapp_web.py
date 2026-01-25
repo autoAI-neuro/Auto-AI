@@ -229,6 +229,13 @@ def whatsapp_webhook(
                 break
     
     if not client:
+        # Skip WhatsApp system IDs (groups and linked devices)
+        if '@lid' in sender_phone or '@g.us' in sender_phone:
+            print(f"[Webhook] Skipping system ID: {sender_phone}")
+            # Don't create a client for groups or system IDs
+            # Just skip this message
+            return {"success": True, "message": "Skipped system ID"}
+        
         # Create new client automatically (Lead Capture)
         from app.models import get_uuid
         client = Client(
