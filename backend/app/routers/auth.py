@@ -15,7 +15,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        return {"message": f"DEBUG: Usuario no encontrado con email '{email}'"}
+        # Don't reveal if email exists or not for security
+        return {"message": "Si el correo existe, recibirás un enlace de recuperación."}
     
     # Generate reset token
     reset_token = create_access_token(
@@ -34,9 +35,53 @@ def forgot_password(email: str = Body(..., embed=True), db: Session = Depends(ge
     
     success, error_msg = send_email(user.email, subject, body)
     if success:
-        return {"message": f"DEBUG: Correo ENVIADO a {user.email}"}
+        return {"message": "Te hemos enviado un correo con las instrucciones para recuperar tu contraseña."}
     else:
-        return {"message": f"DEBUG: Falla al enviar: {error_msg}"}
+        # Log the error server-side but show generic message to user
+        print(f"[Email Error] {error_msg}")
+        raise HTTPException(status_code=500, detail="No se pudo enviar el correo. Intenta más tarde.")
+
+@router.post("/reset-password")
+def reset_password(
+    token: str = Body(...),
+    new_password: str = Body(...),
+    db: Session = Depends(get_db)
+):
+    from jose import jwt, JWTError
+    from app.auth import SECRET_KEY, ALGORITHM, get_password_hash
+    
+    try:
+        # Decode and verify the token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = payload.get("sub")
+        purpose = payload.get("purpose")
+        
+        # Verify it's a reset token
+        if purpose != "reset":
+            raise HTTPException(status_code=400, detail="Token inválido")
+        
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Token inválido")
+        
+        # Find the user
+        user = db.query(User).filter(User.id == int(user_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        
+        # Update the password
+        user.password_hash = get_password_hash(new_password)
+        db.commit()
+        
+        return {"message": "Contraseña actualizada exitosamente. Ya puedes iniciar sesión."}
+    
+    except JWTError as e:
+        print(f"[Reset Password] JWT Error: {e}")
+        raise HTTPException(status_code=400, detail="El enlace ha expirado o es inválido. Solicita uno nuevo.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[Reset Password] Error: {e}")
+        raise HTTPException(status_code=500, detail="Error al restablecer la contraseña")
 
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
