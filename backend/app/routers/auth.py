@@ -50,28 +50,43 @@ def reset_password(
     from jose import jwt, JWTError
     from app.auth import SECRET_KEY, ALGORITHM, get_password_hash
     
+    print(f"[Reset Password] Starting reset process...")
+    print(f"[Reset Password] Token length: {len(token) if token else 'None'}")
+    print(f"[Reset Password] Password length: {len(new_password) if new_password else 'None'}")
+    
     try:
         # Decode and verify the token
+        print(f"[Reset Password] Decoding token...")
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id = payload.get("sub")
         purpose = payload.get("purpose")
+        print(f"[Reset Password] Token decoded: user_id={user_id}, purpose={purpose}")
         
         # Verify it's a reset token
         if purpose != "reset":
+            print(f"[Reset Password] Invalid purpose: {purpose}")
             raise HTTPException(status_code=400, detail="Token inválido")
         
         if not user_id:
+            print(f"[Reset Password] No user_id in token")
             raise HTTPException(status_code=400, detail="Token inválido")
         
         # Find the user
+        print(f"[Reset Password] Finding user with id={user_id}")
         user = db.query(User).filter(User.id == int(user_id)).first()
         if not user:
+            print(f"[Reset Password] User not found")
             raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
+        print(f"[Reset Password] User found: {user.email}")
+        
         # Update the password
+        print(f"[Reset Password] Hashing new password...")
         user.password_hash = get_password_hash(new_password)
+        print(f"[Reset Password] Committing to database...")
         db.commit()
         
+        print(f"[Reset Password] Password updated successfully!")
         return {"message": "Contraseña actualizada exitosamente. Ya puedes iniciar sesión."}
     
     except JWTError as e:
@@ -80,8 +95,10 @@ def reset_password(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"[Reset Password] Error: {e}")
-        raise HTTPException(status_code=500, detail="Error al restablecer la contraseña")
+        print(f"[Reset Password] Unexpected Error: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
 @router.post("/register", response_model=Token)
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
