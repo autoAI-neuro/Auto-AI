@@ -1,20 +1,10 @@
-import React, { useState } from 'react';
-import AutomationList from '../components/AutomationList';
-import AutomationBuilder from '../components/AutomationBuilder';
+import React from 'react';
+import SalesCloneBuilder from '../components/SalesCloneBuilder';
 
 const AutomationsPage = () => {
-    const [view, setView] = useState('list'); // 'list' or 'create'
-
     return (
-        <div className="h-full">
-            {view === 'list' ? (
-                <AutomationList onCreateNew={() => setView('create')} />
-            ) : (
-                <AutomationBuilder
-                    onCancel={() => setView('list')}
-                    onSaveSuccess={() => setView('list')}
-                />
-            )}
+        <div className="h-full overflow-auto">
+            <SalesCloneBuilder />
         </div>
     );
 };
