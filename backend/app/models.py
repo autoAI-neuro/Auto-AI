@@ -175,3 +175,33 @@ class InventoryItem(Base):
     description = Column(Text, nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class SalesClone(Base):
+    """AI Sales Clone for automated personalized responses"""
+    __tablename__ = "sales_clones"
+    
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, ForeignKey("users.id"), unique=True, nullable=False)
+    
+    # Clone Identity
+    name = Column(String, default="Mi Clon de Ventas")
+    
+    # AI Configuration
+    personality = Column(Text, nullable=True)        # User's sales personality description
+    sales_logic = Column(Text, nullable=True)        # Sales strategy and approach
+    tone_keywords = Column(JSON, nullable=True)      # Keywords/phrases to use
+    avoid_keywords = Column(JSON, nullable=True)     # Words to avoid
+    example_responses = Column(JSON, nullable=True)  # Example Q&A pairs for training
+    
+    # Training Data
+    voice_samples = Column(JSON, nullable=True)      # Paths to voice notes (future)
+    
+    # Status Flags
+    is_active = Column(Boolean, default=False)       # Auto-reply ON/OFF (OFF by default!)
+    is_trained = Column(Boolean, default=False)      # Has user completed basic training
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+

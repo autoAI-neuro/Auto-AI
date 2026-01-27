@@ -4,10 +4,10 @@ import os
 import httpx
 from datetime import datetime
 from sqlalchemy import text
-from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory, email
+from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory, email, sales_clone
 from app.db.session import engine, get_db
 from app.db.base import Base
-from app.models import User, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem  # Import models so SQLAlchemy can detect them
+from app.models import User, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem, SalesClone  # Import models so SQLAlchemy can detect them
 
 # Create Tables
 Base.metadata.create_all(bind=engine)
@@ -42,6 +42,7 @@ app.include_router(analytics.router)
 app.include_router(automations.router)
 app.include_router(inventory.router)
 app.include_router(email.router)
+app.include_router(sales_clone.router)
 
 @app.get("/health")
 async def health():
