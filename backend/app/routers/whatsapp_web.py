@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 import httpx
 from typing import List
 from app.db.session import get_db
-from app.models import User, Client
+from app.models import User, Client, get_uuid
 from app.deps import get_current_user
 from app.utils.reliability import message_rate_limiter
 from app.routers.messages import save_outbound_message
@@ -286,6 +286,73 @@ def whatsapp_webhook(
         )
     except Exception as e:
         print(f"[Webhook] Automation error: {e}")
+
+    # 5. AI Sales Clone Auto-Response
+    try:
+        from app.utils.ai_response import check_clone_status, generate_clone_response
+        from app.models import Message as MessageModel
+        
+        clone_status = check_clone_status(db, user_id)
+        
+        if clone_status["has_active_clone"]:
+            clone = clone_status["clone"]
+            print(f"[AI Clone] User {user_id} has active clone, generating response...")
+            
+            # Build client context for better responses
+            client_context = {
+                "name": client.name,
+                "status": client.status,
+                "car_interest": f"{client.car_make} {client.car_model}" if client.car_make else None
+            }
+            
+            # Generate AI response
+            ai_result = generate_clone_response(
+                clone=clone,
+                buyer_message=text,
+                client_context=client_context
+            )
+            
+            ai_response = ai_result.get("response", "")
+            confidence = ai_result.get("confidence", 0)
+            
+            print(f"[AI Clone] Generated response (confidence: {confidence}): {ai_response[:100]}...")
+            
+            # Only send if we have a response and decent confidence
+            if ai_response and confidence >= 0.3:
+                # Send the AI response via WhatsApp
+                try:
+                    send_result = send_whatsapp_message_sync(
+                        user_id=user_id,
+                        phone_number=sender_phone,
+                        message=ai_response,
+                        client_id=client.id
+                    )
+                    
+                    # Save AI response as outbound message
+                    ai_message = MessageModel(
+                        id=get_uuid(),
+                        user_id=user_id,
+                        client_id=client.id,
+                        phone=sender_phone,
+                        direction="outbound",
+                        content=ai_response,
+                        status="sent"
+                    )
+                    db.add(ai_message)
+                    db.commit()
+                    
+                    print(f"[AI Clone] Auto-response sent successfully to {sender_phone}")
+                    
+                except Exception as send_error:
+                    print(f"[AI Clone] Failed to send auto-response: {send_error}")
+            else:
+                print(f"[AI Clone] Skipped response (low confidence or empty)")
+                
+    except Exception as e:
+        # Don't fail webhook if AI response fails
+        print(f"[AI Clone] Error generating response: {e}")
+        import traceback
+        traceback.print_exc()
 
     return {"status": "processed"}
 
