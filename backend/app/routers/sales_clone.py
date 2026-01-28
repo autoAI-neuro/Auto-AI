@@ -76,32 +76,39 @@ def update_sales_clone(
     db: Session = Depends(get_db)
 ):
     """Update the user's sales clone configuration"""
-    clone = db.query(SalesClone).filter(SalesClone.user_id == current_user.id).first()
-    
-    if not clone:
-        # Create new clone
-        clone = SalesClone(
-            id=get_uuid(),
-            user_id=current_user.id
-        )
-        db.add(clone)
-    
-    # Update fields
-    update_data = clone_data.dict(exclude_unset=True)
-    for field, value in update_data.items():
-        setattr(clone, field, value)
-    
-    # Check if trained (has enough data)
-    has_personality = bool(clone.personality and len(clone.personality) > 50)
-    has_logic = bool(clone.sales_logic and len(clone.sales_logic) > 50)
-    has_examples = bool(clone.example_responses and len(clone.example_responses) >= 3)
-    
-    clone.is_trained = has_personality and has_logic and has_examples
-    
-    db.commit()
-    db.refresh(clone)
-    
-    return clone
+    try:
+        clone = db.query(SalesClone).filter(SalesClone.user_id == current_user.id).first()
+        
+        if not clone:
+            # Create new clone
+            clone = SalesClone(
+                id=get_uuid(),
+                user_id=current_user.id
+            )
+            db.add(clone)
+        
+        # Update fields
+        update_data = clone_data.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(clone, field, value)
+        
+        # Check if trained (has enough data)
+        has_personality = bool(clone.personality and len(clone.personality) > 50)
+        has_logic = bool(clone.sales_logic and len(clone.sales_logic) > 50)
+        has_examples = bool(clone.example_responses and len(clone.example_responses) >= 3)
+        
+        clone.is_trained = has_personality and has_logic and has_examples
+        
+        db.commit()
+        db.refresh(clone)
+        
+        return clone
+    except Exception as e:
+        print(f"[SalesClone] Error saving: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error al guardar: {str(e)}")
 
 
 @router.post("/toggle")
