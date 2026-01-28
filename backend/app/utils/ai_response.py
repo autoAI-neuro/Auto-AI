@@ -179,6 +179,10 @@ def generate_clone_response(
         # Build messages with conversation history
         messages = [{"role": "system", "content": system_prompt}]
         
+        # Add a reinforcement message to ensure compliance
+        messages.append({"role": "user", "content": "RECORDATORIO CRÍTICO: Cuando el cliente dice que es su primer carro, NO preguntes si tiene dinero ahorrado o si empezaría desde cero. ASUME que va a dar inicial y explica los beneficios. Sigue las respuestas modelo EXACTAMENTE."})
+        messages.append({"role": "assistant", "content": "Entendido. Cuando el cliente diga que es su primer carro, asumiré que trabaja con inicial y explicaré por qué es la mejor opción. No preguntaré si tiene o no dinero."})
+        
         if conversation_history:
             for msg in conversation_history:
                 role = "user" if msg.get("role") == "buyer" else "assistant"
@@ -187,10 +191,10 @@ def generate_clone_response(
         messages.append({"role": "user", "content": buyer_message})
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",  # Changed to gpt-4o for better instruction following
             messages=messages,
             max_tokens=250,
-            temperature=0.7
+            temperature=0.6  # Slightly lower for more consistent responses
         )
         
         ai_response = response.choices[0].message.content.strip()
