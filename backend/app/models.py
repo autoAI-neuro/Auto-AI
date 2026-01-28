@@ -205,3 +205,81 @@ class SalesClone(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+
+# ============================================
+# RAY CLON V2.0 - State Machine Models
+# ============================================
+
+class ConversationState(Base):
+    """
+    Tracks the state of a sales conversation for the RAY agent.
+    This enables stage-based progression (INTAKE → APPOINTMENT).
+    """
+    __tablename__ = "conversation_states"
+    
+    id = Column(String, primary_key=True, default=get_uuid)
+    client_id = Column(String, ForeignKey("clients.id", ondelete="CASCADE"), unique=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    
+    # ===== STATE MACHINE =====
+    stage = Column(String, default="INTAKE")  
+    # Stages: INTAKE, CREDIT_PROFILE, DEAL_TYPE, OFFER_BUILD, RECOMMENDATION, APPOINTMENT, WRAP
+    
+    status_color = Column(String, default="yellow")  # green, yellow, red
+    # 🟢 green = appointment scheduled
+    # 🟡 yellow = in progress, needs follow-up
+    # 🔴 red = lost, unqualified, no response
+    
+    # ===== LEAD PROFILE (extracted from conversation) =====
+    vehicle_interest = Column(JSON, nullable=True)  # {model, year, body_type, trim}
+    deal_intent = Column(String, default="unknown")  # purchase, lease, unknown
+    
+    # Credit
+    credit_score = Column(Integer, nullable=True)  # Approximate score
+    credit_tier = Column(String, nullable=True)  # tier1_plus, tier1, tier2, tier3, first_buyer
+    credit_history_years = Column(Integer, nullable=True)
+    first_time_buyer = Column(Boolean, default=False)
+    
+    # Trade-in
+    has_trade_in = Column(Boolean, default=False)
+    trade_in_details = Column(JSON, nullable=True)  # {vehicle_desc, is_lease, payoff_est, vin}
+    
+    # Budget signals
+    monthly_target = Column(Integer, nullable=True)  # Target monthly payment
+    downpayment_available = Column(Integer, nullable=True)  # Cash available for down
+    
+    # Timeline
+    buying_timeline = Column(String, nullable=True)  # "now", "this_week", "exploring"
+    
+    # ===== APPOINTMENT =====
+    appointment_datetime = Column(DateTime(timezone=True), nullable=True)
+    appointment_location = Column(String, nullable=True)
+    appointment_notes = Column(Text, nullable=True)
+    
+    # ===== FOLLOW-UP SCHEDULING =====
+    next_action = Column(String, nullable=True)  # What to do next
+    next_action_eta = Column(DateTime(timezone=True), nullable=True)  # When to follow up
+    last_message_at = Column(DateTime(timezone=True), nullable=True)
+    
+    # ===== CONVERSATION SUMMARY =====
+    conversation_summary = Column(Text, nullable=True)  # "Moraleja" for human seller
+    key_objections = Column(JSON, nullable=True)  # List of objections raised
+    
+    # ===== CALCULATED OFFERS =====
+    last_offer = Column(JSON, nullable=True)  # Last calculated payment scenario
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+# Stage constants for reference
+CONVERSATION_STAGES = [
+    "INTAKE",           # 0 - Identify what they want + first buyer?
+    "CREDIT_PROFILE",   # 1 - Get credit score/tier
+    "DEAL_TYPE",        # 2 - Purchase vs Lease
+    "OFFER_BUILD",      # 3 - Use tools to calculate real numbers
+    "RECOMMENDATION",   # 4 - Ray's strategic advice
+    "APPOINTMENT",      # 5 - Schedule visit
+    "WRAP"              # 6 - Confirmation + follow-up
+]

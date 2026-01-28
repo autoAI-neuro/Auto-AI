@@ -145,7 +145,7 @@ def test_sales_clone(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Test the sales clone with a simulated buyer message"""
+    """Test the sales clone with a simulated buyer message - Uses RAY CLON V2.0"""
     clone = db.query(SalesClone).filter(SalesClone.user_id == current_user.id).first()
     
     if not clone:
@@ -157,17 +157,41 @@ def test_sales_clone(
             detail="Configura la personalidad y lógica de ventas primero"
         )
     
-    # Generate AI response with conversation history
-    from app.utils.ai_response import generate_clone_response
+    # For testing, create or get a test client to track state
+    from app.models import Client
     
-    response = generate_clone_response(
+    test_client = db.query(Client).filter(
+        Client.user_id == current_user.id,
+        Client.phone == "TEST_ARENA"
+    ).first()
+    
+    if not test_client:
+        test_client = Client(
+            id=get_uuid(),
+            user_id=current_user.id,
+            name="Cliente Prueba",
+            phone="TEST_ARENA",
+            status="new"
+        )
+        db.add(test_client)
+        db.commit()
+        db.refresh(test_client)
+    
+    # Use the new RAY CLON V2.0 agent
+    from app.utils.sales_agent import process_message_with_agent
+    
+    result = process_message_with_agent(
+        db=db,
         clone=clone,
+        client_id=test_client.id,
         buyer_message=test_msg.message,
-        client_context=None,  # No real client in test mode
         conversation_history=test_msg.conversation_history
     )
     
-    return response
+    return {
+        "response": result["response"],
+        "confidence": result["confidence"]
+    }
 
 
 @router.get("/status")
@@ -186,3 +210,29 @@ def get_clone_status(
         "is_active": clone.is_active if clone else False,
         "is_trained": clone.is_trained if clone else False
     }
+
+
+@router.post("/test/reset")
+def reset_test_arena(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset the test arena conversation state to start fresh"""
+    from app.models import Client, ConversationState
+    
+    # Find test client
+    test_client = db.query(Client).filter(
+        Client.user_id == current_user.id,
+        Client.phone == "TEST_ARENA"
+    ).first()
+    
+    if test_client:
+        # Delete conversation state
+        db.query(ConversationState).filter(
+            ConversationState.client_id == test_client.id
+        ).delete()
+        db.commit()
+        
+        return {"message": "Arena de pruebas reiniciada", "success": True}
+    
+    return {"message": "No había estado previo", "success": True}
