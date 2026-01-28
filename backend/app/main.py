@@ -7,7 +7,7 @@ from sqlalchemy import text
 from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory, email, sales_clone
 from app.db.session import engine, get_db
 from app.db.base import Base
-from app.models import User, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem, SalesClone  # Import models so SQLAlchemy can detect them
+from app.models import User, Client, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem, SalesClone, ConversationState  # Import models so SQLAlchemy can detect them
 
 # Create Tables
 Base.metadata.create_all(bind=engine)

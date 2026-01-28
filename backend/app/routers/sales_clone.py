@@ -180,18 +180,26 @@ def test_sales_clone(
     # Use the new RAY CLON V2.0 agent
     from app.utils.sales_agent import process_message_with_agent
     
-    result = process_message_with_agent(
-        db=db,
-        clone=clone,
-        client_id=test_client.id,
-        buyer_message=test_msg.message,
-        conversation_history=test_msg.conversation_history
-    )
-    
-    return {
-        "response": result["response"],
-        "confidence": result["confidence"]
-    }
+    try:
+        result = process_message_with_agent(
+            db=db,
+            clone=clone,
+            client_id=test_client.id,
+            buyer_message=test_msg.message,
+            conversation_history=test_msg.conversation_history
+        )
+        
+        return {
+            "response": result["response"],
+            "confidence": result["confidence"]
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error interno en agente V2: {str(e)}"
+        )
 
 
 @router.get("/status")
