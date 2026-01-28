@@ -25,145 +25,98 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # STAGE-SPECIFIC PROMPTS
 # ============================================
 
+# ============================================
+# MASTER PROMPT V2.0 - RAY CLON
+# ============================================
+
+RAY_BASE_PROMPT = """Eres **Ray**, vendedor de Toyota. Hablas en español, tono humano, directo, con seguridad y claridad. 
+Tu objetivo es **calificar → construir confianza → dar escenarios reales usando herramientas → cerrar cita cuando tenga sentido**. 
+No eres soporte, no eres corporativo.
+
+### Reglas de oro (NO NEGOCIABLES)
+
+1. **PROHIBIDO agendar cita** hasta completar el **MINI-PERFIL** (ver abajo).
+2. **PROHIBIDO inventar números**. Si no tienes la herramienta en el momento, lo dices: “Para darte número real necesito correr la calculadora Toyota”.
+3. **Nunca preguntes “¿prefieres con o sin inicial?”**
+4. **Nunca presiones con cita repetitiva** (“mañana 6pm o viernes 5pm”) si el cliente aún pregunta “¿califico?”.
+5. **Nunca contradigas una decisión del cliente.** Si el cliente dijo “compra”, tú sigues compra.
+6. **Nunca cierres la conversación vacío** (“estamos en contacto”). Si el cliente se enfría, haces rescate con valor.
+7. Máximo **1 pregunta por mensaje** (excepción: 2 preguntas solo en el primer mensaje).
+8. **PROHIBIDO preguntar “cuánto tiempo llevas trabajando”**. En su lugar: “¿cómo generas ingresos? (empleado / Uber / cash / negocio)”.
+9. **PROHIBIDO** frases de bot: "avancemos con el proceso", "te indicaré cómo hacerlo", "de manera segura".
+
+### Flujo Ray (Mentalidad)
+
+1. **Entrada**: Confirmas modelo y pides 2 datos básicos (Primer comprador + Score aprox).
+2. **Calificación**: Si falta score o documento, lo pides. Si falta tipo de ingreso, lo pides.
+3. **Escenario**: SOLO cuando tienes perfil, das números estimados (compra o lease).
+4. **Cita**: SOLO después de dar números. La cita es para "cerrar en 20 min", no para "ver si calificas".
+
+### Respuestas clave Ray (cuando el cliente reta)
+
+- “¿Cómo me agendas si no sabes mi score?” → “Exacto, por eso primero lo cuadramos aquí. Dame tu score aproximado y si tienes SSN o pasaporte.”
+- “¿Califico o no?” → “Con lo que me digas de score + documento + tipo de ingreso, te puedo decir si estás en rango. No te voy a hacer perder el tiempo.”
+- “No quiero ir a perder el tiempo” → “Así mismo pienso yo. Vamos a filtrarlo aquí primero.”"""
+
+
+# ============================================
+# GATING SYSTEM (CANDADO A-E)
+# ============================================
+
+def _get_missing_info(state: dict) -> List[str]:
+    """Check what pieces of the MINI-PROFILE are missing."""
+    missing = []
+    
+    # A) Vehicle Interest
+    if not state.get("vehicle_interest"):
+        missing.append("Modelo de interés (A)")
+        
+    # B) First Time Buyer
+    if state.get("first_time_buyer") is None:
+        missing.append("Si es primer comprador (B)")
+        
+    # C) Score
+    if not state.get("credit_score"):
+        missing.append("Score aproximado (C)")
+        
+    # D) Documents (simulated check keywords in history or specific field if we added it)
+    # For now we rely on score/first buyer logic, but ideally we'd track "has_doc_info"
+    
+    # E) Income Type
+    # We don't have a specific field for 'income_type' in state yet, 
+    # but we can check if we've identified it or if it's implicitly missing.
+    # For this implementation, we focus on A, B, C as HARD GATES.
+    
+    return missing
+
 STAGE_PROMPTS = {
-    "INTAKE": """FASE ACTUAL: INTAKE (Apertura)
+    "QUALIFICATION_NEEDED": """📢 **ALERTA: FALTAN DATOS DEL PERFIL**
+    
+No tienes autorización para agendar cita todavía.
+Te faltan estos datos para poder dar precios reales:
+{missing_list}
 
-OBJETIVO: Identificar qué carro quiere + si es primer comprador.
-MÁXIMO 2 preguntas en esta fase.
+TU MISIÓN EN ESTE MENSAJE:
+Conseguir UNO (máximo dos) de estos datos.
+NO hables de citas todavía. NO des precios finales todavía.
+    
+Ejemplo para pedir Score + Primer carro:
+"Para no hablar números al aire: ¿sería tu primer carro financiado? Y tu score está más cerca de 600, 650 o 700+?" """,
 
-SI NO SABES QUÉ CARRO QUIERE:
-→ "Perfecto hermano. ¿Qué estás buscando: sedán, SUV o pickup? Y dime si sería tu primer carro financiado o ya tienes crédito."
+    "OFFER_READY": """✅ **PERFIL COMPLETO: MODO ESCENARIOS**
 
-SI YA SABES EL CARRO PERO NO SI ES PRIMER COMPRADOR:
-→ "Buen carro, hermano. ¿Sería tu primer financiamiento o ya has tenido crédito antes?"
+Ya tienes la info básica. Ahora usa las herramientas (calculadora) para dar un estimado REAL.
+Si ya diste el estimado, entonces (y solo entonces) puedes sugerir que pase para verlo.
 
-CUANDO TENGAS AMBOS DATOS → avanza a CREDIT_PROFILE""",
+SI EL CLIENTE DUDA:
+Recuérdale que los números finales dependen del banco, pero que el estimado es sólido.""",
 
-    "CREDIT_PROFILE": """FASE ACTUAL: CREDIT_PROFILE
+    "APPOINTMENT": """📅 **MODO CITA (SÓLO SI YA DISTE NÚMEROS)**
 
-OBJETIVO: Obtener score aproximado y antigüedad de crédito.
-NO preguntar documentos todavía.
-
-PREGUNTA CLAVE:
-→ "Para darte números reales, dime tu score aproximado: ¿más cerca de 620, 680 o 720+?"
-
-SI ES PRIMER COMPRADOR SIN SCORE:
-→ "Dale, como es tu primer carro, los bancos te evalúan diferente. Lo importante es trabajar el crédito bien desde el principio."
-
-NO PREGUNTES SOBRE TRABAJO NI INGRESO TODAVÍA.
-
-CUANDO TENGAS CREDIT INFO → avanza a DEAL_TYPE""",
-
-    "DEAL_TYPE": """FASE ACTUAL: DEAL_TYPE
-
-OBJETIVO: Determinar si quiere compra o lease.
-
-SI NO HA MENCIONADO PREFERENCIA:
-→ "¿Lo estás pensando en compra o en lease? Te explico rápido: compra es tuyo al final, lease es pago más bajo pero lo devuelves. Para tu perfil te puedo decir cuál te conviene mejor."
-
-SI PREGUNTA LA DIFERENCIA:
-→ Explica en 2-3 oraciones máximo, luego recomienda según su perfil crediticio.
-
-CUANDO TENGAS DEAL INTENT → avanza a OFFER_BUILD""",
-
-    "OFFER_BUILD": """FASE ACTUAL: OFFER_BUILD
-
-OBJETIVO: Usar calculadoras para dar números REALES.
-
-INFORMACIÓN QUE NECESITAS:
-- Precio del vehículo (de inventario o MSRP conocido)
-- Downpayment disponible
-- Credit tier (ya debes tenerlo)
-
-RESPUESTA DEBE INCLUIR:
-1. Pago mensual estimado
-2. Cash due at signing
-3. Disclaimer corto: "sujeto a aprobación"
-
-FORMATO RAY:
-→ "Con tu perfil y $X de inicial, el Corolla te quedaría en aproximadamente $XXX/mes por 60 meses. Esto es con la calculadora oficial, el número final lo cuadramos cuando te revisen el crédito."
-
-CUANDO DES NÚMEROS → avanza a RECOMMENDATION""",
-
-    "RECOMMENDATION": """FASE ACTUAL: RECOMMENDATION (Consejo Ray)
-
-OBJETIVO: Dar consejo estratégico basado en TODO lo que sabes del cliente.
-
-PARA PRIMER COMPRADOR:
-→ "Mi recomendación: con el lease construyes crédito sin ahorcarte. En 3 años subes tu score y el siguiente carro sale más fácil."
-
-PARA CLIENTE CON BUEN SCORE QUERIENDO SUV:
-→ "Con tu crédito no hay problema. El SUV te queda bien, el pago está manejable."
-
-PARA CLIENTE CON SCORE BAJO:
-→ "Te soy honesto: con el score actual el pago sube. Si metes un poco más de inicial lo mejoramos. ¿Con cuánto más podrías arrancar?"
-
-SIEMPRE TERMINAR CON TIMELINE:
-→ "¿Lo quieres para ya, esta semana, o estás explorando?"
-
-CUANDO TENGAS TIMELINE → avanza a APPOINTMENT""",
-
-    "APPOINTMENT": """FASE ACTUAL: APPOINTMENT
-
-OBJETIVO: Cerrar cita.
-
-OBJETIVO: Cerrar cita de forma NATURAL, no forzada.
-
-PROPUESTA ORGÁNICA:
-→ "Dale hermano. Para ver esto en detalle y que te pruebes el carro, ¿qué día te queda cómodo pasar por acá? Yo me acomodo a ti."
-
-SI PIDE PRECIO EXACTO ANTES DE IR:
-→ "El estimado es el que te di. El número final exacto depende del banco, y eso solo te lo puedo sacar estando tú aquí. Vente mañana y lo liquidamos rápido."
-
-SI ACEPTA:
-→ "Perfecto, quedamos para [DÍA HORA]. Te mando la ubicación. Pregunta por Ray en la entrada."
-
-CUANDO AGENDE → avanza a WRAP""",
-
-    "WRAP": """FASE ACTUAL: WRAP
-
-OBJETIVO: Confirmar y dejar todo listo.
-
-CONFIRMACIÓN:
-→ "Listo hermano, quedamos para [FECHA]. Antes de que vengas, ¿tienes trade-in o empezamos desde cero?"
-
-SI TIENE TRADE-IN:
-→ "Dale, tráelo y lo evaluamos. ¿Sabes más o menos cuánto debes todavía o ya está pagado?"
-
-CIERRE RAY (concreto, no vacío):
-→ "Perfecto. Yo me encargo de tener todo listo para cuando llegues. Si surge algo antes, me escribes."
-
-NUNCA digas "estamos en contacto" o "cualquier cosa aquí estoy"."""
+Vende la cita como "cerrar el trato", no como "empezar el proceso".
+Usa el cierre orgánico: "Cuando tengas chance pásate y lo vemos" o "Avísame qué día te queda mejor".
+NO presiones con horarios específicos a menos que él pregunte."""
 }
-
-
-# ============================================
-# RAY BASE PROMPT (Always included)
-# ============================================
-
-RAY_BASE_PROMPT = """Eres Ray, vendedor de carros REAL en Miami.
-
-ESTILO ÚNICO:
-- Directo, natural, hablas como en la calle pero profesional
-- Usas "hermano" de forma natural
-- Seguro, calmado, NUNCA necesitado
-- LIDERAS la conversación, no la acompañas
-
-🚫 PROHIBIDO ABSOLUTO:
-- "estamos en contacto"
-- "cualquier cosa aquí estoy"
-- "avancemos con el proceso"
-- "te indicaré cómo hacerlo"
-- "¿Te parece si...?"
-- "¿Prefieres con o sin inicial?"
-- Preguntas vacías sin propósito
-
-REGLAS DE ORO:
-1. NUNCA inventes números - usa solo lo que te da el sistema
-2. NUNCA repitas preguntas ya respondidas
-3. SIEMPRE deja siguiente paso concreto con tiempo
-4. Respuestas CORTAS (2-4 oraciones) - esto es WhatsApp
-5. Si el cliente ya dijo qué carro quiere, YA LO SABES"""
 
 
 # ============================================
@@ -214,15 +167,23 @@ def process_message_with_agent(
         state.update(extracted)
         update_conversation_state(db, client_id, clone.user_id, **extracted)
     
-    # Determine if we should advance stage
-    new_stage = _determine_next_stage(state, buyer_message)
-    if new_stage != current_stage:
-        state["stage"] = new_stage
-        update_conversation_state(db, client_id, clone.user_id, stage=new_stage)
+    # Determine if we should update stage based on gating
+    missing_items = _get_missing_info(state)
     
-    # Generate tool context if in OFFER_BUILD stage
+    if not missing_items:
+        # Mini-profile complete!
+        if state.get("appointment_datetime"):
+             state["stage"] = "APPOINTMENT"
+        elif state.get("stage") != "APPOINTMENT":
+             state["stage"] = "OFFER_BUILD"
+        update_conversation_state(db, client_id, clone.user_id, stage=state["stage"])
+    else:
+        # Missing info -> Force QUALIFICATION
+        state["stage"] = "INTAKE" 
+    
+    # Generate tool context IF profile is complete
     tool_context = ""
-    if state["stage"] == "OFFER_BUILD" and state.get("vehicle_interest"):
+    if not missing_items:
         tool_context = _generate_offer_context(state)
     
     # Build the full prompt
@@ -248,6 +209,55 @@ def process_message_with_agent(
 # ============================================
 # HELPER FUNCTIONS
 # ============================================
+
+def _generate_offer_context(state: dict) -> str:
+    """Generate tool-based context for offer building."""
+    
+    vehicle = state.get("vehicle_interest", {})
+    price = vehicle.get("price_est", 30000)
+    downpayment = state.get("downpayment_available", 1000)
+    credit_score = state.get("credit_score")
+    is_first_buyer = state.get("first_time_buyer", False)
+    
+    scenarios = generate_payment_scenarios(
+        vehicle_price=price,
+        credit_score=credit_score,
+        is_first_buyer=is_first_buyer,
+        downpayment=downpayment
+    )
+    
+    # Safe format helper
+    def fmt_usd(val):
+        return f"${val:,}" if val is not None else "N/A"
+
+    context = f"""
+DATOS DE CALCULADORA (USAR ESTOS NÚMEROS):
+- Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
+- Precio base: {fmt_usd(price)}
+- Inicial disponible: {fmt_usd(downpayment)}
+- Tier crediticio: {scenarios['credit_tier'].get('tier', 'Unknown')} ({scenarios['credit_tier'].get('description', '')})
+
+ESCENARIO COMPRA:
+- Pago mensual: ${scenarios['purchase']['monthly_payment']}/mes x {scenarios['purchase']['term_months']} meses
+- APR estimado: {scenarios['purchase']['apr']*100:.1f}%
+- Cash due at signing: ${scenarios['purchase']['cash_due_at_signing']}
+
+"""
+    
+    if scenarios.get("lease"):
+        context += f"""ESCENARIO LEASE:
+- Pago mensual: ${scenarios['lease']['monthly_payment']}/mes x {scenarios['lease']['term_months']} meses
+- Due at signing: ${scenarios['lease']['due_at_signing']}
+- 12,000 millas/año
+
+"""
+    
+    context += f"""RECOMENDACIÓN RAY: {scenarios['recommendation']}
+
+USA ESTOS NÚMEROS EXACTOS. No inventes otros."""
+    
+    return context
+
 
 def _extract_info_from_message(message: str, current_state: dict) -> dict:
     """Extract relevant info from buyer message."""
@@ -326,115 +336,27 @@ def _extract_info_from_message(message: str, current_state: dict) -> dict:
     return extracted
 
 
-def _determine_next_stage(state: dict, message: str) -> str:
-    """Determine if we should advance to next stage."""
-    
-    current = state.get("stage", "INTAKE")
-    
-    if current == "INTAKE":
-        # Move to CREDIT_PROFILE if we know vehicle AND first_buyer status
-        if state.get("vehicle_interest") and state.get("first_time_buyer") is not None:
-            return "CREDIT_PROFILE"
-    
-    elif current == "CREDIT_PROFILE":
-        # Move to DEAL_TYPE if we have credit info
-        if state.get("credit_score") or state.get("first_time_buyer"):
-            return "DEAL_TYPE"
-    
-    elif current == "DEAL_TYPE":
-        # Move to OFFER_BUILD if we know deal intent
-        if state.get("deal_intent") and state["deal_intent"] != "unknown":
-            return "OFFER_BUILD"
-    
-    elif current == "OFFER_BUILD":
-        # After giving numbers, move to RECOMMENDATION
-        # This is triggered by the agent after calculating
-        return "RECOMMENDATION"
-    
-    elif current == "RECOMMENDATION":
-        # Move to APPOINTMENT when timeline is known
-        if state.get("buying_timeline"):
-            return "APPOINTMENT"
-    
-    elif current == "APPOINTMENT":
-        # Move to WRAP when appointment is set
-        if state.get("appointment_datetime"):
-            return "WRAP"
-    
-    return current
-
-
-def _generate_offer_context(state: dict) -> str:
-    """Generate tool-based context for offer building."""
-    
-    vehicle = state.get("vehicle_interest", {})
-    price = vehicle.get("price_est", 30000)
-    downpayment = state.get("downpayment_available", 1000)
-    credit_score = state.get("credit_score")
-    is_first_buyer = state.get("first_time_buyer", False)
-    
-    scenarios = generate_payment_scenarios(
-        vehicle_price=price,
-        credit_score=credit_score,
-        is_first_buyer=is_first_buyer,
-        downpayment=downpayment
-    )
-    
-    # Safe format helper
-    def fmt_usd(val):
-        return f"${val:,}" if val is not None else "N/A"
-
-    context = f"""
-DATOS DE CALCULADORA (USAR ESTOS NÚMEROS):
-- Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
-- Precio base: {fmt_usd(price)}
-- Inicial disponible: {fmt_usd(downpayment)}
-- Tier crediticio: {scenarios['credit_tier'].get('tier', 'Unknown')} ({scenarios['credit_tier'].get('description', '')})
-
-ESCENARIO COMPRA:
-- Pago mensual: ${scenarios['purchase']['monthly_payment']}/mes x {scenarios['purchase']['term_months']} meses
-- APR estimado: {scenarios['purchase']['apr']*100:.1f}%
-- Cash due at signing: ${scenarios['purchase']['cash_due_at_signing']}
-
-"""
-    
-    if scenarios.get("lease"):
-        context += f"""ESCENARIO LEASE:
-- Pago mensual: ${scenarios['lease']['monthly_payment']}/mes x {scenarios['lease']['term_months']} meses
-- Due at signing: ${scenarios['lease']['due_at_signing']}
-- 12,000 millas/año
-
-"""
-    
-    context += f"""RECOMENDACIÓN RAY: {scenarios['recommendation']}
-
-USA ESTOS NÚMEROS EXACTOS. No inventes otros."""
-    
-    return context
-
-
-def _get_status_color(state: dict) -> str:
-    """Determine lead status color based on state."""
-    
-    stage = state.get("stage", "INTAKE")
-    
-    if stage == "WRAP" and state.get("appointment_datetime"):
-        return "green"  # 🟢 Cita agendada
-    
-    # Could add red logic for lost leads
-    
-    return "yellow"  # 🟡 En progreso
-
-
 def _build_agent_prompt(clone, state: dict, tool_context: str) -> str:
-    """Build full system prompt for current stage."""
+    """Build full system prompt using GATING LOGIC (Candado A-E)."""
     
     parts = [RAY_BASE_PROMPT]
     
-    # Add stage-specific prompt
-    stage = state.get("stage", "INTAKE")
-    if stage in STAGE_PROMPTS:
-        parts.append(STAGE_PROMPTS[stage])
+    # 1. CHECK GATING (Candado A-E)
+    missing_items = _get_missing_info(state)
+    
+    if missing_items:
+        # GATING ACTIVE: Force qualification mode
+        missing_list_str = "\n".join([f"- {item}" for item in missing_items])
+        prompt = STAGE_PROMPTS["QUALIFICATION_NEEDED"].format(missing_list=missing_list_str)
+        parts.append(prompt)
+    
+    elif state.get("stage") == "APPOINTMENT" or state.get("appointment_datetime"):
+        # APPOINTMENT MODE (Only if numbers were given)
+        parts.append(STAGE_PROMPTS["APPOINTMENT"])
+        
+    else:
+        # OFFER MODE (Profile complete, allow tools)
+        parts.append(STAGE_PROMPTS["OFFER_READY"])
     
     # Add current state context
     # Safe format helper
@@ -444,18 +366,17 @@ def _build_agent_prompt(clone, state: dict, tool_context: str) -> str:
 
     state_context = f"""
 ESTADO ACTUAL DEL CLIENTE:
-- Stage: {stage}
 - Vehículo interés: {state.get('vehicle_interest', 'No definido')}
 - Primer comprador: {state.get('first_time_buyer', 'No sé')}
 - Score crédito: {state.get('credit_score', 'No sé')}
 - Intención: {state.get('deal_intent', 'unknown')}
 - Inicial disponible: {fmt_down(state)}
-- Timeline: {state.get('buying_timeline', 'No definido')}
+- DATOS FALTANTES: {missing_items if missing_items else 'NINGUNO - PERFIL COMPLETO'}
 """
     parts.append(state_context)
     
-    # Add tool context if available
-    if tool_context:
+    # Add tool context if available (Only allowed if NO missing items)
+    if tool_context and not missing_items:
         parts.append(tool_context)
     
     # Add user's custom personality if available
