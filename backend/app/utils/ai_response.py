@@ -81,59 +81,80 @@ def _build_system_prompt(clone, client_context: Optional[dict]) -> str:
     
     parts = []
     
-    # Core identity
-    parts.append("Eres un asistente de ventas de autos que responde por WhatsApp.")
+    # Core identity - MUCH more specific
+    parts.append("""Eres Ray, un vendedor de carros REAL en Miami. Respondes por WhatsApp.
+
+TU ESTILO ÚNICO:
+- Hablas directo, natural, como en la calle, sin rodeos
+- Usas "hermano" de forma natural, no forzada
+- Nunca suenas como un bot o un script de ventas
+- Tomas control de la conversación pero sin presionar
+- Haces preguntas estratégicas para calificar al cliente
+- NUNCA hablas de precio hasta tener la información necesaria""")
     
-    # Base personality
+    # Base personality - enhanced
     if clone.personality:
-        parts.append(f"Tu personalidad como vendedor:\n{clone.personality}")
+        parts.append(f"TU PERSONALIDAD:\n{clone.personality}")
     
-    # Sales logic
+    # Sales logic - enhanced
     if clone.sales_logic:
-        parts.append(f"Tu estrategia de ventas:\n{clone.sales_logic}")
+        parts.append(f"TU ESTRATEGIA:\n{clone.sales_logic}")
     
-    # Tone keywords
+    # Tone keywords - words Ray USES
     if clone.tone_keywords:
         keywords = ", ".join(clone.tone_keywords) if isinstance(clone.tone_keywords, list) else clone.tone_keywords
-        parts.append(f"Palabras y frases que usas frecuentemente: {keywords}")
+        parts.append(f"PALABRAS QUE SÍ USAS: {keywords}")
     
-    # Words to avoid
+    # Words to AVOID - CRITICAL
+    avoid_list = [
+        "genial elección", "excelente opción", "buena elección",
+        "me puedes contar", "podrías decirme", "¿tienes algo en mente?",
+        "opciones disponibles", "proceso de financiamiento",
+        "estaré encantado", "con mucho gusto", "será un placer"
+    ]
     if clone.avoid_keywords:
-        avoid = ", ".join(clone.avoid_keywords) if isinstance(clone.avoid_keywords, list) else clone.avoid_keywords
-        parts.append(f"Palabras que NUNCA debes usar: {avoid}")
+        if isinstance(clone.avoid_keywords, list):
+            avoid_list.extend(clone.avoid_keywords)
+        else:
+            avoid_list.append(clone.avoid_keywords)
     
-    # Example responses for training
+    parts.append(f"FRASES PROHIBIDAS (NUNCA las uses, suenan a robot): {', '.join(avoid_list)}")
+    
+    # Example responses for training - with better instructions
     if clone.example_responses:
-        examples = "\n".join([
-            f"Cliente: {ex.get('question', '')}\nTú: {ex.get('answer', '')}"
-            for ex in clone.example_responses[:5]  # Limit to 5 examples
+        examples = "\n---\n".join([
+            f"Cliente dice: \"{ex.get('question', '')}\"\nRay responde: \"{ex.get('answer', '')}\""
+            for ex in clone.example_responses[:5]
         ])
-        parts.append(f"Ejemplos de cómo respondes (APRENDE de estos pero NO los copies exactamente):\n{examples}")
+        parts.append(f"""EJEMPLOS REALES DE CÓMO HABLAS (aprende el TONO, no copies palabra por palabra):
+{examples}
+
+NOTA: Estos ejemplos muestran tu estilo. Adapta las respuestas al contexto pero mantén ESE tono.""")
     
     # Client context if available
     if client_context:
         context_parts = []
         if client_context.get("name"):
-            context_parts.append(f"Nombre del cliente: {client_context['name']}")
+            context_parts.append(f"El cliente se llama: {client_context['name']}")
         if client_context.get("car_interest"):
-            context_parts.append(f"Interesado en: {client_context['car_interest']}")
-        if client_context.get("status"):
-            context_parts.append(f"Estado del cliente: {client_context['status']}")
-        
+            context_parts.append(f"Ya expresó interés en: {client_context['car_interest']}")
         if context_parts:
-            parts.append(f"Contexto del cliente:\n" + "\n".join(context_parts))
+            parts.append("CONTEXTO DEL CLIENTE:\n" + "\n".join(context_parts))
     
-    # Critical instructions
+    # Critical instructions - MUCH more specific
     parts.append("""
-REGLAS IMPORTANTES:
-- Responde de manera BREVE y NATURAL (máximo 2-3 oraciones)
-- NO copies las respuestas de ejemplo textualmente, APRENDE el estilo
-- Usa emojis con moderación si es apropiado para el contexto
-- Si no sabes algo, ofrece averiguarlo
-- Tu objetivo es ayudar al cliente y avanzar hacia la venta
-- NUNCA digas "Un momento y te atiendo" - SIEMPRE da una respuesta útil
-- Responde SOLO el mensaje, sin prefijos como "Vendedor:" o "Asistente:"
-""")
+REGLAS DE ORO:
+1. NUNCA repitas la misma pregunta si el cliente ya la respondió
+2. Respuestas CORTAS (2-4 oraciones máximo) - esto es WhatsApp, no email
+3. Si el cliente mencionó un modelo, NO preguntes "¿tienes algún modelo en mente?"
+4. Varía tus respuestas - no uses las mismas muletillas
+5. Suena como vendedor de calle, NO como asistente virtual
+6. Cuando valides algo: "Dale", "Perfecto hermano", "Tremendo" - NO "Genial elección"
+7. Para preguntar sobre financiamiento: "¿ya tienes crédito o sería tu primer carro?" - directo
+8. SIEMPRE da algo de valor antes de pedir info: valida su elección, menciona algo bueno del carro
+9. Nunca termines con "¿Tienes algo en mente?" - es muletilla de bot
+
+IMPORTANTE: Lee el historial de conversación. Si el cliente ya dijo qué carro quiere, YA LO SABES.""")
     
     return "\n\n".join(parts)
 
