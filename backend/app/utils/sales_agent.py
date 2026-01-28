@@ -417,3 +417,93 @@ def _call_openai(system_prompt: str, user_message: str, history: Optional[List[d
     except Exception as e:
         print(f"[Sales Agent] OpenAI error: {e}")
         return "Dale hermano, un momento que reviso esto y te confirmo."
+
+
+def _get_status_color(state: dict) -> str:
+    """Determine lead status color based on state."""
+    
+    stage = state.get("stage", "INTAKE")
+    
+    if stage == "WRAP" and state.get("appointment_datetime"):
+        return "green"  # 🟢 Cita agendada
+    
+    # Could add red logic for lost leads
+    
+    return "yellow"  # 🟡 En progreso
+
+
+def _extract_info_from_message(message: str, current_state: dict) -> dict:
+    """Extract relevant info from buyer message."""
+    
+    extracted = {}
+    msg_lower = message.lower()
+    
+    # Vehicle interest
+    car_models = {
+        "corolla": {"model": "Corolla", "body_type": "sedan", "price_est": 28000},
+        "camry": {"model": "Camry", "body_type": "sedan", "price_est": 32000},
+        "rav4": {"model": "RAV4", "body_type": "suv", "price_est": 35000},
+        "tacoma": {"model": "Tacoma", "body_type": "pickup", "price_est": 38000},
+        "highlander": {"model": "Highlander", "body_type": "suv", "price_est": 45000},
+        "civic": {"model": "Civic", "body_type": "sedan", "price_est": 27000},
+        "accord": {"model": "Accord", "body_type": "sedan", "price_est": 32000},
+        "crv": {"model": "CR-V", "body_type": "suv", "price_est": 34000},
+        "cr-v": {"model": "CR-V", "body_type": "suv", "price_est": 34000}
+    }
+    
+    for key, info in car_models.items():
+        if key in msg_lower:
+            extracted["vehicle_interest"] = info
+            break
+    
+    # Year extraction
+    import re
+    year_match = re.search(r'20(2[4-9]|[3-9]\d)', message)
+    if year_match and "vehicle_interest" in extracted:
+        extracted["vehicle_interest"]["year"] = int(year_match.group())
+    
+    # First time buyer
+    first_buyer_phrases = ["primer carro", "primera vez", "primer financ", "nunca he", "first time", "first car"]
+    if any(phrase in msg_lower for phrase in first_buyer_phrases):
+        extracted["first_time_buyer"] = True
+    
+    has_credit_phrases = ["ya tengo credito", "ya he tenido", "tengo tarjetas", "have credit"]
+    if any(phrase in msg_lower for phrase in has_credit_phrases):
+        extracted["first_time_buyer"] = False
+    
+    # Credit score extraction
+    score_match = re.search(r'\b(5[5-9]\d|6\d{2}|7\d{2}|8\d{2})\b', message)
+    if score_match:
+        extracted["credit_score"] = int(score_match.group())
+    
+    # Score range mentions
+    if "750" in message or "excelente" in msg_lower:
+        extracted["credit_score"] = 750
+    elif "720" in message:
+        extracted["credit_score"] = 720
+    elif "680" in message or "bueno" in msg_lower:
+        extracted["credit_score"] = 680
+    elif "620" in message or "bajo" in msg_lower:
+        extracted["credit_score"] = 620
+    
+    # Deal intent
+    if "compra" in msg_lower or "comprar" in msg_lower or "purchase" in msg_lower:
+        extracted["deal_intent"] = "purchase"
+    elif "lease" in msg_lower or "arrendamiento" in msg_lower:
+        extracted["deal_intent"] = "lease"
+    
+    # Downpayment mentions
+    down_match = re.search(r'\$?([\d,]+)\s*(dolares|dollars|de inicial|down|entrada)', msg_lower)
+    if down_match:
+        amount = int(down_match.group(1).replace(",", ""))
+        extracted["downpayment_available"] = amount
+    
+    # Timeline
+    if any(w in msg_lower for w in ["hoy", "ahora", "ya", "today", "now"]):
+        extracted["buying_timeline"] = "now"
+    elif any(w in msg_lower for w in ["semana", "week", "pronto"]):
+        extracted["buying_timeline"] = "this_week"
+    elif any(w in msg_lower for w in ["explor", "viendo", "looking"]):
+        extracted["buying_timeline"] = "exploring"
+    
+    return extracted
