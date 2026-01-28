@@ -106,7 +106,7 @@ const SalesCloneBuilder = () => {
             const response = await api.post('/sales-clone/test',
                 {
                     message: msgToSend,
-                    conversation_history: testConversation  // Send all previous messages
+                    conversation_history: updatedConversation  // FIXED: Send updated conversation
                 },
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
@@ -120,6 +120,18 @@ const SalesCloneBuilder = () => {
             toast.error(message);
         } finally {
             setTesting(false);
+        }
+    };
+
+    const resetTestArena = async () => {
+        try {
+            await api.post('/sales-clone/test/reset', {}, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            setTestConversation([]);
+            toast.success('Memoria reiniciada');
+        } catch (error) {
+            console.error('Error resetting:', error);
         }
     };
 
@@ -264,10 +276,19 @@ const SalesCloneBuilder = () => {
             {/* Test Mode Panel */}
             {testMode && (
                 <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4">
-                    <h3 className="text-blue-400 font-medium mb-3 flex items-center gap-2">
-                        <Sparkles className="w-4 h-4" />
-                        Arena de Pruebas
-                    </h3>
+                    <div className="flex justify-between items-center mb-3">
+                        <h3 className="text-blue-400 font-medium flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Arena de Pruebas (V2.0)
+                        </h3>
+                        <button
+                            onClick={resetTestArena}
+                            className="text-xs text-neutral-500 hover:text-white flex items-center gap-1"
+                        >
+                            <Trash2 className="w-3 h-3" />
+                            Reiniciar
+                        </button>
+                    </div>
                     <p className="text-neutral-400 text-sm mb-4">
                         Simula una conversación como si fueras un comprador
                     </p>
