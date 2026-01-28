@@ -376,12 +376,16 @@ def _generate_offer_context(state: dict) -> str:
         downpayment=downpayment
     )
     
+    # Safe format helper
+    def fmt_usd(val):
+        return f"${val:,}" if val is not None else "N/A"
+
     context = f"""
 DATOS DE CALCULADORA (USAR ESTOS NÚMEROS):
 - Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
-- Precio base: ${price:,}
-- Inicial disponible: ${downpayment:,}
-- Tier crediticio: {scenarios['credit_tier']['tier']} ({scenarios['credit_tier']['description']})
+- Precio base: {fmt_usd(price)}
+- Inicial disponible: {fmt_usd(downpayment)}
+- Tier crediticio: {scenarios['credit_tier'].get('tier', 'Unknown')} ({scenarios['credit_tier'].get('description', '')})
 
 ESCENARIO COMPRA:
 - Pago mensual: ${scenarios['purchase']['monthly_payment']}/mes x {scenarios['purchase']['term_months']} meses
@@ -429,6 +433,11 @@ def _build_agent_prompt(clone, state: dict, tool_context: str) -> str:
         parts.append(STAGE_PROMPTS[stage])
     
     # Add current state context
+    # Safe format helper
+    def fmt_down(s):
+        val = s.get('downpayment_available')
+        return f"${val:,}" if val is not None else "$0"
+
     state_context = f"""
 ESTADO ACTUAL DEL CLIENTE:
 - Stage: {stage}
@@ -436,7 +445,7 @@ ESTADO ACTUAL DEL CLIENTE:
 - Primer comprador: {state.get('first_time_buyer', 'No sé')}
 - Score crédito: {state.get('credit_score', 'No sé')}
 - Intención: {state.get('deal_intent', 'unknown')}
-- Inicial disponible: ${state.get('downpayment_available', 0):,}
+- Inicial disponible: {fmt_down(state)}
 - Timeline: {state.get('buying_timeline', 'No definido')}
 """
     parts.append(state_context)
