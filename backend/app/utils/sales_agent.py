@@ -287,14 +287,16 @@ Nunca expliques el proceso.
 Habla como alguien que ya hizo los números.
 
 Tu misión es:
+- DAR LOS NÚMEROS EXACTOS (Copia y pega del contexto).
 - Mostrar escenarios claros y coherentes
-- Mantener el modelo exacto solicitado
-- Aclarar que los montos son aproximados y sujetos a aprobación final
+- Aclarar que los montos son aproximados
 
 Prohibido:
-- Cambiar de modelo
-- Dar ejemplos genéricos
-- Forzar cierre""",
+- Decir "basado en tu score" sin dar el número.
+- Ocultar la mensualidad.
+- Decir "voy a preparar".
+
+SI VES DATOS DE CALCULADORA, ÚSALOS.""",
 
     "APPOINTMENT": """🟦 MODO APPOINTMENT ACTIVADO
 
@@ -314,6 +316,231 @@ Prohibido:
 
 La cita es consecuencia del criterio, no una presión."""
 }
+
+TRADE_IN_ALERT = """🔴 ALERTA TRADE-IN ACTIVADA
+
+⚠️ El cliente indicó que ya tiene un vehículo financiado.
+
+Asume posible upside down hasta que se demuestre lo contrario.
+
+Tu misión es:
+- Frenar ofertas agresivas
+- Explicar que primero hay que evaluar el vehículo actual
+- NO dar cuotas finales sin evaluar trade-in
+
+Prohibido:
+- Ignorar el trade
+- Agendar citas sin aclarar este punto"""
+
+
+# ============================================
+# MAIN AGENT FUNCTION
+# ============================================
+
+def process_message_with_agent(
+    db: Session,
+    clone,  # SalesClone model
+    client_id: str,
+    buyer_message: str,
+    conversation_history: Optional[List[dict]] = None
+) -> Dict[str, Any]:
+    """
+    Main entry point for the RAY agent.
+    Processes message through V3 LOGIC MODES.
+    """
+    
+    # Get or create conversation state
+    state = get_conversation_state(db, client_id)
+    if not state:
+        state = {
+            "mode": "DISCOVERY",
+            "status_color": "yellow",
+            # Profile Data
+            "vehicle_interest": None,
+            "usage_type": None,
+            "first_time_buyer": None,
+            "credit_score": None,
+            "doc_type": None,
+            "deal_intent": "unknown",
+            "strategy_accepted": False,
+            "has_trade_in": False,
+            "downpayment_available": 0
+        }
+        update_conversation_state(db, client_id, clone.user_id, **state)
+    
+    # Extract information from message
+    extracted = _extract_info_from_message(buyer_message, state)
+    
+    # Update state with extracted info
+    if extracted:
+        state.update(extracted)
+        update_conversation_state(db, client_id, clone.user_id, **extracted)
+    
+    # DETERMINE ACTIVE MODE (Cognitive Gating)
+    active_mode = _determine_active_mode(state)
+    state["mode"] = active_mode
+    update_conversation_state(db, client_id, clone.user_id, stage=active_mode)
+    
+    # Generate tool context IF in OFFER mode
+    tool_context = ""
+    if active_mode == "OFFER":
+        tool_context = _generate_offer_context(state)
+    
+    # Build the full prompt
+    system_prompt = _build_agent_prompt(clone, state, active_mode, tool_context)
+    
+    # Generate response
+    response = _call_openai(system_prompt, buyer_message, conversation_history)
+    
+    # Update status color based on mode
+    status_color = _get_status_color(state)
+    if status_color != state.get("status_color"):
+        update_conversation_state(db, client_id, clone.user_id, status_color=status_color)
+    
+    return {
+        "response": response,
+        "confidence": 0.90,
+        "stage": active_mode,
+        "status_color": status_color,
+        "state_update": state
+    }
+
+
+# ============================================
+# HELPER FUNCTIONS
+# ============================================
+
+def _build_agent_prompt(clone, state: dict, mode: str, tool_context: str) -> str:
+    """Build full system prompt using V3 LOGIC MODES."""
+    
+    parts = [RAY_BASE_PROMPT]
+    
+    # Inject Active Mode Prompt
+    if mode in LOGIC_MODES:
+        parts.append(LOGIC_MODES[mode])
+        
+    # Inject Tool Context (CRITICAL: High Priority injection)
+    # Put it right after the mode instruction so the model sees "HERE ARE THE NUMBERS"
+    if tool_context and mode == "OFFER":
+        parts.append(f"🔍 [DATOS REALES DE HERRAMIENTA DISPONIBLES]:\n{tool_context}")
+        
+    # Inject Trade-In Alert if applicable
+    if state.get("has_trade_in"):
+        parts.append(TRADE_IN_ALERT)
+    
+    # State Context
+    def fmt_down(s):
+        val = s.get('downpayment_available')
+        return f"${val:,}" if val is not None else "$0"
+
+    state_context = f"""
+DATOS DEL CLIENTE (SISTEMA):
+- Vehículo: {state.get('vehicle_interest', {}).get('model', 'N/A')}
+- Uso: {state.get('usage_type', 'N/A')}
+- Primer Comprador: {state.get('first_time_buyer', 'N/A')}
+- Score: {state.get('credit_score', 'N/A')}
+- Documento: {state.get('doc_type', 'N/A')}
+- Estrategia Aceptada: {state.get('strategy_accepted', False)}
+- Trade-In: {state.get('has_trade_in', False)}
+- Inicial: {fmt_down(state)}
+"""
+    parts.append(state_context)
+    
+    # User Personality
+    if clone.personality:
+        parts.append(f"\nPERSONALIZACIÓN ADICIONAL:\n{clone.personality}")
+    
+    return "\n\n---\n\n".join(parts)
+
+
+def _determine_active_mode(state: dict) -> str:
+    """
+    Cognitive Gating Logic to determine the active mode.
+    Flow: DISCOVERY -> QUALIFICATION -> STRATEGY -> OFFER -> APPOINTMENT
+    """
+    
+    # 1. DISCOVERY GATE
+    # Needs: Vehicle AND Usage AND info about financing history
+    # Relaxed slightly: If we know vehicle + usage, we can move to Qual
+    # and ask for financing history there if needed, but strict Discovery is better.
+    if not state.get("vehicle_interest") or \
+       not state.get("usage_type"):
+        return "DISCOVERY"
+
+    # 2. QUALIFICATION GATE
+    # Needs: Credit Score AND Doc Type
+    if not state.get("credit_score") or not state.get("doc_type"):
+        return "QUALIFICATION"
+
+    # 3. STRATEGY GATE
+    # Needs: Strategy Accepted flag.
+    # CRITICAL FIX: If profile is solid (e.g. good score + purchase), 
+    # we can imply strategy acceptance to skip unnecessary friction.
+    # But for now, let's keep it safe.
+    
+    # Auto-accept strategy if user explicitly said "Purchase" and has good profile?
+    # No, adhere to user request: "No advances hasta que cliente ACEPTE".
+    # BUT, if we just got the Qual info, we MUST enter STRATEGY.
+    
+    if not state.get("strategy_accepted"):
+        return "STRATEGY"
+
+    # 4. OFFER/APPOINTMENT LOGIC
+    # If appointment set -> Appointment
+    if state.get("appointment_datetime"):
+        return "APPOINTMENT"
+    
+    # Default to OFFER (Tools Enabled)
+    return "OFFER"
+
+
+def _generate_offer_context(state: dict) -> str:
+    """Generate tool-based context for offer building."""
+    
+    vehicle = state.get("vehicle_interest", {})
+    price = vehicle.get("price_est", 30000)
+    downpayment = state.get("downpayment_available", 1000)
+    credit_score = state.get("credit_score")
+    is_first_buyer = state.get("first_time_buyer", False)
+    
+    scenarios = generate_payment_scenarios(
+        vehicle_price=price,
+        credit_score=credit_score,
+        is_first_buyer=is_first_buyer,
+        downpayment=downpayment
+    )
+    
+    # Safe format helper
+    def fmt_usd(val):
+        return f"${val:,}" if val is not None else "N/A"
+
+    context = f"""
+DATOS DE CALCULADORA (Estos son los números FINALES para esta fase):
+- Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
+- Precio base: {fmt_usd(price)}
+- Inicial: {fmt_usd(downpayment)}
+
+OPCIÓN COMPRA (RECOMENDADA):
+- Mensualidad: ${scenarios['purchase']['monthly_payment']}/mes
+- Plazo: {scenarios['purchase']['term_months']} meses
+- Inicial Total: ${scenarios['purchase']['cash_due_at_signing']}
+
+"""
+    
+    if scenarios.get("lease"):
+        context += f"""OPCIÓN LEASE:
+- Mensualidad: ${scenarios['lease']['monthly_payment']}/mes
+- Plazo: {scenarios['lease']['term_months']} meses
+- Inicial Total: ${scenarios['lease']['due_at_signing']}
+- 12k millas/año
+"""
+    
+    context += f"""
+RECOMENDACIÓN RAY: {scenarios['recommendation']}
+
+INSTRUCCIÓN: Copia estos números en tu respuesta. No digas "basado en tu perfil". Di los números."""
+    
+    return context
 
 TRADE_IN_ALERT = """🔴 ALERTA TRADE-IN ACTIVADA
 
