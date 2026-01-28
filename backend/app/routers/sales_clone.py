@@ -36,6 +36,7 @@ class SalesCloneResponse(BaseModel):
 
 class TestMessage(BaseModel):
     message: str  # User pretending to be buyer
+    conversation_history: Optional[List[dict]] = None  # Previous messages [{role: "buyer"|"clone", text: str}]
 
 class TestResponse(BaseModel):
     response: str  # AI clone's response
@@ -156,13 +157,14 @@ def test_sales_clone(
             detail="Configura la personalidad y lógica de ventas primero"
         )
     
-    # Generate AI response
+    # Generate AI response with conversation history
     from app.utils.ai_response import generate_clone_response
     
     response = generate_clone_response(
         clone=clone,
         buyer_message=test_msg.message,
-        client_context=None  # No real client in test mode
+        client_context=None,  # No real client in test mode
+        conversation_history=test_msg.conversation_history
     )
     
     return response

@@ -12,7 +12,8 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 def generate_clone_response(
     clone,  # SalesClone object
     buyer_message: str,
-    client_context: Optional[dict] = None
+    client_context: Optional[dict] = None,
+    conversation_history: Optional[list] = None  # Previous messages in conversation
 ) -> dict:
     """
     Generate an AI response based on the sales clone's personality and training.
@@ -21,6 +22,7 @@ def generate_clone_response(
         clone: SalesClone model with personality, sales_logic, etc.
         buyer_message: The message from the buyer/client
         client_context: Optional info about the client (name, car interest, etc.)
+        conversation_history: List of previous messages [{role: "buyer"|"clone", text: str}]
     
     Returns:
         dict with 'response' (str) and 'confidence' (float)
@@ -39,12 +41,21 @@ def generate_clone_response(
         
         client = OpenAI(api_key=OPENAI_API_KEY)
         
+        # Build messages array with conversation history
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add conversation history if available
+        if conversation_history:
+            for msg in conversation_history:
+                role = "user" if msg.get("role") == "buyer" else "assistant"
+                messages.append({"role": role, "content": msg.get("text", "")})
+        
+        # Add current message
+        messages.append({"role": "user", "content": buyer_message})
+        
         response = client.chat.completions.create(
             model="gpt-4o-mini",  # Fast, cheap, excellent quality
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": buyer_message}
-            ],
+            messages=messages,
             max_tokens=200,
             temperature=0.7  # Some creativity but not too random
         )

@@ -95,13 +95,19 @@ const SalesCloneBuilder = () => {
         if (!testMessage.trim()) return;
 
         setTesting(true);
-        setTestConversation(prev => [...prev, { role: 'buyer', text: testMessage }]);
+        const newBuyerMsg = { role: 'buyer', text: testMessage };
+        const updatedConversation = [...testConversation, newBuyerMsg];
+        setTestConversation(updatedConversation);
         const msgToSend = testMessage;
         setTestMessage('');
 
         try {
+            // Send message with conversation history for context
             const response = await api.post('/sales-clone/test',
-                { message: msgToSend },
+                {
+                    message: msgToSend,
+                    conversation_history: testConversation  // Send all previous messages
+                },
                 { headers: { 'Authorization': `Bearer ${token}` } }
             );
             setTestConversation(prev => [...prev, {
@@ -205,8 +211,8 @@ const SalesCloneBuilder = () => {
                     <button
                         onClick={() => setTestMode(!testMode)}
                         className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${testMode
-                                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                            : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
                             }`}
                     >
                         <MessageSquare className="w-4 h-4" />
@@ -218,10 +224,10 @@ const SalesCloneBuilder = () => {
                         onClick={toggleActive}
                         disabled={!clone.is_trained}
                         className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-all ${clone.is_active
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : clone.is_trained
-                                    ? 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
-                                    : 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                            : clone.is_trained
+                                ? 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                                : 'bg-neutral-900 text-neutral-600 cursor-not-allowed'
                             }`}
                         title={!clone.is_trained ? 'Completa el entrenamiento primero' : ''}
                     >
@@ -276,8 +282,8 @@ const SalesCloneBuilder = () => {
                         {testConversation.map((msg, i) => (
                             <div key={i} className={`flex ${msg.role === 'buyer' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`max-w-[80%] px-3 py-2 rounded-lg ${msg.role === 'buyer'
-                                        ? 'bg-blue-500/20 text-blue-100'
-                                        : 'bg-purple-500/20 text-purple-100'
+                                    ? 'bg-blue-500/20 text-blue-100'
+                                    : 'bg-purple-500/20 text-purple-100'
                                     }`}>
                                     <p className="text-sm">{msg.text}</p>
                                     {msg.confidence && (
