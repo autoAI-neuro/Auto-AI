@@ -20,17 +20,13 @@ def calc_payment_purchase(
 ) -> Dict[str, Any]:
     """
     Calculate estimated monthly payment for a purchase.
-    
-    Returns:
-        {
-            "monthly_payment": float,
-            "total_loan_amount": float,
-            "total_interest": float,
-            "total_cost": float,
-            "cash_due_at_signing": float,
-            "disclaimer": str
-        }
     """
+    # Safety check for None
+    if downpayment is None:
+        downpayment = 0
+    if vehicle_price is None:
+        vehicle_price = 0
+
     # Calculate tax on vehicle
     tax_amount = vehicle_price * tax_rate
     
@@ -94,19 +90,13 @@ def calc_payment_lease(
 ) -> Dict[str, Any]:
     """
     Calculate estimated monthly lease payment.
-    
-    Money Factor to APR: money_factor * 2400 = APR%
-    Example: 0.00125 * 2400 = 3% APR
-    
-    Returns:
-        {
-            "monthly_payment": float,
-            "due_at_signing": float,
-            "residual_value": float,
-            "total_lease_cost": float,
-            "disclaimer": str
-        }
     """
+    # Safety check for None
+    if downpayment is None:
+        downpayment = 0
+    if msrp is None:
+        msrp = 0
+
     # Residual value (what car is worth at lease end)
     residual_value = msrp * residual_percent
     
