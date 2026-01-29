@@ -95,12 +95,15 @@ Si el cliente no explica el motivo de compra, no se muestran cuotas y no se avan
 
 ## FASE 2 — PERFIL CREDITICIO (SIN DRAMA)
 
-Cuando el cliente dice: “620, primer carro, pasaporte”
+Cuando el cliente dice: “[SCORE], primer carro, pasaporte”
 
-El clon responde exactamente con lógica:
-“Tienes un crédito relativamente bueno. Con el pasaporte puedo ayudarte, así que no te preocupes por eso.
-Como primer comprador, el Corolla es la mejor opción para tu primer financiamiento. Es un carro que el banco aprueba fácil y te sirve para construir crédito.
-En 12 meses ya puedes tener mejor tasa o cambiar carro con mucha más confianza del banco.”
+El clon responde exactamente con lógica (EJEMPLO):
+“Tienes un crédito [BUENO/MALO]. Con el pasaporte puedo ayudarte...
+Como primer comprador, el Corolla es la mejor opción...”
+
+⚠️ CRÍTICO:
+- Si el cliente NO TE HA DADO EL SCORE: NO INVENTES UN NÚMERO. PÍDELO.
+- El ejemplo de arriba es solo un EJEMPLO de tono.
 
 ❌ NO preguntar:
 - cuánto gana
@@ -120,7 +123,7 @@ El clon DEBE cambiar recomendación sin miedo:
 
 Forma correcta de mostrar números:
 “Así te quedaría la cuota aproximada en lease…”
-(Inserta resultado real)
+(SI TIENES LOS NÚMEROS DE LA CALCULADORA, ÚSALOS AQUÍ. SI NO, NO LOS INVENTES).
 
 ## FASE 4 — CLIENTE CON 720 + CARRO FINANCIADO (ALERTA)
 
@@ -383,8 +386,20 @@ def _build_agent_prompt(clone, state: dict, mode: str, tool_context: str) -> str
         
     # Inject Tool Context (CRITICAL: High Priority injection)
     # Put it right after the mode instruction so the model sees "HERE ARE THE NUMBERS"
-    if tool_context and mode in ["OFFER", "STRATEGY"]:
-        parts.append(f"🔍 [DATOS REALES DE HERRAMIENTA DISPONIBLES]:\n{tool_context}")
+    if mode in ["OFFER", "STRATEGY"]:
+        if tool_context:
+            parts.append(f"🔍 [DATOS REALES DE HERRAMIENTA DISPONIBLES]:\n{tool_context}")
+        else:
+            # SAFETY FALLBACK: If we are in Strategy/Offer but have NO numbers, 
+            # we must WARN the model not to invent them.
+            parts.append("""
+⛔ ADVERTENCIA DE SISTEMA: FALLO DE CALCULADORA
+No se pudieron generar los escenarios de pago (faltan datos o score inválido).
+TU ACCIÓN OBLIGATORIA:
+- NO des números.
+- NO uses el placeholder [inserta resultado real].
+- Dile al cliente: "Para darte la cuota exacta necesito confirmar [DATO FALTANTE]".
+""")
         
     # Inject Trade-In Alert if applicable
     if state.get("has_trade_in"):
