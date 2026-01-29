@@ -436,9 +436,6 @@ def _determine_active_mode(state: dict) -> str:
     """
     
     # 1. DISCOVERY GATE
-    # Needs: Vehicle AND Usage AND info about financing history
-    # Relaxed slightly: If we know vehicle + usage, we can move to Qual
-    # and ask for financing history there if needed, but strict Discovery is better.
     if not state.get("vehicle_interest") or \
        not state.get("usage_type"):
         return "DISCOVERY"
@@ -449,20 +446,10 @@ def _determine_active_mode(state: dict) -> str:
         return "QUALIFICATION"
 
     # 3. STRATEGY GATE
-    # Needs: Strategy Accepted flag.
-    # CRITICAL FIX: If profile is solid (e.g. good score + purchase), 
-    # we can imply strategy acceptance to skip unnecessary friction.
-    # But for now, let's keep it safe.
-    
-    # Auto-accept strategy if user explicitly said "Purchase" and has good profile?
-    # No, adhere to user request: "No advances hasta que cliente ACEPTE".
-    # BUT, if we just got the Qual info, we MUST enter STRATEGY.
-    
     if not state.get("strategy_accepted"):
         return "STRATEGY"
 
     # 4. OFFER/APPOINTMENT LOGIC
-    # If appointment set -> Appointment
     if state.get("appointment_datetime"):
         return "APPOINTMENT"
     
@@ -495,6 +482,7 @@ DATOS DE CALCULADORA (Estos son los números FINALES para esta fase):
 - Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
 - Precio base: {fmt_usd(price)}
 - Inicial: {fmt_usd(downpayment)}
+- Tier: {scenarios['credit_tier'].get('tier', '?')}
 
 OPCIÓN COMPRA (RECOMENDADA):
 - Mensualidad: ${scenarios['purchase']['monthly_payment']}/mes
@@ -515,188 +503,6 @@ OPCIÓN COMPRA (RECOMENDADA):
 RECOMENDACIÓN RAY: {scenarios['recommendation']}
 
 INSTRUCCIÓN: Copia estos números en tu respuesta. No digas "basado en tu perfil". Di los números."""
-    
-    return context
-
-TRADE_IN_ALERT = """🔴 ALERTA TRADE-IN ACTIVADA
-
-⚠️ El cliente indicó que ya tiene un vehículo financiado.
-
-Asume posible upside down hasta que se demuestre lo contrario.
-
-Tu misión es:
-- Frenar ofertas agresivas
-- Explicar que primero hay que evaluar el vehículo actual
-- NO dar cuotas finales sin evaluar trade-in
-
-Prohibido:
-- Ignorar el trade
-- Agendar citas sin aclarar este punto"""
-
-
-# ============================================
-# MAIN AGENT FUNCTION
-# ============================================
-
-def process_message_with_agent(
-    db: Session,
-    clone,  # SalesClone model
-    client_id: str,
-    buyer_message: str,
-    conversation_history: Optional[List[dict]] = None
-) -> Dict[str, Any]:
-    """
-    Main entry point for the RAY agent.
-    Processes message through V3 LOGIC MODES.
-    """
-    
-    # Get or create conversation state
-    state = get_conversation_state(db, client_id)
-    if not state:
-        state = {
-            "mode": "DISCOVERY",
-            "status_color": "yellow",
-            # Profile Data
-            "vehicle_interest": None,
-            "usage_type": None,
-            "first_time_buyer": None,
-            "credit_score": None,
-            "doc_type": None,
-            "deal_intent": "unknown",
-            "strategy_accepted": False,
-            "has_trade_in": False,
-            "downpayment_available": 0
-        }
-        update_conversation_state(db, client_id, clone.user_id, **state)
-    
-    # Extract information from message
-    extracted = _extract_info_from_message(buyer_message, state)
-    
-    # Update state with extracted info
-    if extracted:
-        state.update(extracted)
-        update_conversation_state(db, client_id, clone.user_id, **extracted)
-    
-    # DETERMINE ACTIVE MODE (Cognitive Gating)
-    active_mode = _determine_active_mode(state)
-    state["mode"] = active_mode
-    update_conversation_state(db, client_id, clone.user_id, stage=active_mode)
-    
-    # Generate tool context IF in OFFER or STRATEGY (Phase 3 Support)
-    tool_context = ""
-    if active_mode in ["OFFER", "STRATEGY"]:
-        tool_context = _generate_offer_context(state)
-    
-    # Build the full prompt
-    system_prompt = _build_agent_prompt(clone, state, active_mode, tool_context)
-    
-    # Generate response
-    response = _call_openai(system_prompt, buyer_message, conversation_history)
-    
-    # Update status color based on mode
-    status_color = _get_status_color(state)
-    if status_color != state.get("status_color"):
-        update_conversation_state(db, client_id, clone.user_id, status_color=status_color)
-    
-    return {
-        "response": response,
-        "confidence": 0.90,
-        "stage": active_mode,
-        "status_color": status_color,
-        "state_update": state
-    }
-
-
-# ============================================
-# HELPER FUNCTIONS
-# ============================================
-
-def _determine_active_mode(state: dict) -> str:
-    """
-    Cognitive Gating Logic to determine the active mode.
-    Flow: DISCOVERY -> QUALIFICATION -> STRATEGY -> OFFER -> APPOINTMENT
-    """
-    
-    # 1. DISCOVERY GATE
-    # Needs: Vehicle AND Usage AND info about financing history
-    # Relaxed slightly: If we know vehicle + usage, we can move to Qual
-    # and ask for financing history there if needed, but strict Discovery is better.
-    if not state.get("vehicle_interest") or \
-       not state.get("usage_type"):
-        return "DISCOVERY"
-
-    # 2. QUALIFICATION GATE
-    # Needs: Credit Score AND Doc Type
-    if not state.get("credit_score") or not state.get("doc_type"):
-        return "QUALIFICATION"
-
-    # 3. STRATEGY GATE
-    # Needs: Strategy Accepted flag.
-    # CRITICAL FIX: If profile is solid (e.g. good score + purchase), 
-    # we can imply strategy acceptance to skip unnecessary friction.
-    # But for now, let's keep it safe.
-    
-    # Auto-accept strategy if user explicitly said "Purchase" and has good profile?
-    # No, adhere to user request: "No advances hasta que cliente ACEPTE".
-    # BUT, if we just got the Qual info, we MUST enter STRATEGY.
-    
-    if not state.get("strategy_accepted"):
-        return "STRATEGY"
-
-    # 4. OFFER/APPOINTMENT LOGIC
-    # If appointment set -> Appointment
-    if state.get("appointment_datetime"):
-        return "APPOINTMENT"
-    
-    # Default to OFFER (Tools Enabled)
-    return "OFFER"
-
-
-def _generate_offer_context(state: dict) -> str:
-    """Generate tool-based context for offer building."""
-    
-    vehicle = state.get("vehicle_interest", {})
-    price = vehicle.get("price_est", 30000)
-    downpayment = state.get("downpayment_available", 1000)
-    credit_score = state.get("credit_score")
-    is_first_buyer = state.get("first_time_buyer", False)
-    
-    scenarios = generate_payment_scenarios(
-        vehicle_price=price,
-        credit_score=credit_score,
-        is_first_buyer=is_first_buyer,
-        downpayment=downpayment
-    )
-    
-    # Safe format helper
-    def fmt_usd(val):
-        return f"${val:,}" if val is not None else "N/A"
-
-    context = f"""
-DATOS DE CALCULADORA (USAR ESTOS NÚMEROS):
-- Vehículo: {vehicle.get('model', 'N/A')} {vehicle.get('year', '')}
-- Precio base: {fmt_usd(price)}
-- Inicial disponible: {fmt_usd(downpayment)}
-- Tier crediticio: {scenarios['credit_tier'].get('tier', 'Unknown')} ({scenarios['credit_tier'].get('description', '')})
-
-ESCENARIO COMPRA:
-- Pago mensual: ${scenarios['purchase']['monthly_payment']}/mes x {scenarios['purchase']['term_months']} meses
-- APR estimado: {scenarios['purchase']['apr']*100:.1f}%
-- Cash due at signing: ${scenarios['purchase']['cash_due_at_signing']}
-
-"""
-    
-    if scenarios.get("lease"):
-        context += f"""ESCENARIO LEASE:
-- Pago mensual: ${scenarios['lease']['monthly_payment']}/mes x {scenarios['lease']['term_months']} meses
-- Due at signing: ${scenarios['lease']['due_at_signing']}
-- 12,000 millas/año
-
-"""
-    
-    context += f"""RECOMENDACIÓN RAY: {scenarios['recommendation']}
-
-USA ESTOS NÚMEROS EXACTOS. No inventes otros."""
     
     return context
 
@@ -725,21 +531,18 @@ def _extract_info_from_message(message: str, current_state: dict) -> dict:
             extracted["vehicle_interest"] = info
             break
             
-    # Usage Type (New V3 field)
+    # Usage Type
     if any(w in msg_lower for w in ["uber", "lyft", "rideshare", "taxi"]):
         extracted["usage_type"] = "Rideshare/Uber"
     elif any(w in msg_lower for w in ["trabajo", "work", "construcion", "chamba"]):
         extracted["usage_type"] = "Trabajo"
     elif any(w in msg_lower for w in ["familia", "hijos", "esposa", "personal", "diario"]):
         extracted["usage_type"] = "Personal/Familia"
-    # Basic fallback if explicit usage mentioned but not categorized
     elif "para " in msg_lower:
-        # Simple heuristic, assumes user might be saying "para mi hija" etc.
-        # Can be refined.
         pass
 
-    # Doc Type (New V3 field)
-    if "ssn" in msg_lower or "social" in msg_lower or "seguro social" in msg_lower:
+    # Doc Type
+    if "ssn" in msg_lower or "social" in msg_lower or "seguro" in msg_lower:
         extracted["doc_type"] = "SSN"
     elif "itin" in msg_lower or "tax id" in msg_lower:
         extracted["doc_type"] = "ITIN"
@@ -751,10 +554,9 @@ def _extract_info_from_message(message: str, current_state: dict) -> dict:
         extracted["has_trade_in"] = True
 
     # Strategy Acceptance
-    # Phrases indicating agreement to proposal
     if current_state.get("mode") == "STRATEGY":
         agreement_phrases = ["esta bien", "me parece", "dale", "ok", "vamos con", "hagamos", "esta bien"]
-        if any(w in msg_lower for w in agreement_phrases) and not "no" in msg_lower[:3]: # weak check
+        if any(w in msg_lower for w in agreement_phrases) and not "no" in msg_lower[:3]:
              extracted["strategy_accepted"] = True
         if "compra" in msg_lower:
              extracted["deal_intent"] = "purchase"
@@ -763,100 +565,25 @@ def _extract_info_from_message(message: str, current_state: dict) -> dict:
              extracted["deal_intent"] = "lease"
              extracted["strategy_accepted"] = True
 
-    # Year extraction
-    import re
-    year_match = re.search(r'20(2[4-9]|[3-9]\d)', message)
-    if year_match and "vehicle_interest" in extracted:
-        extracted["vehicle_interest"]["year"] = int(year_match.group())
-    
-    # First time buyer
-    first_buyer_phrases = ["primer carro", "primera vez", "primer financ", "nunca he", "first time", "first car"]
-    if any(phrase in msg_lower for phrase in first_buyer_phrases):
-        extracted["first_time_buyer"] = True
-    
-    has_credit_phrases = ["ya tengo credito", "ya he tenido", "tengo tarjetas", "have credit"]
-    if any(phrase in msg_lower for phrase in has_credit_phrases):
-        extracted["first_time_buyer"] = False
-    
     # Credit score extraction
+    import re
     score_match = re.search(r'\b(5[5-9]\d|6\d{2}|7\d{2}|8\d{2})\b', message)
     if score_match:
         extracted["credit_score"] = int(score_match.group())
-    
-    # Score range mentions
-    if "750" in message or "excelente" in msg_lower:
-        extracted["credit_score"] = 750
-    elif "720" in message:
-        extracted["credit_score"] = 720
-    elif "680" in message or "bueno" in msg_lower:
-        extracted["credit_score"] = 680
-    elif "620" in message or "bajo" in msg_lower or "mal credito" in msg_lower:
-        extracted["credit_score"] = 620
-    
-    # Simple deal intent (if mentioned early)
-    if "compra" in msg_lower:
-        extracted["deal_intent"] = "purchase"
-    elif "lease" in msg_lower:
-        extracted["deal_intent"] = "lease"
-    
-    # Downpayment mentions
+    if "620" in message: extracted["credit_score"] = 620 # Explicit for robustness
+
+    # Downpayment extraction
     down_match = re.search(r'\$?([\d,]+)\s*(dolares|dollars|de inicial|down|entrada)', msg_lower)
     if down_match:
         amount = int(down_match.group(1).replace(",", ""))
         extracted["downpayment_available"] = amount
     
-    # Timeline
-    if any(w in msg_lower for w in ["hoy", "ahora", "ya", "today", "now"]):
-        extracted["buying_timeline"] = "now"
-    elif any(w in msg_lower for w in ["semana", "week", "pronto"]):
-        extracted["buying_timeline"] = "this_week"
-    elif any(w in msg_lower for w in ["explor", "viendo", "looking"]):
-        extracted["buying_timeline"] = "exploring"
-    
+    # First time buyer
+    first_buyer_phrases = ["primer carro", "primera vez", "primer financ", "nunca he", "first time", "first car"]
+    if any(phrase in msg_lower for phrase in first_buyer_phrases):
+        extracted["first_time_buyer"] = True
+
     return extracted
-
-
-def _build_agent_prompt(clone, state: dict, mode: str, tool_context: str) -> str:
-    """Build full system prompt using V3 LOGIC MODES."""
-    
-    parts = [RAY_BASE_PROMPT]
-    
-    # Inject Active Mode Prompt
-    if mode in LOGIC_MODES:
-        parts.append(LOGIC_MODES[mode])
-        
-    # Inject Tool Context (CRITICAL: High Priority injection)
-    # Put it right after the mode instruction so the model sees "HERE ARE THE NUMBERS"
-    if tool_context and mode == "OFFER":
-        parts.append(f"🔍 [DATOS REALES DE HERRAMIENTA DISPONIBLES]:\n{tool_context}")
-        
-    # Inject Trade-In Alert if applicable
-    if state.get("has_trade_in"):
-        parts.append(TRADE_IN_ALERT)
-    
-    # State Context
-    def fmt_down(s):
-        val = s.get('downpayment_available')
-        return f"${val:,}" if val is not None else "$0"
-
-    state_context = f"""
-DATOS DEL CLIENTE (SISTEMA):
-- Vehículo: {state.get('vehicle_interest', {}).get('model', 'N/A')}
-- Uso: {state.get('usage_type', 'N/A')}
-- Primer Comprador: {state.get('first_time_buyer', 'N/A')}
-- Score: {state.get('credit_score', 'N/A')}
-- Documento: {state.get('doc_type', 'N/A')}
-- Estrategia Aceptada: {state.get('strategy_accepted', False)}
-- Trade-In: {state.get('has_trade_in', False)}
-- Inicial: {fmt_down(state)}
-"""
-    parts.append(state_context)
-    
-    # User Personality
-    if clone.personality:
-        parts.append(f"\nPERSONALIZACIÓN ADICIONAL:\n{clone.personality}")
-    
-    return "\n\n---\n\n".join(parts)
 
 
 def _call_openai(system_prompt: str, user_message: str, history: Optional[List[dict]]) -> str:
@@ -897,4 +624,14 @@ def _get_status_color(state: dict) -> str:
     mode = state.get("mode", "DISCOVERY")
     if mode == "APPOINTMENT" or state.get("appointment_datetime"):
         return "green"
-    return "yellow"
+    elif mode in ["OFFER", "STRATEGY"]:
+        return "blue"
+    elif mode == "QUALIFICATION":
+        return "yellow"
+    return "gray"
+
+
+
+# ============================================
+# END OF FILE
+# ============================================
