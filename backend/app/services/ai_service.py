@@ -94,55 +94,214 @@ Responde SOLO con el JSON, sin explicaciones adicionales.
         return ExtractedClientData()
 
 
+from app.services.calculator import CalculatorService
+from app.services.calendar_integration import CalendarService
+import json
+
+RAY_SYSTEM_PROMPT = """Eres RAY, vendedor senior de Toyota.
+No eres un bot conversacional.
+Eres un cierre asistido por herramientas reales.
+
+Tu objetivo es cerrar ventas bien estructuradas, no vender por impulso.
+
+🔒 IDENTIDAD Y TONO
+Directo
+Claro
+Sin frases robóticas
+Sin formalidades innecesarias
+Sin empatía falsa
+Lideras la conversación
+
+PROHIBIDO decir:
+"Gracias por compartir"
+"Genial"
+"Excelente elección"
+"Déjame revisar"
+"La calculadora de Toyota"
+"Sistema / plataforma"
+"Agenda una cita" sin números
+
+🧠 REGLAS DE ORO
+Nunca inventes datos.
+Nunca asumas información no dicha.
+Nunca des números sin usar la Calculadora AutoAI.
+Nunca agendes sin:
+Perfil completo
+Números dados
+
+Si falta información → preguntas claras y puntuales.
+Si no es viable → dilo con respeto y firmeza.
+
+🔧 USO DE HERRAMIENTAS (OBLIGATORIO)
+
+Calculadora AutoAI (calculate_payment):
+SOLO se usa cuando:
+Ya sabes el modelo
+Ya sabes si es compra o lease (o ambos para comparar)
+Ya conoces el score aproximado
+Down payment (si no dice, asume $2000 o pregunta)
+Los números que das deben salir de esta herramienta.
+Está prohibido estimar "a ojo".
+
+Calendario AutoAI (check_calendar):
+SOLO se consulta después de dar números y que el cliente valide interés.
+SOLO se ofrecen horarios disponibles.
+Máximo 2 opciones por mensaje.
+
+🧠 FLUJO MENTAL OBLIGATORIO
+FASE 1 – PERFIL
+Preguntas necesarias:
+¿Qué carro buscas?
+¿Para qué lo vas a usar?
+¿Es tu primer carro o ya has financiado?
+¿Qué documento tienes?
+¿Tu score está más cerca de 600, 650 o 700+?
+⛔ No hables de precios ni citas aquí.
+
+FASE 2 – ESTRATEGIA
+Decides según perfil:
+Uber → Compra
+Pocas millas → Lease
+Primer carro → Conservador
+Carro financiado → Alerta payoff
+Hablas claro:
+"La idea no es venderte algo de lo que te arrepientas mañana."
+
+FASE 3 – NÚMEROS
+Llamas a Calculadora AutoAI
+Usas el modelo exacto solicitado
+Das:
+Pago mensual estimado
+Due at signing estimado
+APR aproximado
+Aclaras que es un aproximado realista
+
+FASE 4 – CITA
+Explicas que la cita es para:
+Manejar el carro
+Ver números finales
+Tomar decisión
+Consultas Calendario AutoAI
+Ofreces 1–2 horarios reales
+
+🧠 FILOSOFÍA RAY
+Prefieres:
+Perder una venta
+Antes que meter a alguien en un mal negocio
+Tu meta:
+Que el cliente esté cómodo
+Que vuelva en el futuro
+Construir relación, no presión
+"""
+
+RAY_TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_payment",
+            "description": "Calculates monthly payment for Lease or Finance. Use this BEFORE giving any price.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_name": {"type": "string", "description": "Car model (e.g., 'Corolla', 'RAV4')"},
+                    "plan_type": {"type": "string", "enum": ["lease", "finance"], "description": "Type of deal"},
+                    "credit_score": {"type": "integer", "description": "Client's FICO score"},
+                    "down_payment": {"type": "number", "description": "Down payment amount in USD"}
+                },
+                "required": ["model_name", "plan_type", "credit_score", "down_payment"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "check_calendar",
+            "description": "Checks available appointment slots. Use this ONLY after giving numbers.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    }
+]
+
 def generate_smart_reply(message_content: str, client_name: str = None, context: str = None) -> str:
     """
-    Generate a suggested reply to a client message.
-    
-    Args:
-        message_content: The message to reply to
-        client_name: Optional client name for personalization
-        context: Optional additional context
-        
-    Returns:
-        Suggested reply text
+    Generate a suggested reply using Ray's persona and tools.
     """
     if not os.getenv("OPENAI_API_KEY"):
         return ""
     
     client = OpenAI()
     
-    name_str = f"El cliente se llama {client_name}." if client_name else ""
-    context_str = f"Contexto adicional: {context}" if context else ""
+    # Context setup
+    inputs = f"Cliente: {client_name or 'Desconocido'}\nContexto: {context}\nÚltimo mensaje: {message_content}"
     
-    prompt = f"""Como vendedor experto, genera la MEJOR respuesta para cerrar la venta o avanzar el trato.
-{name_str}
-{context_str}
-
-MENSAJE DEL CLIENTE:
-"{message_content}"
-
-REGLAS DE ORO:
-1. MAXIMO 2 oraciones. Sé conciso. La gente no lee textos largos.
-2. Usa un tono cálido pero con autoridad.
-3. Termina siempre con una pregunta o llamada a la acción clara.
-4. No uses saludos genéricos como "Espero que estés bien". Ve al grano amablemente.
-5. Español neutro y natural.
-
-Responde SOLO con el texto de la respuesta.
-"""
-
+    messages = [
+        {"role": "system", "content": RAY_SYSTEM_PROMPT},
+        {"role": "user", "content": inputs}
+    ]
+    
     try:
-        completion = client.chat.completions.create(
+        # First call: Check if tools are needed
+        response = client.chat.completions.create(
             model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "Eres un vendedor experto de alto nivel. Tu objetivo es cerrar ventas. Eres carismático, breve y persuasivo."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=150
+            messages=messages,
+            tools=RAY_TOOLS,
+            tool_choice="auto",
+            temperature=0.3 # Low temp for strict adherence
         )
         
-        return completion.choices[0].message.content.strip()
+        response_message = response.choices[0].message
+        
+        # If tool requested
+        if response_message.tool_calls:
+            # Append method to history
+            messages.append(response_message)
+            
+            for tool_call in response_message.tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
+                
+                tool_output = "Error en herramienta"
+                
+                if function_name == "calculate_payment":
+                    # Map args to service
+                    if function_args.get("plan_type") == "lease":
+                        res = CalculatorService.calculate_lease(
+                            function_args.get("model_name"),
+                            function_args.get("credit_score"),
+                            function_args.get("down_payment")
+                        )
+                    else: # finance
+                        res = CalculatorService.calculate_finance(
+                            function_args.get("model_name"),
+                            function_args.get("credit_score"),
+                            function_args.get("down_payment")
+                        )
+                    tool_output = json.dumps(res)
+                    
+                elif function_name == "check_calendar":
+                    tool_output = CalendarService.check_calendar()
+                
+                # Append tool result
+                messages.append({
+                    "tool_call_id": tool_call.id,
+                    "role": "tool",
+                    "name": function_name,
+                    "content": tool_output,
+                })
+            
+            # Second call: Get final answer with tool data
+            final_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=messages,
+                temperature=0.7 # Slight creativity for phrasing
+            )
+            return final_response.choices[0].message.content.strip()
+            
+        return response_message.content.strip()
         
     except Exception as e:
         print(f"[AI] Error generating reply: {e}")
