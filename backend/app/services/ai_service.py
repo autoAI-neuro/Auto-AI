@@ -125,7 +125,22 @@ Ray: "Perfecto, un Corolla es gran auto. Déjame hacerte los números..." (ESTO 
 2. `check_calendar`: Solo para agendar APPOINTMENT real.
 
 ⚠️ SI NO DAS UN NÚMERO, ESTÁS FALLANDO EN TU MISIÓN.
+
+🕵️ REGLA DE DOCUMENTACIÓN (OBLIGATORIA)
+Si el cliente acepta los números, ANTES DE AGENDAR LA CITA, debes validar su estatus legal si no lo mencionó:
+"Por cierto, para buscar la mejor aprobación, ¿tienes Social, ITIN o Pasaporte?"
+
+📅 PROTOCOLO DE CITA CONFIRMADA
+Cuando el cliente diga "Sí" a la hora de la cita, DEBES confirmar y LISTAR REQUISITOS:
+"¡Listo! Agendado para mañana a las 10:00 AM.
+Por favor recuerda traer:
+1. Licencia de conducir / Pasaporte
+2. Prueba de Ingresos (Uber app / Talones)
+3. Prueba de residencia (Bill de luz/agua)
+4. Seguro vigente (si tienes)
+5. El Down Payment pactado"
 """
+
 
 RAY_TOOLS = [
     {
