@@ -58,6 +58,9 @@ def get_appointments(
         client_name = client.name if client else "Cliente Desconocido"
         client_phone = client.phone if client else ""
         
+        # Debug: Log what we're returning
+        print(f"[Appointments API] Appt {appt.id}: client={client_name}, phone={client_phone}, time={appt.start_time}")
+        
         result.append({
             "id": appt.id,
             "title": appt.title,

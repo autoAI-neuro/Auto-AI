@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from app.models import Appointment, Client, get_uuid
 from sqlalchemy.orm import Session
 import re
+import pytz
 
 class CalendarService:
     
@@ -25,16 +26,33 @@ class CalendarService:
         """
         Parse various date formats that OpenAI might send.
         Handles: ISO 8601, natural language ("tomorrow 10am"), etc.
+        All times are interpreted as Florida time (America/New_York).
         """
         print(f"[CalendarService] Parsing date string: '{date_str}'")
         
+        florida_tz = pytz.timezone('America/New_York')
+        
+        # Helper to localize naive datetime to Florida
+        def localize_to_florida(dt):
+            if dt.tzinfo is None:
+                return florida_tz.localize(dt)
+            return dt.astimezone(florida_tz)
+        
         # 1. Try standard ISO format first
         try:
-            return datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+            # If it already has timezone info, convert to Florida
+            if parsed.tzinfo:
+                result = parsed.astimezone(florida_tz)
+            else:
+                # Assume it's Florida time
+                result = florida_tz.localize(parsed)
+            print(f"[CalendarService] ISO parsed as Florida time: {result}")
+            return result
         except ValueError:
             pass
         
-        # 2. Try common patterns
+        # 2. Try common patterns (these are assumed to be Florida time)
         patterns = [
             "%Y-%m-%dT%H:%M:%S",
             "%Y-%m-%d %H:%M:%S",
@@ -45,21 +63,30 @@ class CalendarService:
         ]
         for pattern in patterns:
             try:
-                return datetime.strptime(date_str, pattern)
+                parsed = datetime.strptime(date_str, pattern)
+                result = florida_tz.localize(parsed)
+                print(f"[CalendarService] Pattern '{pattern}' parsed as Florida time: {result}")
+                return result
             except ValueError:
                 continue
         
         # 3. Handle relative dates (tomorrow, next monday, etc.)
-        now = datetime.now()
+        # Use Florida time as reference
+        now = datetime.now(florida_tz)
         lower_str = date_str.lower()
         
         # Extract time if present (e.g., "10:00", "10am", "2pm")
         time_match = re.search(r'(\d{1,2}):?(\d{2})?\s*(am|pm)?', lower_str, re.IGNORECASE)
         hour = 10  # Default to 10 AM
+        minute = 0
         if time_match:
             hour = int(time_match.group(1))
+            if time_match.group(2):
+                minute = int(time_match.group(2))
             if time_match.group(3) and time_match.group(3).lower() == 'pm' and hour < 12:
                 hour += 12
+            elif time_match.group(3) and time_match.group(3).lower() == 'am' and hour == 12:
+                hour = 0
         
         # Parse relative date
         if "mañana" in lower_str or "tomorrow" in lower_str:
@@ -89,8 +116,8 @@ class CalendarService:
             # Default to tomorrow if we can't parse
             target = now + timedelta(days=1)
         
-        result = target.replace(hour=hour, minute=0, second=0, microsecond=0)
-        print(f"[CalendarService] Parsed relative date: {result}")
+        result = target.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        print(f"[CalendarService] Parsed relative date as Florida time: {result}")
         return result
 
     @staticmethod
