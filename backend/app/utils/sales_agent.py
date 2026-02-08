@@ -252,13 +252,32 @@ def _call_openai_with_tools(system_prompt: str, user_message: str, history: Opti
     
     messages.append({"role": "user", "content": user_message})
     
+    # === APPOINTMENT KEYWORD DETECTION ===
+    # If user mentions appointment-related words, FORCE the tool
+    appointment_keywords = [
+        "cita", "agendar", "agéndame", "agendame", "agenda", "appointment",
+        "mañana", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo",
+        "10am", "10:00", "11am", "2pm", "3pm", "4pm", "5pm",
+        "a las", "para el", "para mañana", "nos vemos"
+    ]
+    
+    user_msg_lower = user_message.lower()
+    should_force_appointment = any(kw in user_msg_lower for kw in appointment_keywords)
+    
+    # Determine tool_choice
+    if should_force_appointment:
+        print(f"[SalesAgent] 🎯 Appointment keywords detected! Forcing schedule_appointment tool.")
+        tool_choice_param = {"type": "function", "function": {"name": "schedule_appointment"}}
+    else:
+        tool_choice_param = "auto"
+    
     try:
-        # First call force tool use auto
+        # First call with dynamic tool choice
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=messages,
             tools=RAY_TOOLS,
-            tool_choice="auto",
+            tool_choice=tool_choice_param,
             temperature=0.3
         )
         
