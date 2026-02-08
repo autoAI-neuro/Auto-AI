@@ -128,21 +128,38 @@ class CalendarService:
         client_name: If provided and client is a "Lead", updates the client record
         """
         try:
-            # If client_name provided, update the client record
-            if client_name:
-                client = db.query(Client).filter(Client.id == client_id).first()
-                if client and (client.name.startswith("Lead") or client.name.startswith("lead")):
-                    old_name = client.name
-                    client.name = client_name
-                    db.commit()
-                    print(f"[CalendarService] 📝 Updated client name: '{old_name}' → '{client_name}'")
-            
-            # Parse start_time with flexible parser
+            # Parse start_time with flexible parser first (needed for duplication check)
             if isinstance(start_time, str):
                 start_dt = CalendarService.parse_flexible_datetime(start_time)
             else:
                 start_dt = start_time
                 
+            # 1. Check for DUPLICATES (Same client, same time)
+            existing_appt = db.query(Appointment).filter(
+                Appointment.client_id == client_id,
+                Appointment.start_time == start_dt
+            ).first()
+            
+            if existing_appt:
+                print(f"[CalendarService] ⚠️ Duplicate appointment detected for client {client_id} at {start_dt}. Returning existing.")
+                return existing_appt
+
+            # 2. If client_name provided, update valid client record
+            if client_name:
+                # Validation: Ignore garbage names
+                invalid_names = ["me", "yo", "myself", "cliente", "lead", "usuario", "hola", "si", "no", "ok", "auto", "carro"]
+                
+                if len(client_name) > 2 and client_name.lower().strip() not in invalid_names:
+                    client = db.query(Client).filter(Client.id == client_id).first()
+                    # Update if generic "Lead", new client, or has an INVALID name (like "me")
+                    current_name_lower = client.name.lower() if client else ""
+                    if client and (current_name_lower.startswith("lead") or client.name == "Cliente Nuevo" or current_name_lower in invalid_names or len(client.name) < 3):
+                        old_name = client.name
+                        client.name = client_name
+                        db.commit()
+                        print(f"[CalendarService] 📝 Updated client name: '{old_name}' → '{client_name}'")
+                else:
+                    print(f"[CalendarService] ⚠️ Ignored invalid name update: '{client_name}'")
             # Assume 1 hour duration
             end_dt = start_dt + timedelta(hours=1)
             
