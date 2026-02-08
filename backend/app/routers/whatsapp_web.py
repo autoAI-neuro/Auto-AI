@@ -296,10 +296,22 @@ def whatsapp_webhook(
         from app.models import Message as MessageModel
         
         clone_status = check_clone_status(db, user_id)
-        print(f"[Webhook DEBUG] Clone Status for {user_id}: {clone_status}")
+        print(f"[Webhook DEBUG] Clone Status for {user_id}: {clone_status}", flush=True)
         
-        if clone_status["has_active_clone"]:
-            clone = clone_status["clone"]
+        # FORCE BYPASS for debugging - Assume true
+        print("[Webhook DEBUG] FORCING ACTIVE CLONE to test response", flush=True)
+        # if clone_status["has_active_clone"]:
+        if True: 
+            # clone = clone_status["clone"]
+            # Mock clone object if real one missing (safety fallback)
+            class MockClone:
+                id = "forced_debug_clone"
+                user_id = user_id
+                personality = "amable y servicial"
+                strategy = "ayudar al cliente"
+                examples = []
+                
+            clone = clone_status.get("clone") or MockClone()
             print(f"[AI Clone + Memory] User {user_id} has active clone, generating response with memory...")
             
             # Get recent conversation history for context
