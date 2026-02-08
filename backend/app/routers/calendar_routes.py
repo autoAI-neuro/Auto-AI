@@ -46,7 +46,7 @@ def get_appointments(
     result = []
     for appt in appointments:
         client = db.query(Client).filter(Client.id == appt.client_id).first()
-        client_name = f"{client.first_name} {client.last_name}" if client else "Cliente Desconocido"
+        client_name = client.name if client else "Cliente Desconocido"
         
         result.append({
             "id": appt.id,
@@ -81,7 +81,7 @@ def create_appointment(
     db.refresh(new_appt)
     
     client = db.query(Client).filter(Client.id == appt.client_id).first()
-    client_name = f"{client.first_name} {client.last_name}" if client else "Cliente"
+    client_name = client.name if client else "Cliente"
     
     return {
         "id": new_appt.id,
