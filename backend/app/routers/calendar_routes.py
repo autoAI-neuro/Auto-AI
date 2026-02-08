@@ -33,6 +33,14 @@ def get_appointments(
     db: Session = Depends(get_db)
 ):
     """Get appointments for the calendar view"""
+    print(f"[Appointments API] Fetching for user_id: {current_user.id}")
+    
+    # Debug: Check ALL appointments in DB first
+    all_appts = db.query(Appointment).all()
+    print(f"[Appointments API] Total appointments in DB: {len(all_appts)}")
+    for a in all_appts[:5]:  # Show first 5
+        print(f"  - ID: {a.id}, user_id: {a.user_id}, client_id: {a.client_id}, time: {a.start_time}")
+    
     query = db.query(Appointment).filter(Appointment.user_id == current_user.id)
     
     if start_date:
@@ -41,6 +49,7 @@ def get_appointments(
         query = query.filter(Appointment.start_time <= end_date)
         
     appointments = query.all()
+    print(f"[Appointments API] Found {len(appointments)} for current user")
     
     # Enrich with client names
     result = []
