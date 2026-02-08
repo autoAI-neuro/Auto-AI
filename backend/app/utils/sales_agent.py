@@ -125,12 +125,13 @@ RAY_TOOLS = [
         "type": "function",
         "function": {
             "name": "schedule_appointment",
-            "description": "Schedule a confirmed appointment.",
+            "description": "Schedule a confirmed appointment. IMPORTANT: Include the client's name if they provided it.",
             "parameters": {
                 "type": "object",
                 "properties": {
                     "datetime_iso": {"type": "string", "description": "ISO 8601 datetime (e.g. 2026-02-08T10:00:00)"},
-                    "notes": {"type": "string", "description": "Any special notes or requirements (documents to bring)"}
+                    "notes": {"type": "string", "description": "Any special notes or requirements (documents to bring)"},
+                    "client_name": {"type": "string", "description": "Client's full name (first + last) if provided during conversation"}
                 },
                 "required": ["datetime_iso"]
             }
@@ -338,6 +339,7 @@ def _call_openai_with_tools(
                     # Call Calendar Service to create appointment
                     dt_iso = func_args.get("datetime_iso")
                     notes = func_args.get("notes", "")
+                    client_name = func_args.get("client_name")  # Name provided by client
                     
                     try:
                         # Correct import from the new service location
@@ -348,7 +350,8 @@ def _call_openai_with_tools(
                             client_id=client_id,
                             user_id=user_id,
                             start_time=dt_iso,
-                            notes=notes
+                            notes=notes,
+                            client_name=client_name  # Pass to update client profile
                         )
                         # Format success output
                         tool_output = json.dumps({

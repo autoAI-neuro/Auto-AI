@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from app.models import Appointment, get_uuid
+from app.models import Appointment, Client, get_uuid
 from sqlalchemy.orm import Session
 import re
 
@@ -94,12 +94,22 @@ class CalendarService:
         return result
 
     @staticmethod
-    def create_appointment(db: Session, client_id: str, user_id: str, start_time: str, notes: str = ""):
+    def create_appointment(db: Session, client_id: str, user_id: str, start_time: str, notes: str = "", client_name: str = None):
         """
         Create a real appointment in the database.
         start_time: ISO format string, datetime object, or natural language
+        client_name: If provided and client is a "Lead", updates the client record
         """
         try:
+            # If client_name provided, update the client record
+            if client_name:
+                client = db.query(Client).filter(Client.id == client_id).first()
+                if client and (client.name.startswith("Lead") or client.name.startswith("lead")):
+                    old_name = client.name
+                    client.name = client_name
+                    db.commit()
+                    print(f"[CalendarService] 📝 Updated client name: '{old_name}' → '{client_name}'")
+            
             # Parse start_time with flexible parser
             if isinstance(start_time, str):
                 start_dt = CalendarService.parse_flexible_datetime(start_time)
