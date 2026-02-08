@@ -180,7 +180,7 @@ const CalendarView = ({ onQuickSend }) => {
             }
         });
         return list;
-    }, [calendarClients, currentDate]);
+    }, [calendarClients, currentDate, appointments]); // FIXED: Added appointments to dependencies!
 
     const handleEventClick = (event) => {
         // Prepare template
