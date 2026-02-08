@@ -24,6 +24,8 @@ class AppointmentResponse(BaseModel):
     end: datetime
     status: str
     client_name: str
+    client_phone: Optional[str] = ""
+    notes: Optional[str] = ""
 
 @router.get("/", response_model=List[AppointmentResponse])
 def get_appointments(
