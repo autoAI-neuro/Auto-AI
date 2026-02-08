@@ -46,6 +46,7 @@ app.include_router(inventory.router)
 app.include_router(email.router)
 app.include_router(sales_clone.router)
 app.include_router(memory.router)
+app.include_router(calendar_routes.router)
 
 @app.get("/health")
 async def health():
