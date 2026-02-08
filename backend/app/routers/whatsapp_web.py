@@ -24,6 +24,45 @@ def debug_connectivity():
     """Debug endpoint to test connectivity from within the server process"""
     results = {}
     
+# Send WhatsApp Message Helper
+def send_whatsapp_message_sync(user_id: str, phone_number: str, message: str, client_id: str = None):
+    """
+    Synchronous helper to send WhatsApp message via Node.js service.
+    Using requests library for simplicity in this context.
+    """
+    try:
+        # Construct payload
+        payload = {
+            "userId": user_id,
+            "phoneNumber": phone_number,
+            "message": message
+        }
+        
+        print(f"[Backend] Sending WhatsApp message to {phone_number} via {WHATSAPP_SERVICE_URL}")
+        
+        # Call Node.js service
+        resp = requests.post(
+            f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send",
+            json=payload,
+            timeout=10
+        )
+        
+        if resp.status_code == 200:
+            print(f"[Backend] Message sent successfully: {resp.json()}")
+            return resp.json()
+        else:
+            print(f"[Backend] Failed to send message. Status: {resp.status_code}, Response: {resp.text}")
+            raise Exception(f"WhatsApp Service Error: {resp.text}")
+            
+    except Exception as e:
+        print(f"[Backend] Error sending message: {str(e)}")
+        raise e
+
+@router.get("/debug-connectivity")
+def debug_connectivity():
+    """Debug endpoint to test connectivity from within the server process"""
+    results = {}
+    
     # 1. Test TCP Trace
     try:
         host = "127.0.0.1"
@@ -535,13 +574,6 @@ def send_bulk_messages(
         "message": f"Sending to {len(target_phones)} recipients in background",
         "count": len(target_phones)
     }
-
-
-class SendMediaRequest(BaseModel):
-    phone_number: str
-    media_url: str
-    media_type: str  # image, video, audio, document
-    caption: str = ""
 
 @router.post("/send-media")
 def send_whatsapp_media(
