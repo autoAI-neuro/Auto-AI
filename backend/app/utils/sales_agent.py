@@ -89,6 +89,14 @@ Por favor recuerda traer:
 
 INSTRUCCIONES EXTRA DE CONTEXTO:
 A continuación verás el estado actual del cliente. ÚSALO para no preguntar lo que ya sabes.
+
+🚨 REGLA DE EXTRACCIÓN DE NOMBRE (CRÍTICA) 🚨
+Si el usuario dice "Me llamo Pedro Pérez", "Soy Pedro", "Mi nombre es Pedro":
+- EXTRAE: "Pedro Pérez"
+- NO EXTRAER: "Cliente", "me", "yo", "usuario", "Lead".
+- Si la tool `schedule_appointment` pide `client_name`, PASA EL NOMBRE REAL.
+- NUNCA PASES "Cliente" o "Lead" como nombre en la tool. Si no sabes el nombre real, PREGÚNTALO: "¿Con quién tengo el gusto?"
+
 """
 
 RAY_TOOLS = [

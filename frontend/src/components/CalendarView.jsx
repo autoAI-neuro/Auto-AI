@@ -242,6 +242,7 @@ const CalendarView = ({ onQuickSend }) => {
 
     // Send confirmation message for an appointment
     const handleSendConfirmation = async (event) => {
+        console.log("🖱️ handleSendConfirmation EVENT:", event); // DEBUG
         const clientName = event.client?.name?.split(' ')[0] || 'Cliente';
         const time = event.time || '10:00 AM';
         const message = templates['appointment']
