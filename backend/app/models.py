@@ -283,3 +283,85 @@ CONVERSATION_STAGES = [
     "APPOINTMENT",      # 5 - Schedule visit
     "WRAP"              # 6 - Confirmation + follow-up
 ]
+
+
+# ============================================
+# CLIENT MEMORY - Memory System for Ray V2.0
+# ============================================
+
+class ClientMemory(Base):
+    """
+    Memoria persistente para cada cliente - usada por Ray.
+    Almacena preferencias, objeciones, historial de ofertas y contexto personal.
+    """
+    __tablename__ = "client_memories"
+    
+    id = Column(String, primary_key=True, default=get_uuid)
+    client_id = Column(String, ForeignKey("clients.id", ondelete="CASCADE"), unique=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    
+    # === PREFERENCIAS DE VEHÍCULO ===
+    vehicles_interested = Column(JSON, nullable=True)    # [{model, trim, color, reason, date}]
+    vehicles_rejected = Column(JSON, nullable=True)      # [{model, reason, date}]
+    preferred_body_type = Column(String, nullable=True)  # "sedan", "suv", "truck", etc.
+    
+    # === PRESUPUESTO ===
+    preferred_budget_monthly = Column(Integer, nullable=True)
+    preferred_budget_down = Column(Integer, nullable=True)
+    preferred_plan = Column(String, nullable=True)       # "lease" | "finance" | None
+    max_budget_mentioned = Column(Integer, nullable=True)
+    
+    # === PERFIL DE COMUNICACIÓN ===
+    communication_style = Column(String, nullable=True)  # "formal" | "casual" | "direct" | "friendly"
+    preferred_language = Column(String, default="es")    # "es" | "en" | "spanglish"
+    response_speed = Column(String, nullable=True)       # "fast" | "slow" | "variable"
+    best_contact_times = Column(JSON, nullable=True)     # ["morning", "afternoon", "evening"]
+    prefers_calls = Column(Boolean, default=False)
+    prefers_text = Column(Boolean, default=True)
+    
+    # === OBJECIONES Y CONCERNS ===
+    objections = Column(JSON, nullable=True)             # [{objection, response_given, resolved, date}]
+    concerns = Column(JSON, nullable=True)               # ["price", "credit", "timing", "spouse_approval"]
+    
+    # === CONTEXTO PERSONAL ===
+    family_info = Column(JSON, nullable=True)            # {spouse_name, kids_count, pet_type, etc}
+    occupation = Column(String, nullable=True)
+    income_type = Column(String, nullable=True)          # "w2", "1099", "self_employed", "uber"
+    important_dates = Column(JSON, nullable=True)        # [{type, date, note}]
+    personal_notes = Column(Text, nullable=True)         # Notas manuales del vendedor
+    
+    # === CRÉDITO ===
+    credit_score_mentioned = Column(Integer, nullable=True)
+    credit_tier = Column(String, nullable=True)          # "tier1_plus", "tier1", "tier2", "tier3"
+    has_cosigner = Column(Boolean, default=False)
+    document_type = Column(String, nullable=True)        # "ssn", "itin", "passport"
+    first_time_buyer = Column(Boolean, default=False)
+    
+    # === HISTORIAL DE OFERTAS ===
+    offers_given = Column(JSON, nullable=True)           # [{date, vehicle, payment, down, term, accepted}]
+    last_offer = Column(JSON, nullable=True)             # Última oferta dada
+    
+    # === TRADE-IN ===
+    has_trade_in = Column(Boolean, default=False)
+    trade_in_details = Column(JSON, nullable=True)       # {make, model, year, payoff, condition}
+    
+    # === MÉTRICAS DE ENGAGEMENT ===
+    interaction_count = Column(Integer, default=0)
+    messages_sent = Column(Integer, default=0)
+    messages_received = Column(Integer, default=0)
+    avg_response_time_minutes = Column(Integer, nullable=True)
+    last_interaction_at = Column(DateTime(timezone=True), nullable=True)
+    relationship_score = Column(Integer, default=50)     # 0-100 (warmth of relationship)
+    
+    # === AI INSIGHTS ===
+    ai_summary = Column(Text, nullable=True)             # Resumen generado por AI
+    key_insights = Column(JSON, nullable=True)           # ["price_sensitive", "ready_to_buy", etc]
+    buying_signals = Column(JSON, nullable=True)         # ["asked_for_appointment", "mentioned_urgency"]
+    
+    # === TIMELINE ===
+    buying_timeline = Column(String, nullable=True)      # "now", "this_week", "this_month", "exploring"
+    last_timeline_update = Column(DateTime(timezone=True), nullable=True)
+    
+    # === TIMESTAMPS ===
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())

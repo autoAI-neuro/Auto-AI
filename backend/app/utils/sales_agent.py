@@ -125,9 +125,17 @@ def process_message_with_agent(
     """
     Main entry point for the RAY agent (V2 Unified Brain).
     Connects to OpenAI, uses tools, and manages state.
+    NOW WITH MEMORY SYSTEM: Ray remembers everything about each client.
     """
+    from app.services.memory_service import MemoryService
     
-    # Get or create conversation state
+    # === STEP 1: Get or create memory for this client ===
+    memory = MemoryService.get_or_create_memory(db, client_id, clone.user_id)
+    
+    # Increment interaction count
+    MemoryService.increment_interaction(db, client_id, clone.user_id)
+    
+    # === STEP 2: Get conversation state (for stage tracking) ===
     state = get_conversation_state(db, client_id)
     if not state:
         state = {
@@ -137,37 +145,72 @@ def process_message_with_agent(
             "usage_type": None
         }
         update_conversation_state(db, client_id, clone.user_id, **state)
-
-    # Build Context
+    
+    # === STEP 3: Generate rich context from memory ===
+    memory_context = MemoryService.generate_context_for_ray(memory)
+    
     context_str = f"""
-    ESTADO ACTUAL DEL CLIENTE:
-    - Vehículo Interés: {state.get('vehicle_interest', 'No definido')}
-    - Uso: {state.get('usage_type', 'No definido')}
-    - Score: {state.get('credit_score', 'No definido')}
-    - Documento: {state.get('doc_type', 'No definido')}
+{memory_context}
+
+ESTADO DE LA CONVERSACIÓN ACTUAL:
+- Stage: {state.get('stage', 'INTAKE')}
+- Vehículo discutido: {state.get('vehicle_interest', 'No definido')}
+- Score mencionado: {state.get('credit_score', 'No definido')}
+- Documento: {state.get('doc_type', 'No definido')}
+
+PERSONALIDAD PERSONALIZADA DEL USUARIO:
+{clone.personality or 'Usa el tono de Ray por defecto.'}
+
+INSTRUCCIÓN ESPECIAL DE MEMORIA:
+Si el cliente ya te dio información antes (ves arriba en MEMORIA DEL CLIENTE), 
+NO la pidas de nuevo. Usa lo que ya sabes para personalizar tu respuesta.
+Si hay objeciones previas, tenlas en cuenta al responder.
+"""
     
-    PERSONALIDAD PERSONALIZADA DEL USUARIO:
-    {clone.personality or 'Usa el tono de Ray por defecto.'}
-    """
-    
-    # Call OpenAI with Tools
+    # === STEP 4: Call OpenAI with full context ===
     response_text = _call_openai_with_tools(
         system_prompt=RAY_SYSTEM_PROMPT + "\n" + context_str,
         user_message=buyer_message,
         history=conversation_history
     )
     
-    # Simple state extraction update based on the AI's response logic is hard without structured output,
-    # so for V2 we rely on the Tool Calls to be the "Actions". 
-    # We can add a lightweight extraction later if needed.
-    # For now, we update Last Message time.
+    # === STEP 5: Extract insights from buyer's message and update memory ===
+    try:
+        # Get existing memory as dict for context
+        existing_memory = {
+            "vehicles_interested": memory.vehicles_interested,
+            "preferred_budget_monthly": memory.preferred_budget_monthly,
+            "objections": memory.objections
+        }
+        
+        # Extract new insights from the buyer's message
+        insights = MemoryService.extract_insights_from_message(
+            buyer_message, 
+            existing_memory
+        )
+        
+        # Apply insights to memory
+        if insights:
+            MemoryService.update_memory_from_insights(db, client_id, insights)
+    except Exception as e:
+        print(f"[SalesAgent] Error updating memory: {e}")
+    
+    # === STEP 6: Calculate relationship score ===
+    try:
+        new_score = MemoryService.calculate_relationship_score(memory)
+        if memory.relationship_score != new_score:
+            memory.relationship_score = new_score
+            db.commit()
+    except Exception as e:
+        print(f"[SalesAgent] Error calculating relationship score: {e}")
     
     return {
         "response": response_text,
         "confidence": 0.95,
         "stage": "RAY_V2_AUTO",
         "status_color": "green",
-        "state_update": state
+        "state_update": state,
+        "memory_updated": True
     }
 
 def _call_openai_with_tools(system_prompt: str, user_message: str, history: Optional[List[dict]]) -> str:
