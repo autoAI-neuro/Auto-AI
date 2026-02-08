@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Gift, Clock, Zap, X, Send, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Gift, Clock, Zap, X, Send, MessageSquare, Trash2, CheckCircle, Phone } from 'lucide-react';
 import api from '../config';
 import { useAuth } from '../context/AuthContext';
 
 const CalendarView = ({ onQuickSend }) => {
     const { token } = useAuth();
     const [currentDate, setCurrentDate] = useState(new Date());
-    const [selectedEvent, setSelectedEvent] = useState(null); // For modal
+    const [selectedEvent, setSelectedEvent] = useState(null); // For single event modal
+    const [selectedDay, setSelectedDay] = useState(null); // For day detail modal
     const [sending, setSending] = useState(false);
     const [calendarClients, setCalendarClients] = useState([]);
     const [appointments, setAppointments] = useState([]);
@@ -88,9 +89,8 @@ const CalendarView = ({ onQuickSend }) => {
                     label: `${timeStr} - Cita: ${appt.client_name}`,
                     color: 'text-emerald-400',
                     bgColor: 'bg-emerald-500/20',
-                    icon: CalendarIcon, // Or a specific check icon
-                    client: { name: appt.client_name, phone: "" }, // Phone needs to be fetched or populated if we want to msg
-                    // Extract extra data for template
+                    icon: CalendarIcon,
+                    client: { name: appt.client_name, phone: appt.client_phone || "" },
                     time: timeStr,
                     rawAppt: appt
                 });
@@ -204,6 +204,61 @@ const CalendarView = ({ onQuickSend }) => {
         }
     };
 
+    // Handler for clicking on a day cell - opens day detail modal
+    const handleDayClick = (day) => {
+        const dayEvents = events.filter(e => e.day === day);
+        if (dayEvents.length > 0) {
+            setSelectedDay({
+                day,
+                date: new Date(currentDate.getFullYear(), currentDate.getMonth(), day),
+                events: dayEvents
+            });
+        }
+    };
+
+    // Delete/Cancel an appointment
+    const handleDeleteAppointment = async (appointmentId) => {
+        if (!window.confirm("¿Estás seguro de cancelar esta cita?")) return;
+
+        try {
+            await api.delete(`/appointments/${appointmentId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            // Refresh calendar data
+            setRefreshKey(prev => prev + 1);
+            // Close modal if open
+            setSelectedDay(null);
+        } catch (e) {
+            console.error("Error deleting appointment:", e);
+            alert("Error al cancelar la cita");
+        }
+    };
+
+    // Send confirmation message for an appointment
+    const handleSendConfirmation = async (event) => {
+        const clientName = event.client?.name?.split(' ')[0] || 'Cliente';
+        const time = event.time || '10:00 AM';
+        const message = templates['appointment']
+            .replace('{name}', clientName)
+            .replace('{time}', time);
+
+        // Get phone from the appointment or client
+        const phone = event.client?.phone || event.rawAppt?.client_phone || '';
+
+        if (!phone) {
+            alert("No se encontró el teléfono del cliente");
+            return;
+        }
+
+        setSending(true);
+        const success = await onQuickSend(phone, message);
+        setSending(false);
+
+        if (success) {
+            alert("✅ Mensaje de confirmación enviado!");
+        }
+    };
+
     const renderCalendarGrid = () => {
         const daysInMonth = getDaysInMonth(currentDate);
         const firstDay = getFirstDayOfMonth(currentDate);
@@ -221,15 +276,26 @@ const CalendarView = ({ onQuickSend }) => {
 
             days.push(
                 <div key={i} className={`min-h-[120px] p-2 border border-white/5 bg-neutral-900/20 relative group hover:bg-neutral-800/30 transition-colors ${isToday ? 'bg-blue-900/10 border-blue-500/30' : ''}`}>
-                    <span className={`text-sm font-medium ${isToday ? 'text-blue-400' : 'text-neutral-400'}`}>{i}</span>
+                    {/* Day number - clickable if has events */}
+                    <div
+                        onClick={() => dayEvents.length > 0 && handleDayClick(i)}
+                        className={`inline-flex items-center gap-1 ${dayEvents.length > 0 ? 'cursor-pointer hover:bg-white/10 px-2 py-0.5 rounded-lg' : ''}`}
+                    >
+                        <span className={`text-sm font-medium ${isToday ? 'text-blue-400' : 'text-neutral-400'}`}>{i}</span>
+                        {dayEvents.length > 0 && (
+                            <span className="text-[10px] text-neutral-500 opacity-0 group-hover:opacity-100 transition-opacity">
+                                Ver {dayEvents.length}
+                            </span>
+                        )}
+                    </div>
 
                     <div className="mt-2 space-y-1">
-                        {dayEvents.map((ev, idx) => {
+                        {dayEvents.slice(0, 3).map((ev, idx) => {
                             const Icon = ev.icon;
                             return (
                                 <div
                                     key={idx}
-                                    onClick={() => handleEventClick(ev)}
+                                    onClick={(e) => { e.stopPropagation(); handleEventClick(ev); }}
                                     className={`flex items-center gap-1.5 px-2 py-1 rounded-md text-xs cursor-pointer hover:opacity-80 hover:scale-[1.02] transition-all ${ev.bgColor} ${ev.color}`}
                                 >
                                     <Icon size={10} />
@@ -237,6 +303,15 @@ const CalendarView = ({ onQuickSend }) => {
                                 </div>
                             );
                         })}
+                        {/* Show "+X more" if more than 3 events */}
+                        {dayEvents.length > 3 && (
+                            <div
+                                onClick={() => handleDayClick(i)}
+                                className="text-[10px] text-neutral-400 hover:text-white cursor-pointer px-2"
+                            >
+                                +{dayEvents.length - 3} más...
+                            </div>
+                        )}
                     </div>
                 </div>
             );
@@ -346,6 +421,107 @@ const CalendarView = ({ onQuickSend }) => {
                                     </>
                                 )}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Day Detail Modal */}
+            {selectedDay && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-lg max-h-[80vh] overflow-hidden shadow-2xl">
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-5 border-b border-white/10 bg-neutral-950/50">
+                            <div>
+                                <h3 className="text-lg font-medium text-white">
+                                    📅 {selectedDay.date.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                                </h3>
+                                <p className="text-neutral-400 text-sm mt-1">
+                                    {selectedDay.events.length} evento{selectedDay.events.length !== 1 ? 's' : ''}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setSelectedDay(null)}
+                                className="p-2 hover:bg-white/10 rounded-full text-neutral-400 hover:text-white transition-colors"
+                            >
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Events List */}
+                        <div className="p-4 overflow-y-auto max-h-[60vh] space-y-3">
+                            {/* Group events by type */}
+                            {['appointment', 'birthday', 'followup', 'upgrade'].map(type => {
+                                const typeEvents = selectedDay.events.filter(e => e.type === type);
+                                if (typeEvents.length === 0) return null;
+
+                                const typeLabels = {
+                                    appointment: { label: '✅ Citas Confirmadas', color: 'text-emerald-400' },
+                                    birthday: { label: '🎂 Cumpleaños', color: 'text-pink-400' },
+                                    followup: { label: '📞 Seguimientos (6 meses)', color: 'text-blue-400' },
+                                    upgrade: { label: '🎉 Aniversarios', color: 'text-yellow-400' }
+                                };
+
+                                return (
+                                    <div key={type} className="bg-neutral-950/50 rounded-xl p-4 border border-white/5">
+                                        <h4 className={`text-sm font-medium mb-3 ${typeLabels[type].color}`}>
+                                            {typeLabels[type].label}
+                                        </h4>
+                                        <div className="space-y-2">
+                                            {typeEvents.map((ev, idx) => (
+                                                <div key={idx} className="bg-neutral-900/50 rounded-lg p-3 border border-white/5">
+                                                    <div className="flex items-start justify-between">
+                                                        <div className="flex-1">
+                                                            <p className="text-white font-medium text-sm">
+                                                                {ev.time && <span className="text-neutral-400 mr-2">{ev.time}</span>}
+                                                                {ev.client?.name || 'Cliente'}
+                                                            </p>
+                                                            {ev.client?.phone && (
+                                                                <p className="text-neutral-500 text-xs flex items-center gap-1 mt-1">
+                                                                    <Phone size={10} /> {ev.client.phone}
+                                                                </p>
+                                                            )}
+                                                            {ev.rawAppt?.notes && (
+                                                                <p className="text-neutral-400 text-xs mt-2 italic">
+                                                                    "{ev.rawAppt.notes.substring(0, 60)}..."
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Action Buttons */}
+                                                    <div className="flex gap-2 mt-3">
+                                                        {type === 'appointment' ? (
+                                                            <>
+                                                                <button
+                                                                    onClick={() => handleSendConfirmation(ev)}
+                                                                    disabled={sending}
+                                                                    className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
+                                                                >
+                                                                    <CheckCircle size={12} /> Confirmar
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteAppointment(ev.rawAppt?.id)}
+                                                                    className="flex items-center justify-center gap-1.5 px-3 py-2 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg text-xs font-medium transition-colors"
+                                                                >
+                                                                    <Trash2 size={12} /> Cancelar
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                onClick={() => { setSelectedDay(null); handleEventClick(ev); }}
+                                                                className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-medium transition-colors"
+                                                            >
+                                                                <Send size={12} /> Enviar Mensaje
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

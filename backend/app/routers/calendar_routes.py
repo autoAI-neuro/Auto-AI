@@ -56,6 +56,7 @@ def get_appointments(
     for appt in appointments:
         client = db.query(Client).filter(Client.id == appt.client_id).first()
         client_name = client.name if client else "Cliente Desconocido"
+        client_phone = client.phone if client else ""
         
         result.append({
             "id": appt.id,
@@ -63,7 +64,9 @@ def get_appointments(
             "start": appt.start_time,
             "end": appt.end_time,
             "status": appt.status,
-            "client_name": client_name
+            "client_name": client_name,
+            "client_phone": client_phone,
+            "notes": appt.notes or ""
         })
         
     return result
@@ -100,3 +103,28 @@ def create_appointment(
         "status": new_appt.status,
         "client_name": client_name
     }
+
+@router.delete("/{appointment_id}")
+def delete_appointment(
+    appointment_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Delete/Cancel an appointment"""
+    # Find the appointment
+    appt = db.query(Appointment).filter(
+        Appointment.id == appointment_id,
+        Appointment.user_id == current_user.id  # Security: only own appointments
+    ).first()
+    
+    if not appt:
+        raise HTTPException(status_code=404, detail="Cita no encontrada")
+    
+    # Delete it
+    db.delete(appt)
+    db.commit()
+    
+    print(f"[Appointments API] Deleted appointment: {appointment_id}")
+    
+    return {"status": "deleted", "id": appointment_id}
+
