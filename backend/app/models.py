@@ -49,8 +49,12 @@ class Client(Base):
     interest_rate = Column(Float, nullable=True)
     document_path = Column(String, nullable=True) # Path to uploaded ID
     
+    # Relationship Score
+    relationship_score = Column(Float, default=50.0)  # 0-100 warmth score
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
 
 class MessageTemplate(Base):
     __tablename__ = "message_templates"

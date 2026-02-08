@@ -108,6 +108,21 @@ RAY_TOOLS = [
                 "required": []
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "schedule_appointment",
+            "description": "Schedule a confirmed appointment.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "datetime_iso": {"type": "string", "description": "ISO 8601 datetime (e.g. 2026-02-08T10:00:00)"},
+                    "notes": {"type": "string", "description": "Any special notes or requirements (documents to bring)"}
+                },
+                "required": ["datetime_iso"]
+            }
+        }
     }
 ]
 
@@ -272,6 +287,33 @@ def _call_openai_with_tools(system_prompt: str, user_message: str, history: Opti
                     
                 elif func_name == "check_calendar":
                     tool_output = CalendarService.check_calendar()
+                    
+                elif func_name == "schedule_appointment":
+                    # Call Calendar Service to create appointment
+                    dt_iso = func_args.get("datetime_iso")
+                    notes = func_args.get("notes", "")
+                    
+                    try:
+                        # Correct import from the new service location
+                        from app.utils.calendar_service import CalendarService as CalSvc
+                        
+                        appt = CalSvc.create_appointment(
+                            db=db,
+                            client_id=client_id,
+                            user_id=clone.user_id,
+                            start_time=dt_iso,
+                            notes=notes
+                        )
+                        # Format success output
+                        tool_output = json.dumps({
+                            "status": "success", 
+                            "appointment_id": appt.id, 
+                            "time": dt_iso,
+                            "message": "Cita agendada correctamente en base de datos."
+                        })
+                    except Exception as e:
+                        print(f"[SalesAgent] Error scheduling appointment: {e}")
+                        tool_output = json.dumps({"status": "error", "message": str(e)})
                 
                 messages.append({
                     "tool_call_id": tool_call.id,
