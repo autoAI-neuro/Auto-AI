@@ -9,17 +9,26 @@ const CalendarView = ({ onQuickSend }) => {
     const [selectedEvent, setSelectedEvent] = useState(null); // For modal
     const [sending, setSending] = useState(false);
     const [calendarClients, setCalendarClients] = useState([]);
+    const [appointments, setAppointments] = useState([]);
 
     // Fetch calendar-specific data (all clients with dates)
     useEffect(() => {
         const loadCalendarData = async () => {
             if (!token) return;
             try {
-                const response = await api.get('/clients/calendar-events', {
+                // 1. Fetch Client Milestones
+                const clientRes = await api.get('/clients/calendar-events', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                setCalendarClients(response.data);
-                console.log("Calendar events loaded:", response.data.length);
+                setCalendarClients(clientRes.data);
+
+                // 2. Fetch Appointments
+                const apptRes = await api.get('/appointments/', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                setAppointments(apptRes.data);
+
+                console.log("Calendar loaded:", clientRes.data.length, "clients,", apptRes.data.length, "appointments");
             } catch (e) {
                 console.error("Error loading calendar data", e);
             }
@@ -31,7 +40,8 @@ const CalendarView = ({ onQuickSend }) => {
     const templates = {
         'birthday': "Feliz cumpleaños {name}, te deseo muchas bendiciones.. recuerda que como tu vendedor de autos de confianza, puedes contar conmigo para asesorarte a ti y a tus amigos en la compra de su proximo vehiculo, pasala bien",
         'followup': "Hola {name}, espero que estés disfrutando tu auto. Han pasado 6 meses desde tu compra y quería asegurarme de que todo marche genial. ¡Cualquier cosa quedo a la orden!",
-        'upgrade': "Hola {name}, ¡feliz primer aniversario con tu auto! Espero que te haya dado muchas alegrías. Si estás pensando en renovar o buscas algo nuevo, avísame, tengo opciones increíbles para ti."
+        'upgrade': "Hola {name}, ¡feliz primer aniversario con tu auto! Espero que te haya dado muchas alegrías. Si estás pensando en renovar o buscas algo nuevo, avísame, tengo opciones increíbles para ti.",
+        'appointment': "Hola {name}, te escribo para confirmar nuestra cita de mañana a las {time}. Recuerda traer tu Licencia y Prueba de Ingresos. ¡Nos vemos pronto!"
     };
 
     // Helper: Days in month
@@ -61,6 +71,29 @@ const CalendarView = ({ onQuickSend }) => {
         const list = [];
         const currentMonth = currentDate.getMonth();
         const currentYear = currentDate.getFullYear();
+
+        // 0. Appointments (Real scheduled events)
+        appointments.forEach(appt => {
+            const apptDate = new Date(appt.start);
+            // Check if falls in current month view
+            if (apptDate.getMonth() === currentMonth && apptDate.getFullYear() === currentYear) {
+                const day = apptDate.getDate();
+                const timeStr = apptDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                list.push({
+                    day: day,
+                    type: 'appointment',
+                    label: `${timeStr} - Cita: ${appt.client_name}`,
+                    color: 'text-emerald-400',
+                    bgColor: 'bg-emerald-500/20',
+                    icon: CalendarIcon, // Or a specific check icon
+                    client: { name: appt.client_name, phone: "" }, // Phone needs to be fetched or populated if we want to msg
+                    // Extract extra data for template
+                    time: timeStr,
+                    rawAppt: appt
+                });
+            }
+        });
 
         // Use calendarClients instead of props.clients
         calendarClients.forEach(client => {
@@ -248,6 +281,9 @@ const CalendarView = ({ onQuickSend }) => {
                 </div>
                 <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-yellow-400"></div> Aniversario
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400"></div> Cita Confirmada
                 </div>
             </div>
 
