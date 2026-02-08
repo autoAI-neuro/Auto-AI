@@ -521,7 +521,7 @@ const CalendarView = ({ onQuickSend }) => {
                                                         {type === 'appointment' ? (
                                                             <>
                                                                 <button
-                                                                    onClick={() => handleSendConfirmation(ev)}
+                                                                    onClick={() => { setSelectedDay(null); handleEventClick(ev); }}
                                                                     disabled={sending}
                                                                     className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 rounded-lg text-xs font-medium transition-colors"
                                                                 >
