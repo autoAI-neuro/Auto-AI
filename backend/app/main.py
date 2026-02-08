@@ -19,8 +19,16 @@ app = FastAPI(title="AUTOAI API", version=APP_VERSION)
 
 @app.on_event("startup")
 async def startup_event():
+    # 1. Start Scheduler
     from app.services.scheduler import start_scheduler
     start_scheduler()
+    
+    # 2. Check Migrations (Hotfix for missing columns)
+    from app.db.migrations import check_and_migrate_tables
+    try:
+        check_and_migrate_tables()
+    except Exception as e:
+        print(f"Migration Error: {e}")
 
 # CORS Configuration - Must be added BEFORE including routers
 app.add_middleware(
