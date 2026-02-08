@@ -365,6 +365,31 @@ class ClientMemory(Base):
     # === TIMELINE ===
     buying_timeline = Column(String, nullable=True)      # "now", "this_week", "this_month", "exploring"
     last_timeline_update = Column(DateTime(timezone=True), nullable=True)
+
+
+class Appointment(Base):
+    """
+    Scheduled appointments for test drives or visits.
+    Displayed on the Dashboard Calendar.
+    """
+    __tablename__ = "appointments"
+
+    id = Column(String, primary_key=True, default=get_uuid)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False)
+    client_id = Column(String, ForeignKey("clients.id"), nullable=False)
+    
+    title = Column(String, nullable=False)  # "Cita con Juan Pérez"
+    start_time = Column(DateTime(timezone=True), nullable=False)
+    end_time = Column(DateTime(timezone=True), nullable=False)
+    
+    status = Column(String, default="scheduled")  # scheduled, completed, cancelled, no_show
+    notes = Column(Text, nullable=True)
+    
+    # Polymorphic or flexible relation (optional)
+    ref_id = Column(String, nullable=True)  # Reference to external ID if needed
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
     
     # === TIMESTAMPS ===
     created_at = Column(DateTime(timezone=True), server_default=func.now())
