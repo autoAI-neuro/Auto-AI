@@ -287,35 +287,44 @@ def whatsapp_webhook(
     except Exception as e:
         print(f"[Webhook] Automation error: {e}")
 
-    # 5. AI Sales Clone Auto-Response
+    # 5. AI Sales Clone Auto-Response (NOW WITH MEMORY SYSTEM!)
     try:
-        from app.utils.ai_response import check_clone_status, generate_clone_response
+        from app.utils.ai_response import check_clone_status
+        from app.utils.sales_agent import process_message_with_agent
         from app.models import Message as MessageModel
         
         clone_status = check_clone_status(db, user_id)
         
         if clone_status["has_active_clone"]:
             clone = clone_status["clone"]
-            print(f"[AI Clone] User {user_id} has active clone, generating response...")
+            print(f"[AI Clone + Memory] User {user_id} has active clone, generating response with memory...")
             
-            # Build client context for better responses
-            client_context = {
-                "name": client.name,
-                "status": client.status,
-                "car_interest": f"{client.car_make} {client.car_model}" if client.car_make else None
-            }
+            # Get recent conversation history for context
+            recent_messages = db.query(MessageModel).filter(
+                MessageModel.client_id == client.id
+            ).order_by(MessageModel.created_at.desc()).limit(10).all()
             
-            # Generate AI response
-            ai_result = generate_clone_response(
+            # Convert to format expected by the agent
+            conversation_history = []
+            for msg in reversed(recent_messages):
+                role = "buyer" if msg.direction == "inbound" else "assistant"
+                conversation_history.append({"role": role, "text": msg.content})
+            
+            # Use the NEW process_message_with_agent (includes Memory System!)
+            ai_result = process_message_with_agent(
+                db=db,
                 clone=clone,
+                client_id=client.id,
                 buyer_message=text,
-                client_context=client_context
+                conversation_history=conversation_history
             )
             
             ai_response = ai_result.get("response", "")
             confidence = ai_result.get("confidence", 0)
+            memory_updated = ai_result.get("memory_updated", False)
             
-            print(f"[AI Clone] Generated response (confidence: {confidence}): {ai_response[:100]}...")
+            print(f"[AI Clone + Memory] Generated response (confidence: {confidence}, memory_updated: {memory_updated})")
+            print(f"[AI Clone + Memory] Response: {ai_response[:100]}...")
             
             # Only send if we have a response and decent confidence
             if ai_response and confidence >= 0.3:
@@ -341,16 +350,16 @@ def whatsapp_webhook(
                     db.add(ai_message)
                     db.commit()
                     
-                    print(f"[AI Clone] Auto-response sent successfully to {sender_phone}")
+                    print(f"[AI Clone + Memory] Auto-response sent successfully to {sender_phone}")
                     
                 except Exception as send_error:
-                    print(f"[AI Clone] Failed to send auto-response: {send_error}")
+                    print(f"[AI Clone + Memory] Failed to send auto-response: {send_error}")
             else:
-                print(f"[AI Clone] Skipped response (low confidence or empty)")
+                print(f"[AI Clone + Memory] Skipped response (low confidence or empty)")
                 
     except Exception as e:
         # Don't fail webhook if AI response fails
-        print(f"[AI Clone] Error generating response: {e}")
+        print(f"[AI Clone + Memory] Error generating response: {e}")
         import traceback
         traceback.print_exc()
 
