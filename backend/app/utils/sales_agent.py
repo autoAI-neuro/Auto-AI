@@ -263,9 +263,12 @@ def _call_openai_with_tools(system_prompt: str, user_message: str, history: Opti
         )
         
         response_msg = response.choices[0].message
+        print(f"[SalesAgent] OpenAI Response: {response_msg.content}")
+        print(f"[SalesAgent] Tool Calls: {response_msg.tool_calls}")
         
         # Tool execution loop
         if response_msg.tool_calls:
+            print(f"[SalesAgent] Executing {len(response_msg.tool_calls)} tools...")
             messages.append(response_msg)
             
             for tool_call in response_msg.tool_calls:
