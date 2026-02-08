@@ -10,8 +10,10 @@ const CalendarView = ({ onQuickSend }) => {
     const [sending, setSending] = useState(false);
     const [calendarClients, setCalendarClients] = useState([]);
     const [appointments, setAppointments] = useState([]);
+    const [refreshKey, setRefreshKey] = useState(0); // Used to force refresh
 
     // Fetch calendar-specific data (all clients with dates)
+    // Reloads when: token changes, month changes, or refreshKey changes
     useEffect(() => {
         const loadCalendarData = async () => {
             if (!token) return;
@@ -34,7 +36,7 @@ const CalendarView = ({ onQuickSend }) => {
             }
         };
         loadCalendarData();
-    }, [token]);
+    }, [token, currentDate, refreshKey]); // Now reloads when month changes!
 
     // Templates
     const templates = {
