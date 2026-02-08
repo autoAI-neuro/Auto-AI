@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import List, Optional
 from app.db.session import get_db
 from app.deps import get_current_user
-from app.models import Client, User, Tag, ClientTag
+from app.models import Client, User, Tag, ClientTag, Appointment
 from app.schemas.crm import ClientCreate, ClientUpdate, ClientResponse
 
 router = APIRouter(prefix="/clients", tags=["clients"])
@@ -157,21 +157,27 @@ def delete_client(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Delete a client"""
-    # Delete request
+    """Delete a client and all related data (appointments, etc.)"""
+    # Find client
     client = db.query(Client).filter(
         Client.id == client_id,
         Client.user_id == current_user.id
     ).first()
     
     if not client:
-        # Not found
         raise HTTPException(status_code=404, detail="Client not found")
-        
+    
+    # 1. Delete all appointments for this client
+    deleted_appts = db.query(Appointment).filter(
+        Appointment.client_id == client_id
+    ).delete()
+    print(f"[Clients API] Deleted {deleted_appts} appointments for client {client_id}")
+    
+    # 2. Delete the client
     db.delete(client)
     db.commit()
-    # Success
-    return {"message": "Client deleted"}
+    
+    return {"message": f"Client and {deleted_appts} appointments deleted"}
 
 
 @router.get("/calendar-events")

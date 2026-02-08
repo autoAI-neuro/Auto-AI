@@ -81,7 +81,13 @@ const CalendarView = ({ onQuickSend }) => {
             // Check if falls in current month view
             if (apptDate.getMonth() === currentMonth && apptDate.getFullYear() === currentYear) {
                 const day = apptDate.getDate();
-                const timeStr = apptDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                // Force Florida timezone (America/New_York)
+                const timeStr = apptDate.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                    timeZone: 'America/New_York'
+                });
 
                 list.push({
                     day: day,
