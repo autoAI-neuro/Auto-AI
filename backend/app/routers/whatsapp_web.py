@@ -575,6 +575,12 @@ def send_bulk_messages(
         "count": len(target_phones)
     }
 
+class SendMediaRequest(BaseModel):
+    phone_number: str
+    media_url: str
+    media_type: str  # image, video, audio, document
+    caption: str = ""
+
 @router.post("/send-media")
 def send_whatsapp_media(
     request: SendMediaRequest,
