@@ -103,17 +103,17 @@ class BaileysClient {
                         console.log(`Reconnecting in ${delay}ms...`);
                         setTimeout(() => this.connect(), delay);
                     } else {
-                        // Sesión cerrada, limpiar auth
+                        // Sesión cerrada/corrupta, limpiar auth automáticamente
                         console.log("Session ended. Connection closed.");
-                        // DO NOT CLEAR AUTH AUTOMATICALLY
-                        // Persist session files so we can reconnect on restart.
-                        // Only clear if explicitly necessary (handled by API /logout or /clear-session).
-                        /*
-                        if (reason !== 408) { 
+
+                        // AUTO-RECOVERY: Clear corrupted auth files for 401 errors
+                        // This allows a fresh QR to be generated on next init
+                        if (reason === 401 || reason === DisconnectReason.loggedOut) {
+                            console.log("🔄 AUTO-RECOVERY: Clearing corrupted auth files to allow fresh QR...");
                             this.clearAuth();
                         }
-                        */
-                        if (this.callbacks.onDisconnected && reason !== 408) { // Already called for 408
+
+                        if (this.callbacks.onDisconnected && reason !== 408) {
                             this.callbacks.onDisconnected('logged_out');
                         }
                     }
