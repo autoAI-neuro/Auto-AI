@@ -33,6 +33,8 @@ app.add_middleware(
 
 app.include_router(auth.router)
 app.include_router(whatsapp_web.router)
+# Fix for Node.js service calling /api/whatsapp/webhook
+app.include_router(whatsapp_web.router, prefix="/api") 
 app.include_router(clients.router)
 app.include_router(files.router)
 app.include_router(tags.router)
