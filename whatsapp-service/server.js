@@ -155,9 +155,12 @@ async function initializeSession(userId) {
                                     timestamp: msg.messageTimestamp,
                                     raw: msg
                                 })
-                            }).then(res => {
-                                log(`[Webhook] Response: ${res.status}`);
-                                if (!res.ok) res.text().then(t => log(`[Webhook] Error: ${t}`));
+                            }).then(async res => {
+                                const responseText = await res.text();
+                                log(`[Webhook] Response Code: ${res.status}`);
+                                log(`[Webhook] Response Body: ${responseText.substring(0, 200)}`); // Limit log size
+
+                                if (!res.ok) log(`[Webhook] Error Details: ${responseText}`);
                             }).catch(e => log(`[Webhook] Fetch error: ${e.message}`));
 
                         } catch (err) {
