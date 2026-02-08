@@ -39,13 +39,43 @@ const CalendarView = ({ onQuickSend }) => {
         loadCalendarData();
     }, [token, currentDate, refreshKey]); // Now reloads when month changes!
 
-    // Templates
-    const templates = {
+    // Templates State - Initialize with defaults, then load from API
+    const [templates, setTemplates] = useState({
         'birthday': "¡Hola {nombre}! 🎉 Desde AutoAI te deseamos un muy feliz cumpleaños. ¡Que tengas un día excelente!",
         'followup': "Hola {nombre}, espero que estés disfrutando tu auto. Han pasado 6 meses desde tu compra y quería asegurarme de que todo marche genial. ¡Cualquier cosa quedo a la orden!",
         'upgrade': "Hola {nombre}, ¡feliz primer aniversario con tu auto! Espero que te haya dado muchas alegrías. Si estás pensando en renovar o buscas algo nuevo, avísame, tengo opciones increíbles para ti.",
         'appointment': "Hola {nombre}, te escribo para confirmar nuestra cita de mañana a las {hora}. Recuerda traer tu Licencia y Prueba de Ingresos. ¡Nos vemos pronto!"
-    };
+    });
+
+    // Fetch Templates from Automation Settings (SalesClone)
+    useEffect(() => {
+        const loadTemplates = async () => {
+            if (!token) return;
+            try {
+                const response = await api.get('/sales-clone', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (response.data?.sales_logic) {
+                    try {
+                        const config = JSON.parse(response.data.sales_logic);
+                        // Map automation config to calendar template keys
+                        setTemplates(prev => ({
+                            ...prev,
+                            'birthday': config.birthday?.template || prev.birthday,
+                            'followup': config.follow_up?.template || prev.followup,
+                            'upgrade': config.anniversary?.template || prev.upgrade, // 'upgrade' in calendar is 'anniversary' in settings
+                            'appointment': config.confirmation?.template || prev.appointment
+                        }));
+                    } catch (e) {
+                        console.warn("Could not parse automation settings for calendar");
+                    }
+                }
+            } catch (error) {
+                console.error("Error loading templates:", error);
+            }
+        };
+        loadTemplates();
+    }, [token]);
 
     // Helper: Days in month
     const getDaysInMonth = (date) => {
