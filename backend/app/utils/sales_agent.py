@@ -193,7 +193,10 @@ Si hay objeciones previas, tenlas en cuenta al responder.
     response_text = _call_openai_with_tools(
         system_prompt=RAY_SYSTEM_PROMPT + "\n" + context_str,
         user_message=buyer_message,
-        history=conversation_history
+        history=conversation_history,
+        db=db,
+        client_id=client_id,
+        user_id=clone.user_id
     )
     
     # === STEP 5: Extract insights from buyer's message and update memory ===
@@ -235,8 +238,15 @@ Si hay objeciones previas, tenlas en cuenta al responder.
         "memory_updated": True
     }
 
-def _call_openai_with_tools(system_prompt: str, user_message: str, history: Optional[List[dict]]) -> str:
-    """Call OpenAI API with Tools."""
+def _call_openai_with_tools(
+    system_prompt: str, 
+    user_message: str, 
+    history: Optional[List[dict]],
+    db: Session = None,
+    client_id: str = None,
+    user_id: str = None
+) -> str:
+    """Call OpenAI API with Tools. Now with DB context for appointment scheduling."""
     
     if not OPENAI_API_KEY:
         return "Error: OPENAI_API_KEY missing."
@@ -329,7 +339,7 @@ def _call_openai_with_tools(system_prompt: str, user_message: str, history: Opti
                         appt = CalSvc.create_appointment(
                             db=db,
                             client_id=client_id,
-                            user_id=clone.user_id,
+                            user_id=user_id,
                             start_time=dt_iso,
                             notes=notes
                         )
