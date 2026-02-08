@@ -4,7 +4,7 @@ import os
 import httpx
 from datetime import datetime
 from sqlalchemy import text
-from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory, email, sales_clone, memory
+from app.routers import auth, whatsapp_web, clients, files, tags, messages, ai, analytics, automations, inventory, email, sales_clone, memory, calendar_routes
 from app.db.session import engine, get_db
 from app.db.base import Base
 from app.models import User, Client, Tag, ClientTag, Message, Automation, AutomationAction, InventoryItem, SalesClone, ConversationState, ClientMemory  # Import models so SQLAlchemy can detect them
