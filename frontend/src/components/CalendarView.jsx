@@ -41,10 +41,10 @@ const CalendarView = ({ onQuickSend }) => {
 
     // Templates
     const templates = {
-        'birthday': "Feliz cumpleaños {name}, te deseo muchas bendiciones.. recuerda que como tu vendedor de autos de confianza, puedes contar conmigo para asesorarte a ti y a tus amigos en la compra de su proximo vehiculo, pasala bien",
-        'followup': "Hola {name}, espero que estés disfrutando tu auto. Han pasado 6 meses desde tu compra y quería asegurarme de que todo marche genial. ¡Cualquier cosa quedo a la orden!",
-        'upgrade': "Hola {name}, ¡feliz primer aniversario con tu auto! Espero que te haya dado muchas alegrías. Si estás pensando en renovar o buscas algo nuevo, avísame, tengo opciones increíbles para ti.",
-        'appointment': "Hola {name}, te escribo para confirmar nuestra cita de mañana a las {time}. Recuerda traer tu Licencia y Prueba de Ingresos. ¡Nos vemos pronto!"
+        'birthday': "¡Hola {nombre}! 🎉 Desde AutoAI te deseamos un muy feliz cumpleaños. ¡Que tengas un día excelente!",
+        'followup': "Hola {nombre}, espero que estés disfrutando tu auto. Han pasado 6 meses desde tu compra y quería asegurarme de que todo marche genial. ¡Cualquier cosa quedo a la orden!",
+        'upgrade': "Hola {nombre}, ¡feliz primer aniversario con tu auto! Espero que te haya dado muchas alegrías. Si estás pensando en renovar o buscas algo nuevo, avísame, tengo opciones increíbles para ti.",
+        'appointment': "Hola {nombre}, te escribo para confirmar nuestra cita de mañana a las {hora}. Recuerda traer tu Licencia y Prueba de Ingresos. ¡Nos vemos pronto!"
     };
 
     // Helper: Days in month
@@ -133,26 +133,8 @@ const CalendarView = ({ onQuickSend }) => {
                 const [pY, pM, pD] = client.purchase_date.split('-').map(Number);
 
                 // 6 Month Check
-                // Target: pM + 6. 
-                // We need to compare specific dates.
-                // Let's create date objects for comparison using UTC to avoid shifts
-                // Actually, logic:
-                // If Purchase is Jan (0), 6mo follow up is July (6).
-                // If Purchase is July (6), 6mo follow up is Jan (0) next year.
-
                 let target6MoMonth = (pM - 1 + 6) % 12;
                 let target6MoYear = pY + Math.floor((pM - 1 + 6) / 12);
-
-                // If current view matches 6mo target
-                // BUT, user asked for reminder "of 6 months". Usually means 6 months AFTER purchase.
-                // We show it if it falls in CURRENT view month.
-                // We ignore the year for "recurring"? No, 6 month is one time.
-                // So checking if target matches current view.
-
-                //Wait, "recordatorios de cumpleaños de 6 meses". 
-                // Logic: 
-                // followUpDate = purchaseDate + 6 months.
-                // if followUpDate.month == currentMonth && followUpDate.year == currentYear -> SHOW
 
                 if (target6MoMonth === currentMonth && target6MoYear === currentYear) {
                     list.push({
@@ -167,11 +149,6 @@ const CalendarView = ({ onQuickSend }) => {
                 }
 
                 // 1 Year Upgrade (Anniversary)
-                // Every year on purchase month? Or just 1 year?
-                // "recordatorios (...) de 12 meses". Could be annual anniversary.
-                // Let's assume Annual Anniversary for now, or just 1st year.
-                // Usually "Upgrade" implies 2-3 years, but user said 12 months.
-                // If we treat it as "Anniversary", we show it every year on the purchase month.
                 if (pM - 1 === currentMonth && currentYear > pY) {
                     list.push({
                         day: pD,
@@ -190,9 +167,22 @@ const CalendarView = ({ onQuickSend }) => {
 
     const handleEventClick = (event) => {
         // Prepare template
-        const rawTemplate = templates[event.type];
-        const firstName = event.client.name.split(' ')[0]; // Basic first name extraction
-        const message = rawTemplate.replace('{name}', firstName);
+        let rawTemplate = templates[event.type];
+
+        // Retrieve custom settings if available (future proofing)
+        // For now, use hardcoded templates updated to match SalesCloneBuilder
+
+        const firstName = event.client.name ? event.client.name.split(' ')[0] : 'Cliente';
+        const time = event.time || '10:00 AM';
+        const dateStr = new Date().toLocaleDateString('es-ES');
+
+        // Robust replacement for all variables
+        const message = rawTemplate
+            .replace(/{nombre}/g, firstName)
+            .replace(/{name}/g, firstName) // Backwards compat
+            .replace(/{time}/g, time)
+            .replace(/{hora}/g, time)
+            .replace(/{fecha}/g, dateStr);
 
         setSelectedEvent({
             ...event,

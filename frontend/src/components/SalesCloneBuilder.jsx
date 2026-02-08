@@ -318,6 +318,11 @@ const SalesCloneBuilder = () => {
                             className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-sm text-neutral-300 focus:outline-none focus:border-purple-500 h-24 resize-none"
                         />
                         <p className="text-xs text-neutral-600">Variables: {'{nombre}'}</p>
+                        <div className="bg-neutral-950/50 p-2 rounded border border-white/5 mt-1">
+                            <p className="text-xs text-neutral-400 italic">
+                                Vista: "{automations.birthday.template.replace('{nombre}', 'Pedro')}"
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -349,6 +354,11 @@ const SalesCloneBuilder = () => {
                             className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-sm text-neutral-300 focus:outline-none focus:border-pink-500 h-24 resize-none"
                         />
                         <p className="text-xs text-neutral-600">Variables: {'{nombre}'}</p>
+                        <div className="bg-neutral-950/50 p-2 rounded border border-white/5 mt-1">
+                            <p className="text-xs text-neutral-400 italic">
+                                Vista: "{automations.anniversary.template.replace('{nombre}', 'Pedro')}"
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -388,6 +398,11 @@ const SalesCloneBuilder = () => {
                             onChange={(e) => updateAutomation('follow_up', 'template', e.target.value)}
                             className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-sm text-neutral-300 focus:outline-none focus:border-amber-500 h-16 resize-none"
                         />
+                        <div className="bg-neutral-950/50 p-2 rounded border border-white/5 mt-1">
+                            <p className="text-xs text-neutral-400 italic">
+                                Vista: "{automations.follow_up.template.replace('{nombre}', 'Pedro')}"
+                            </p>
+                        </div>
                     </div>
                 </div>
 
@@ -419,6 +434,11 @@ const SalesCloneBuilder = () => {
                             className="w-full bg-neutral-950 border border-white/10 rounded-xl p-3 text-sm text-neutral-300 focus:outline-none focus:border-blue-500 h-24 resize-none"
                         />
                         <p className="text-xs text-neutral-600">Variables: {'{fecha}, {hora}'}</p>
+                        <div className="bg-neutral-950/50 p-2 rounded border border-white/5 mt-1">
+                            <p className="text-xs text-neutral-400 italic">
+                                Vista: "{automations.confirmation.template.replace('{nombre}', 'Pedro').replace('{fecha}', 'Mañana').replace('{hora}', '10:00 AM')}"
+                            </p>
+                        </div>
                     </div>
                 </div>
 
