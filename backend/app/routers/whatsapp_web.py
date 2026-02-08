@@ -196,13 +196,15 @@ def whatsapp_webhook(
     db: Session = Depends(get_db)
 ):
     """Receive incoming messages from Node service"""
-    print(f"[Webhook] Received payload: {payload}")
+    print(f"\n[Webhook DEBUG] 📨 MENSAJE ENTRANTE RECIBIDO!")
+    print(f"[Webhook DEBUG] Payload raw: {payload}")
     
     user_id = payload.get("user_id")
     sender_phone = payload.get("sender")
     text = payload.get("text")
     
     if not user_id or not sender_phone:
+        print(f"[Webhook DEBUG] ❌ Faltan datos: user_id={user_id}, sender={sender_phone}")
         raise HTTPException(status_code=400, detail="Missing user_id or sender")
 
     # 1. Verify User
@@ -302,7 +304,7 @@ def whatsapp_webhook(
             # Get recent conversation history for context
             recent_messages = db.query(MessageModel).filter(
                 MessageModel.client_id == client.id
-            ).order_by(MessageModel.created_at.desc()).limit(10).all()
+            ).order_by(MessageModel.sent_at.desc()).limit(10).all()
             
             # Convert to format expected by the agent
             conversation_history = []
