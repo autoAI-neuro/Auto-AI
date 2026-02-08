@@ -5,6 +5,7 @@ Unified Brain: Uses same Logic & Tools as ai_service.py
 import os
 import json
 from typing import Optional, Dict, Any, List
+from datetime import datetime
 from sqlalchemy.orm import Session
 from openai import OpenAI
 
@@ -176,6 +177,8 @@ ESTADO DE LA CONVERSACIÓN ACTUAL:
 - Vehículo discutido: {state.get('vehicle_interest', 'No definido')}
 - Score mencionado: {state.get('credit_score', 'No definido')}
 - Documento: {state.get('doc_type', 'No definido')}
+- FECHA Y HORA ACTUAL: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (Usa esto para calcular "mañana", "lunes", etc)
+
 
 PERSONALIDAD PERSONALIZADA DEL USUARIO:
 {clone.personality or 'Usa el tono de Ray por defecto.'}
