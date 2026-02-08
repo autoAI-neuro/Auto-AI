@@ -296,6 +296,7 @@ def whatsapp_webhook(
         from app.models import Message as MessageModel
         
         clone_status = check_clone_status(db, user_id)
+        print(f"[Webhook DEBUG] Clone Status for {user_id}: {clone_status}")
         
         if clone_status["has_active_clone"]:
             clone = clone_status["clone"]
