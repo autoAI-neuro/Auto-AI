@@ -197,6 +197,15 @@ app.get('/api/whatsapp/status/:userId', (req, res) => {
 // Send Message
 app.post('/api/whatsapp/send', async (req, res) => {
     const { userId, phoneNumber, message, mediaUrl, caption } = req.body;
+
+    // DEBUG: Log the incoming request payload
+    console.log('[Send API] 📦 Request received:');
+    console.log(`  userId: ${userId}`);
+    console.log(`  phoneNumber: ${phoneNumber}`);
+    console.log(`  message: ${message?.substring(0, 50)}...`);
+    console.log(`  mediaUrl: ${mediaUrl || 'NULL'}`);
+    console.log(`  caption: ${caption?.substring(0, 50) || 'NULL'}...`);
+
     const session = sessions.get(userId);
 
     if (!session || session.status !== 'connected') {
@@ -222,17 +231,21 @@ app.post('/api/whatsapp/send', async (req, res) => {
 
         let content = {};
         if (mediaUrl) {
+            console.log(`[Send API] 🖼️ SENDING IMAGE: ${mediaUrl}`);
             content = {
                 image: { url: mediaUrl },
                 caption: caption || message
             };
         } else {
+            console.log(`[Send API] 💬 SENDING TEXT ONLY`);
             content = { text: message };
         }
 
+        console.log(`[Send API] Content type: ${mediaUrl ? 'IMAGE' : 'TEXT'}`);
+
         const msg = await session.sock.sendMessage(jid, content);
 
-        log(`Message sent to ${jid} (Media: ${!!mediaUrl})`);
+        console.log(`[Send API] ✅ Message sent to ${jid} (Media: ${!!mediaUrl})`);
         res.json({ success: true, messageId: msg.key.id });
 
     } catch (error) {
