@@ -19,13 +19,17 @@ def migrate():
 
         print(f"Migrating inventory for user: {user.email}")
 
-        # 2. Load JSON
-        json_path = os.path.join("..", "frontend", "public", "inventory", "catalog.json")
+        # 2. Load JSON from URL (Robust for Railway)
+        catalog_url = "https://auto-ai-beta.vercel.app/inventory/catalog.json"
+        print(f"Fetching catalog from: {catalog_url}")
+        
+        import requests
         try:
-            with open(json_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
+            res = requests.get(catalog_url)
+            res.raise_for_status()
+            data = res.json()
         except Exception as e:
-            print(f"Error loading JSON from {json_path}: {e}")
+            print(f"Error fetching catalog from URL: {e}")
             return
 
         # 3. Process Items
