@@ -25,20 +25,23 @@ def debug_connectivity():
     results = {}
     
 # Send WhatsApp Message Helper
-def send_whatsapp_message_sync(user_id: str, phone_number: str, message: str, client_id: str = None):
+def send_whatsapp_message_sync(user_id: str, phone_number: str, message: str, client_id: str = None, media_url: str = None, caption: str = None):
     """
     Synchronous helper to send WhatsApp message via Node.js service.
     Using requests library for simplicity in this context.
+    Supports Media (Images).
     """
     try:
         # Construct payload
         payload = {
             "userId": user_id,
             "phoneNumber": phone_number,
-            "message": message
+            "message": message,
+            "mediaUrl": media_url,
+            "caption": caption
         }
         
-        print(f"[Backend] Sending WhatsApp message to {phone_number} via {WHATSAPP_SERVICE_URL}")
+        print(f"[Backend] Sending WhatsApp message to {phone_number} via {WHATSAPP_SERVICE_URL} (Media: {bool(media_url)})")
         
         # Call Node.js service
         resp = requests.post(
@@ -88,6 +91,8 @@ def debug_connectivity():
 class SendMessageRequest(BaseModel):
     phone_number: str
     message: str
+    media_url: Optional[str] = None
+    caption: Optional[str] = None
     client_id: str = None
 
 @router.post("/init")
@@ -158,7 +163,7 @@ def get_whatsapp_status(
 
 
 
-def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None, client_id: str = None):
+def send_message_internal(db: Session, user_id: str, phone: str, message: str, attachment: dict = None, client_id: str = None, media_url: str = None, caption: str = None):
     """
     Internal helper to send messages via Node service and save to DB.
     Used by:
@@ -171,11 +176,13 @@ def send_message_internal(db: Session, user_id: str, phone: str, message: str, a
     payload = {
         "userId": user_id,
         "phoneNumber": phone,
-        "message": message
+        "message": message,
+        "mediaUrl": media_url,
+        "caption": caption
     }
     
     # Send to Node Service
-    print(f"[SendInternal] Sending to {phone} for {user_id}")
+    print(f"[SendInternal] Sending to {phone} for {user_id} (Media: {bool(media_url)})")
     with httpx.Client(trust_env=False) as client:
         response = client.post(url, json=payload, timeout=30.0)
         response.raise_for_status()
@@ -187,6 +194,8 @@ def send_message_internal(db: Session, user_id: str, phone: str, message: str, a
             user_id=user_id,
             phone=phone,
             content=message,
+            media_url=media_url,
+            media_type='image' if media_url else None,
             whatsapp_message_id=result.get('messageId'),
             client_id=client_id
         )
@@ -219,7 +228,9 @@ def send_whatsapp_message(
             str(current_user.id), 
             request.phone_number, 
             request.message,
-            client_id=request.client_id
+            client_id=request.client_id,
+            media_url=request.media_url,
+            caption=request.caption
         )
     except httpx.RequestError as e:
         print(f"[Send] RequestError: {e}")
@@ -340,15 +351,7 @@ def whatsapp_webhook(
         # if clone_status["has_active_clone"]:
         if clone_status["has_active_clone"]: 
             clone = clone_status["clone"]
-            # Mock clone object if real one missing (safety fallback)
-            # class MockClone:
-            #     id = "forced_debug_clone"
-            #     user_id = user_id
-            #     personality = "amable y servicial"
-            #     strategy = "ayudar al cliente"
-            #     examples = []
-                
-            # clone = clone_status.get("clone") or MockClone()
+            
             print(f"[AI Clone + Memory] User {user_id} has active clone, generating response with memory...", flush=True)
             
             # Get recent conversation history for context
@@ -373,20 +376,23 @@ def whatsapp_webhook(
             
             ai_response = ai_result.get("response", "")
             confidence = ai_result.get("confidence", 0)
-            memory_updated = ai_result.get("memory_updated", False)
+            media_url = ai_result.get("media_url")
+            media_caption = ai_result.get("media_caption")
             
-            print(f"[AI Clone + Memory] Generated response (confidence: {confidence}, memory_updated: {memory_updated})")
+            print(f"[AI Clone + Memory] Generated response (confidence: {confidence})")
             print(f"[AI Clone + Memory] Response: {ai_response[:100]}...")
             
             # Only send if we have a response and decent confidence
-            if ai_response and confidence >= 0.3:
+            if (ai_response or media_url) and confidence >= 0.3:
                 # Send the AI response via WhatsApp
                 try:
                     send_result = send_whatsapp_message_sync(
                         user_id=user_id,
                         phone_number=sender_phone,
-                        message=ai_response,
-                        client_id=client.id
+                        message=ai_response or media_caption or "Imagen enviada",
+                        client_id=client.id,
+                        media_url=media_url,
+                        caption=media_caption
                     )
                     
                     # Save AI response as outbound message
@@ -396,7 +402,9 @@ def whatsapp_webhook(
                         client_id=client.id,
                         phone=sender_phone,
                         direction="outbound",
-                        content=ai_response,
+                        content=ai_response or media_caption or "Imagen enviada",
+                        media_url=media_url,
+                        media_type='image' if media_url else None,
                         status="sent"
                     )
                     db.add(ai_message)

@@ -4,14 +4,16 @@ Unified Brain: Uses same Logic & Tools as ai_service.py
 """
 import os
 import json
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from openai import OpenAI
 
 from app.services.calculator import CalculatorService
 from app.services.calendar_integration import CalendarService
 from app.utils.agent_tools import update_conversation_state, get_conversation_state
+from app.models import InventoryItem
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
@@ -63,6 +65,7 @@ Ray: "Perfecto, un Corolla es gran auto. Déjame hacerte los números..." (ESTO 
    Cuando el cliente confirme hora/fecha, NO SOLO DIGAS "Agendado".
    TIENES QUE EJECUTAR ESTA TOOL para que quede en el sistema.
    Si no ejecutas la tool, la cita NO EXISTE.
+4. `send_vehicle_photos`: Úsala OBLIGATORIAMENTE cuando el cliente pida ver el auto, fotos, o detalles visuales del el inventario.
 
 ⚠️ SI NO DAS UN NÚMERO, ESTÁS FALLANDO EN TU MISIÓN.
 
@@ -144,6 +147,21 @@ RAY_TOOLS = [
                 "required": ["datetime_iso"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "send_vehicle_photos",
+            "description": "Send photos of a vehicle from inventory to the user via WhatsApp. Use ONLY when user asks for photos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "model_name": {"type": "string", "description": "The exact model name to search for (e.g. 'Corolla', 'Camry', 'RAV4')."},
+                    "features_requested": {"type": "boolean", "description": "If user asked for details/features too."}
+                },
+                "required": ["model_name"]
+            }
+        }
     }
 ]
 
@@ -161,7 +179,7 @@ def process_message_with_agent(
     """
     Main entry point for the RAY agent (V2 Unified Brain).
     Connects to OpenAI, uses tools, and manages state.
-    NOW WITH MEMORY SYSTEM: Ray remembers everything about each client.
+    NOW WITH MEMORY SYSTEM & VEHICLE PHOTOS.
     """
     from app.services.memory_service import MemoryService
     
@@ -206,7 +224,7 @@ Si hay objeciones previas, tenlas en cuenta al responder.
 """
     
     # === STEP 4: Call OpenAI with full context ===
-    response_text = _call_openai_with_tools(
+    response_text, media_info = _call_openai_with_tools(
         system_prompt=RAY_SYSTEM_PROMPT + "\n" + context_str,
         user_message=buyer_message,
         history=conversation_history,
@@ -251,7 +269,9 @@ Si hay objeciones previas, tenlas en cuenta al responder.
         "stage": "RAY_V2_AUTO",
         "status_color": "green",
         "state_update": state,
-        "memory_updated": True
+        "memory_updated": True,
+        "media_url": media_info.get("url") if media_info else None,
+        "media_caption": media_info.get("caption") if media_info else None
     }
 
 def _call_openai_with_tools(
@@ -261,11 +281,15 @@ def _call_openai_with_tools(
     db: Session = None,
     client_id: str = None,
     user_id: str = None
-) -> str:
-    """Call OpenAI API with Tools. Now with DB context for appointment scheduling."""
+) -> Tuple[str, Optional[Dict[str, str]]]:
+    """
+    Call OpenAI API with Tools. 
+    Returns: (response_text, media_info_dict)
+    """
+    media_info = None # Store image info if tool finds one
     
     if not OPENAI_API_KEY:
-        return "Error: OPENAI_API_KEY missing."
+        return "Error: OPENAI_API_KEY missing.", None
     
     client = OpenAI(api_key=OPENAI_API_KEY)
     
@@ -278,22 +302,27 @@ def _call_openai_with_tools(
     
     messages.append({"role": "user", "content": user_message})
     
-    # === APPOINTMENT KEYWORD DETECTION ===
-    # If user mentions appointment-related words, FORCE the tool
+    # === APPOINTMENT & PHOTO KEYWORD DETECTION ===
+    user_msg_lower = user_message.lower()
+    
     appointment_keywords = [
         "cita", "agendar", "agéndame", "agendame", "agenda", "appointment",
         "mañana", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo",
         "10am", "10:00", "11am", "2pm", "3pm", "4pm", "5pm",
         "a las", "para el", "para mañana", "nos vemos"
     ]
+    photo_keywords = ["foto", "ver", "photo", "image", "imagen"]
     
-    user_msg_lower = user_message.lower()
     should_force_appointment = any(kw in user_msg_lower for kw in appointment_keywords)
+    should_suggest_photo = any(kw in user_msg_lower for kw in photo_keywords)
     
     # Determine tool_choice
     if should_force_appointment:
         print(f"[SalesAgent] 🎯 Appointment keywords detected! Forcing schedule_appointment tool.")
         tool_choice_param = {"type": "function", "function": {"name": "schedule_appointment"}}
+    elif should_suggest_photo:
+         print(f"[SalesAgent] 📸 Photo keywords detected! Hinting auto tool choice.")
+         tool_choice_param = "auto"
     else:
         tool_choice_param = "auto"
     
@@ -347,10 +376,9 @@ def _call_openai_with_tools(
                     # Call Calendar Service to create appointment
                     dt_iso = func_args.get("datetime_iso")
                     notes = func_args.get("notes", "")
-                    client_name = func_args.get("client_name")  # Name provided by client
+                    client_name = func_args.get("client_name")
                     
                     try:
-                        # Correct import from the new service location
                         from app.utils.calendar_service import CalendarService as CalSvc
                         
                         appt = CalSvc.create_appointment(
@@ -359,9 +387,8 @@ def _call_openai_with_tools(
                             user_id=user_id,
                             start_time=dt_iso,
                             notes=notes,
-                            client_name=client_name  # Pass to update client profile
+                            client_name=client_name
                         )
-                        # Format success output
                         tool_output = json.dumps({
                             "status": "success", 
                             "appointment_id": appt.id, 
@@ -371,6 +398,49 @@ def _call_openai_with_tools(
                     except Exception as e:
                         print(f"[SalesAgent] Error scheduling appointment: {e}")
                         tool_output = json.dumps({"status": "error", "message": str(e)})
+
+                elif func_name == "send_vehicle_photos":
+                    model_name = func_args.get("model_name")
+                    print(f"[SalesAgent] Searching photo for: {model_name}")
+                    if not model_name:
+                        tool_output = "Error: No model name provided."
+                    else:
+                        # Scan DB for inventory
+                        # Clean model name (remove year/make if present roughly)
+                        # Just search partial match
+                        
+                        # Fix: use %like% search
+                        items = db.query(InventoryItem).filter(
+                            InventoryItem.user_id == user_id,
+                            or_(
+                                InventoryItem.model.ilike(f"%{model_name}%"),
+                                InventoryItem.make.ilike(f"%{model_name}%")
+                            )
+                        ).limit(5).all()
+                        
+                        # Pick best match or first
+                        item = items[0] if items else None
+                        
+                        if item and item.primary_image_url:
+                            # FOUND!
+                            caption = f"Aquí tienes el {item.year} {item.make} {item.model}. "
+                            if item.description:
+                                caption += f"\n\n{item.description[:200]}..."
+                            
+                            media_info = {
+                                "url": item.primary_image_url,
+                                "caption": caption
+                            }
+                            tool_output = json.dumps({
+                                "status": "success",
+                                "message": "Hidden success: Image URL found and will be sent by system.", 
+                                "found_model": f"{item.year} {item.model}"
+                            })
+                        else:
+                            tool_output = json.dumps({
+                                "status": "not_found",
+                                "message": f"No photos found for {model_name} in inventory."
+                            })
                 
                 messages.append({
                     "tool_call_id": tool_call.id,
@@ -385,10 +455,10 @@ def _call_openai_with_tools(
                 messages=messages,
                 temperature=0.7
             )
-            return final_res.choices[0].message.content.strip()
+            return final_res.choices[0].message.content.strip(), media_info
             
-        return response_msg.content.strip()
+        return response_msg.content.strip(), media_info
 
     except Exception as e:
         print(f"[SalesAgent] Error: {e}")
-        return "Hubo un error procesando tu solicitud. Intenta de nuevo."
+        return "Hubo un error procesando tu solicitud. Intenta de nuevo.", None

@@ -196,7 +196,7 @@ app.get('/api/whatsapp/status/:userId', (req, res) => {
 
 // Send Message
 app.post('/api/whatsapp/send', async (req, res) => {
-    const { userId, phoneNumber, message } = req.body;
+    const { userId, phoneNumber, message, mediaUrl, caption } = req.body;
     const session = sessions.get(userId);
 
     if (!session || session.status !== 'connected') {
@@ -214,15 +214,25 @@ app.post('/api/whatsapp/send', async (req, res) => {
         }
 
         // Verify number existence (optional, can skip for speed or use sock.onWhatsApp)
-        const exists = await session.sock.onWhatsApp(jid);
-        if (!exists || exists.length === 0) {
-            return res.status(400).json({ error: 'Number not registered on WhatsApp' });
+        // const exists = await session.sock.onWhatsApp(jid);
+        // if (!exists || exists.length === 0) {
+        //     return res.status(400).json({ error: 'Number not registered on WhatsApp' });
+        // }
+        // jid = exists[0].jid; // Use the returned correct JID
+
+        let content = {};
+        if (mediaUrl) {
+            content = {
+                image: { url: mediaUrl },
+                caption: caption || message
+            };
+        } else {
+            content = { text: message };
         }
-        jid = exists[0].jid; // Use the returned correct JID
 
-        const msg = await session.sock.sendMessage(jid, { text: message });
+        const msg = await session.sock.sendMessage(jid, content);
 
-        log(`Message sent to ${jid}`);
+        log(`Message sent to ${jid} (Media: ${!!mediaUrl})`);
         res.json({ success: true, messageId: msg.key.id });
 
     } catch (error) {
