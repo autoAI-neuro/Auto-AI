@@ -78,3 +78,59 @@ async def seed_inventory(current_user: User = Depends(get_current_user), db: Ses
         
     db.commit()
     return {"message": f"Seeded {len(sample_cars)} cars"}
+
+@router.post("/resync")
+async def resync_inventory(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Force re-sync inventory from Vercel catalog.json"""
+    import requests
+    import uuid
+    
+    catalog_url = "https://auto-ai-beta.vercel.app/inventory/catalog.json"
+    
+    try:
+        res = requests.get(catalog_url, timeout=15)
+        res.raise_for_status()
+        data = res.json()
+        
+        updated = 0
+        created = 0
+        
+        for brand_data in data.get("brands", []):
+            make = brand_data["name"]
+            for model_data in brand_data.get("models", []):
+                model_name = model_data["name"]
+                
+                item = db.query(InventoryItem).filter(
+                    InventoryItem.user_id == current_user.id,
+                    InventoryItem.make == make,
+                    InventoryItem.model == model_name
+                ).first()
+                
+                if not item:
+                    item = InventoryItem(
+                        id=str(uuid.uuid4()),
+                        user_id=current_user.id,
+                        make=make,
+                        model=model_name
+                    )
+                    db.add(item)
+                    created += 1
+                else:
+                    updated += 1
+                
+                item.year = model_data.get("year", 2025)
+                item.primary_image_url = model_data.get("image")
+                item.description = model_data.get("qualities")
+                item.price = 30000.0
+                item.status = "available"
+        
+        db.commit()
+        
+        return {
+            "status": "success",
+            "message": f"Synced inventory: {created} created, {updated} updated",
+            "total_catalog_models": sum(len(b.get("models", [])) for b in data.get("brands", []))
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Sync failed: {str(e)}")
