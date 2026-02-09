@@ -321,8 +321,8 @@ def _call_openai_with_tools(
         print(f"[SalesAgent] 🎯 Appointment keywords detected! Forcing schedule_appointment tool.")
         tool_choice_param = {"type": "function", "function": {"name": "schedule_appointment"}}
     elif should_suggest_photo:
-         print(f"[SalesAgent] 📸 Photo keywords detected! Hinting auto tool choice.")
-         tool_choice_param = "auto"
+         print(f"[SalesAgent] 📸 Photo keywords detected! Forcing tool choice: send_vehicle_photos")
+         tool_choice_param = {"type": "function", "function": {"name": "send_vehicle_photos"}}
     else:
         tool_choice_param = "auto"
     
