@@ -10,6 +10,12 @@
                     "qualities": "Confiable • Económico • Bajo consumo • Ideal para ciudad"
                 },
                 {
+                    "name": "Corolla Hatchback",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Corolla_Hatchback/corolla_hatchback_1.png",
+                    "year": 2026,
+                    "qualities": "Deportivo • Compacto • Ágil • Diseño moderno"
+                },
+                {
                     "name": "Corolla Cross Hybrid",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Corolla_Cross_Hybrid/corolla_cross_hybrid_1.png",
                     "year": 2026,
@@ -52,6 +58,12 @@
                     "qualities": "🔋 100% Híbrido • SUV premium • Diseño elegante • AWD"
                 },
                 {
+                    "name": "C-HR",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/C-HR/chr_1.png",
+                    "year": 2026,
+                    "qualities": "Crossover compacto • Diseño audaz • Deportivo • Urbano"
+                },
+                {
                     "name": "Sienna",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Sienna/sienna_1.png",
                     "year": 2026,
@@ -70,10 +82,22 @@
                     "qualities": "🔋 Híbrido • Full-size SUV • 3 filas • Lujo y poder"
                 },
                 {
+                    "name": "Land Cruiser",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Land_Cruiser/land_cruiser_1.png",
+                    "year": 2026,
+                    "qualities": "🔋 Híbrido • Legendario • Off-road premium • Herencia 4x4"
+                },
+                {
                     "name": "Tacoma",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Tacoma/tacoma_1.jpg",
                     "year": 2026,
                     "qualities": "Pick-up versátil • Trabajo pesado • Duradera • Todo terreno"
+                },
+                {
+                    "name": "Tacoma Hybrid",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Tacoma_Hybrid/tacoma_hybrid_1.png",
+                    "year": 2025,
+                    "qualities": "🔋 Híbrido • Pick-up eficiente • TRD Off-Road • Aventura eco"
                 },
                 {
                     "name": "Tundra",
@@ -88,6 +112,12 @@
                     "qualities": "Deportivo puro • 382 HP • Diseño icónico • Adrenalina"
                 },
                 {
+                    "name": "GR86",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/GR86/gr86_1.png",
+                    "year": 2026,
+                    "qualities": "🏎️ Deportivo • 228 HP • RWD puro • Track ready"
+                },
+                {
                     "name": "Prius",
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Prius/prius_1.jpg",
                     "year": 2026,
@@ -98,6 +128,12 @@
                     "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Prius_Prime/prius_prime_1.png",
                     "year": 2026,
                     "qualities": "⚡ Plug-in Hybrid • 44 mi eléctrico • Máxima eficiencia"
+                },
+                {
+                    "name": "Mirai",
+                    "image": "https://auto-ai-beta.vercel.app/inventory/Toyota/Mirai/mirai_1.png",
+                    "year": 2026,
+                    "qualities": "💧 Hidrógeno • Cero emisiones • 400 mi rango • Futuro hoy"
                 },
                 {
                     "name": "bZ4X",
