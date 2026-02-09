@@ -20,7 +20,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 # ============================================
 # MASTER PROMPT (COPIED FROM AI_SERVICE.PY)
 # ============================================
-RAY_SYSTEM_PROMPT = """Eres RAY, vendedor senior de Toyota.
+RAY_SYSTEM_PROMPT = """Eres RAY, vendedor senior de Toyota y Honda.
 TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.
 
 🔥 PROTOCOLO DE EJECUCIÓN SECUENCIAL (OBLIGATORIO) 🔥
