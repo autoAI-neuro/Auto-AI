@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 import httpx
-from typing import List
+from typing import List, Optional
 from app.db.session import get_db
 from app.models import User, Client, get_uuid
 from app.deps import get_current_user
