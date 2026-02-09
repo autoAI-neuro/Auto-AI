@@ -11,18 +11,15 @@ from app.models import InventoryItem, User, get_uuid
 def migrate():
     db = SessionLocal()
     try:
-        # 1. Get User
-        user = db.query(User).first()
-        if not user:
-            print("No user found. Run seed_db.py first or create a user.")
+        # 1. Get ALL Users (Fix: Seed for everyone so the bot works for any logged in user)
+        users = db.query(User).all()
+        if not users:
+            print("No users found in DB. Skipping inventory migration.")
             return
 
-        print(f"Migrating inventory for user: {user.email}")
-
-        # 2. Load JSON from URL (Robust for Railway)
+        # 2. Load JSON from URL
         catalog_url = "https://auto-ai-beta.vercel.app/inventory/catalog.json"
-        print(f"Fetching catalog from: {catalog_url}")
-        
+        # ... fetch logic ...
         import requests
         try:
             res = requests.get(catalog_url)
@@ -32,45 +29,43 @@ def migrate():
             print(f"Error fetching catalog from URL: {e}")
             return
 
-        # 3. Process Items
-        count = 0
-        for brand_data in data.get("brands", []):
-            make = brand_data["name"]
-            print(f"Processing {make}...")
-            
-            for model_data in brand_data.get("models", []):
-                model_name = model_data["name"]
+        # 3. Process Items for EACH user
+        total_count = 0
+        for user in users:
+            print(f"Processing inventory for user: {user.email} ({user.id})")
+            for brand_data in data.get("brands", []):
+                make = brand_data["name"]
                 
-                # Check if exists
-                item = db.query(InventoryItem).filter(
-                    InventoryItem.user_id == user.id,
-                    InventoryItem.make == make,
-                    InventoryItem.model == model_name
-                ).first()
-                
-                if not item:
-                    item = InventoryItem(
-                        id=get_uuid(),
-                        user_id=user.id,
-                        make=make,
-                        model=model_name
-                    )
-                    db.add(item)
-                    print(f"  Creating {model_name}")
-                else:
-                    print(f"  Updating {model_name}")
-                
-                # Update attributes
-                item.year = model_data.get("year", 2025)
-                item.primary_image_url = model_data.get("image")
-                item.description = model_data.get("qualities")
-                item.price = 30000.0 # Default price as JSON doesn't have it
-                item.status = "available"
-                
-                count += 1
+                for model_data in brand_data.get("models", []):
+                    model_name = model_data["name"]
+                    
+                    # Check if exists for THIS user
+                    item = db.query(InventoryItem).filter(
+                        InventoryItem.user_id == user.id,
+                        InventoryItem.make == make,
+                        InventoryItem.model == model_name
+                    ).first()
+                    
+                    if not item:
+                        item = InventoryItem(
+                            id=get_uuid(),
+                            user_id=user.id,
+                            make=make,
+                            model=model_name
+                        )
+                        db.add(item)
+                    
+                    # Update attributes
+                    item.year = model_data.get("year", 2025)
+                    item.primary_image_url = model_data.get("image")
+                    item.description = model_data.get("qualities")
+                    item.price = 30000.0
+                    item.status = "available"
+                    
+                    total_count += 1
         
         db.commit()
-        print(f"Migration Complete! Processed {count} vehicle models.")
+        print(f"Migration Complete! Processed {total_count} items across {len(users)} users.")
         
     except Exception as e:
         print(f"Migration failed: {e}")
