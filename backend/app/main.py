@@ -30,17 +30,61 @@ async def startup_event():
     except Exception as e:
         print(f"Migration Error: {e}")
 
-    # 3. Auto-Sync Inventory (Railway Fix)
+    # 3. Auto-Sync Inventory (Railway Fix - INLINE to avoid import issues)
     try:
         print("[Startup] Syncing Inventory from Vercel...")
-        # Add parent dir to path if needed to find migrate_inventory.py
-        import sys
-        sys.path.append(os.getcwd()) 
-        from migrate_inventory import migrate
-        migrate()
-        print("[Startup] Inventory Sync Complete.")
+        import requests
+        from app.db.session import SessionLocal
+        from app.models import User, InventoryItem, get_uuid
+        
+        sync_db = SessionLocal()
+        try:
+            users = sync_db.query(User).all()
+            if not users:
+                print("[Startup] No users found, skipping inventory sync.")
+            else:
+                # Fetch catalog
+                catalog_url = "https://auto-ai-beta.vercel.app/inventory/catalog.json"
+                res = requests.get(catalog_url, timeout=10)
+                res.raise_for_status()
+                data = res.json()
+                
+                total_count = 0
+                for user in users:
+                    print(f"[Startup] Syncing for user: {user.email}")
+                    for brand_data in data.get("brands", []):
+                        make = brand_data["name"]
+                        for model_data in brand_data.get("models", []):
+                            model_name = model_data["name"]
+                            
+                            item = sync_db.query(InventoryItem).filter(
+                                InventoryItem.user_id == user.id,
+                                InventoryItem.make == make,
+                                InventoryItem.model == model_name
+                            ).first()
+                            
+                            if not item:
+                                item = InventoryItem(
+                                    id=get_uuid(),
+                                    user_id=user.id,
+                                    make=make,
+                                    model=model_name
+                                )
+                                sync_db.add(item)
+                            
+                            item.year = model_data.get("year", 2025)
+                            item.primary_image_url = model_data.get("image")
+                            item.description = model_data.get("qualities")
+                            item.price = 30000.0
+                            item.status = "available"
+                            total_count += 1
+                
+                sync_db.commit()
+                print(f"[Startup] ✅ Inventory Sync Complete! {total_count} items for {len(users)} users.")
+        finally:
+            sync_db.close()
     except Exception as e:
-        print(f"[Startup] Inventory Sync Failed: {e}")
+        print(f"[Startup] ❌ Inventory Sync Failed: {e}")
 
 # CORS Configuration - Must be added BEFORE including routers
 app.add_middleware(
