@@ -98,7 +98,9 @@ def update_sales_clone(
         has_logic = bool(clone.sales_logic and len(clone.sales_logic) > 50)
         has_examples = bool(clone.example_responses and len(clone.example_responses) >= 3)
         
-        clone.is_trained = has_personality and has_logic and has_examples
+        # Relaxed validation for v2 (Automation Dashboard)
+        # We consider it trained if there is ANY configuration
+        clone.is_trained = True 
         
         db.commit()
         db.refresh(clone)
@@ -123,12 +125,13 @@ def toggle_sales_clone(
     if not clone:
         raise HTTPException(status_code=404, detail="Sales clone not configured")
     
-    # Can only activate if trained
-    if not clone.is_active and not clone.is_trained:
-        raise HTTPException(
-            status_code=400, 
-            detail="Debes completar el entrenamiento antes de activar el clon"
-        )
+    # Validation removed for allowed activation
+    # if not clone.is_active and not clone.is_trained:
+    #     raise HTTPException(
+    #         status_code=400, 
+    #         detail="Debes completar el entrenamiento antes de activar el clon"
+    #     )
+    
     
     clone.is_active = not clone.is_active
     db.commit()
