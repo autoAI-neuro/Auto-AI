@@ -30,6 +30,18 @@ async def startup_event():
     except Exception as e:
         print(f"Migration Error: {e}")
 
+    # 3. Auto-Sync Inventory (Railway Fix)
+    try:
+        print("[Startup] Syncing Inventory from Vercel...")
+        # Add parent dir to path if needed to find migrate_inventory.py
+        import sys
+        sys.path.append(os.getcwd()) 
+        from migrate_inventory import migrate
+        migrate()
+        print("[Startup] Inventory Sync Complete.")
+    except Exception as e:
+        print(f"[Startup] Inventory Sync Failed: {e}")
+
 # CORS Configuration - Must be added BEFORE including routers
 app.add_middleware(
     CORSMiddleware,
