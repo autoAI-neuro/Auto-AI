@@ -431,6 +431,7 @@ def _call_openai_with_tools(
                                 "url": item.primary_image_url,
                                 "caption": caption
                             }
+                            print(f"[SalesAgent] 🖼️ MEDIA FOUND: {item.primary_image_url[:50]}...")
                             tool_output = json.dumps({
                                 "status": "success",
                                 "message": "Hidden success: Image URL found and will be sent by system.", 

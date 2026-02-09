@@ -381,6 +381,7 @@ def whatsapp_webhook(
             
             print(f"[AI Clone + Memory] Generated response (confidence: {confidence})")
             print(f"[AI Clone + Memory] Response: {ai_response[:100]}...")
+            print(f"[AI Clone + Memory] 📷 MEDIA URL: {media_url}")
             
             # Only send if we have a response and decent confidence
             if (ai_response or media_url) and confidence >= 0.3:
