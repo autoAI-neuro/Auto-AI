@@ -205,11 +205,19 @@ app.get('/api/whatsapp/status/:userId', (req, res) => {
 });
 
 // ============================================
-// ENVIAR MENSAJE
+// ENVIAR MENSAJE (Con soporte para Media)
 // ============================================
 app.post('/api/whatsapp/send', async (req, res) => {
-    // Adapter for compatibility with existing frontend request: { userId, phoneNumber, message }
-    const { userId, phoneNumber, message } = req.body;
+    // Extract all possible fields from request
+    const { userId, phoneNumber, message, mediaUrl, caption } = req.body;
+
+    // DEBUG LOGS
+    console.log('[Send API] 📦 Request received:');
+    console.log(`  userId: ${userId}`);
+    console.log(`  phoneNumber: ${phoneNumber}`);
+    console.log(`  message: ${message?.substring(0, 50)}...`);
+    console.log(`  mediaUrl: ${mediaUrl || 'NULL'}`);
+    console.log(`  caption: ${caption?.substring(0, 50) || 'NULL'}`);
 
     const client = clients.get(userId);
 
@@ -245,8 +253,18 @@ app.post('/api/whatsapp/send', async (req, res) => {
     }
 
     try {
-        const result = await client.sendText(phoneNumber, message);
+        let result;
 
+        // Check if we have media to send
+        if (mediaUrl) {
+            console.log(`[Send API] 🖼️ SENDING IMAGE: ${mediaUrl}`);
+            result = await client.sendMedia(phoneNumber, mediaUrl, 'image', caption || message || '');
+        } else {
+            console.log(`[Send API] 💬 SENDING TEXT ONLY`);
+            result = await client.sendText(phoneNumber, message);
+        }
+
+        console.log(`[Send API] ✅ Message sent (Media: ${!!mediaUrl})`);
         res.json({
             status: 'sent',
             messageId: result.key.id,
@@ -254,7 +272,7 @@ app.post('/api/whatsapp/send', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('Error enviando mensaje:', error);
+        console.error('[Send API] ❌ Error enviando mensaje:', error);
         res.status(500).json({
             status: 'error',
             message: error.message
