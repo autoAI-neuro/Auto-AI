@@ -418,6 +418,11 @@ def _call_openai_with_tools(
                             )
                         ).limit(5).all()
                         
+                        # Debug: log all found items
+                        print(f"[SalesAgent] 🔍 Search for '{model_name}' found {len(items)} items:")
+                        for idx, i in enumerate(items):
+                            print(f"  [{idx}] {i.year} {i.make} {i.model} | img: {i.primary_image_url[:60] if i.primary_image_url else 'NO IMAGE'}")
+                        
                         # Pick best match or first
                         item = items[0] if items else None
                         
