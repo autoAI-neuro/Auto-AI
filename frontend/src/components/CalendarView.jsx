@@ -200,7 +200,18 @@ const CalendarView = ({ onQuickSend }) => {
 
         const firstName = event.client.name ? event.client.name.split(' ')[0] : 'Cliente';
         const time = event.time || '10:00 AM';
-        const dateStr = new Date().toLocaleDateString('es-ES');
+
+        // Fix: Use correct date context
+        let dateObj = new Date();
+        if (event.type === 'appointment' && event.rawAppt?.start) {
+            dateObj = new Date(event.rawAppt.start);
+        } else if (event.day) {
+            // Reconstruct date from current view (approximate for recurrence, but better than today)
+            dateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), event.day);
+        }
+
+        // Format to Spanish date (e.g., "lunes, 12 de febrero")
+        const dateStr = dateObj.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long' });
 
         // Robust replacement for all variables
         const message = rawTemplate

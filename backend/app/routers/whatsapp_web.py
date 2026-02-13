@@ -348,6 +348,11 @@ def whatsapp_webhook(
         clone_status = check_clone_status(db, user_id)
         print(f"[Webhook DEBUG] Clone Status for {user_id}: {clone_status}", flush=True)
         
+        # CHECK AUTOMATION FLAG (Request #1)
+        if client and hasattr(client, 'automation_enabled') and client.automation_enabled is False:
+            print(f"[Webhook] 🛑 Automation DISABLED for client {client.name} ({client.phone}). Skipping AI.")
+            return {"status": "skipped", "reason": "automation_disabled"}
+        
         # if clone_status["has_active_clone"]:
         if clone_status["has_active_clone"]: 
             clone = clone_status["clone"]

@@ -7,6 +7,7 @@ class ClientBase(BaseModel):
     phone: str
     email: Optional[EmailStr] = None
     status: Optional[str] = "new"
+    automation_enabled: Optional[bool] = True # Request #1
     tags: Optional[str] = None
     notes: Optional[str] = None
     
@@ -38,6 +39,7 @@ class ClientUpdate(BaseModel):
     car_model: Optional[str] = None
     car_year: Optional[int] = None
     interest_rate: Optional[float] = None
+    automation_enabled: Optional[bool] = None
 
 
 

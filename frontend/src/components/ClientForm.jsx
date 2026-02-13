@@ -15,6 +15,7 @@ const ClientForm = ({ onClose, onSubmit, initialData = {} }) => {
         car_year: initialData.car_year || '',
         purchase_date: initialData.purchase_date || '',
         interest_rate: initialData.interest_rate || '',
+        automation_enabled: initialData.automation_enabled !== false, // Default true
 
         notes: initialData.notes || '',
         tags: initialData.tags || ''
@@ -187,6 +188,21 @@ const ClientForm = ({ onClose, onSubmit, initialData = {} }) => {
                             placeholder="Etiquetas (separadas por coma)"
                             className="input-elegant w-full"
                         />
+                        <div className="flex items-center gap-3 pt-2">
+                            <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    name="automation_enabled"
+                                    checked={formData.automation_enabled}
+                                    onChange={(e) => setFormData(prev => ({ ...prev, automation_enabled: e.target.checked }))}
+                                    className="sr-only peer"
+                                />
+                                <div className="w-11 h-6 bg-neutral-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                <span className="ml-3 text-sm font-medium text-neutral-300">
+                                    {formData.automation_enabled ? 'IA Automática Activada' : 'IA Desactivada (Solo Manual)'}
+                                </span>
+                            </label>
+                        </div>
                     </div>
 
                     <div className="flex justify-end gap-3 pt-4 border-t border-white/5 sticky bottom-0 bg-neutral-900">

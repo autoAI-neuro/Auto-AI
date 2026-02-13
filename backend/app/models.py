@@ -36,7 +36,8 @@ class Client(Base):
     email = Column(String, nullable=True)
     status = Column(String, default="new")  # new, contacted, interested, closed, lost
     tags = Column(String, nullable=True)    # Comma-separated tags
-    notes = Column(String, nullable=True)
+    notes = Column(Text, nullable=True)
+    automation_enabled = Column(Boolean, default=True) # Request #1: Allow disabling automation per client
     
     # Phase 2: Expanded Fields
     last_name = Column(String, nullable=True)

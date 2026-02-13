@@ -29,3 +29,7 @@ Thumbs.db
 
 # Backups (don't deploy these)
 backups/
+
+# Secrets
+token.json
+credentials.json

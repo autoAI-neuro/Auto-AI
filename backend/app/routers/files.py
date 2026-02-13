@@ -141,15 +141,43 @@ def import_clients(
                 # Check Duplicate
                 existing = db.query(Client).filter(Client.user_id == current_user.id, Client.phone == phone_clean).first()
                 if existing:
-                    # Update missing info if found in import
+                    # Update info if found in import (Upsert Logic)
                     updated = False
-                    if not existing.birth_date and 'birth_date' in mapping:
+                    
+                    # Update Name if different (and not empty)
+                    if name and existing.name != name:
+                        existing.name = name
+                        updated = True
+                        
+                    # Helper to update if new val is present
+                    def update_if_present(obj, attr, val):
+                        if val and getattr(obj, attr) != val:
+                            setattr(obj, attr, val)
+                            return True
+                        return False
+
+                    # Update fields
+                    if 'email' in mapping: updated |= update_if_present(existing, 'email', str(row[mapping['email']]).strip())
+                    if 'address' in mapping: updated |= update_if_present(existing, 'address', str(row[mapping['address']]).strip())
+                    if 'notes' in mapping: 
+                        new_note = str(row[mapping['notes']]).strip()
+                        if new_note and new_note not in (existing.notes or ""):
+                            existing.notes = (existing.notes or "") + f"\n[{datetime.date.today()}] {new_note}"
+                            updated = True
+
+                    # Car Details
+                    if 'car_make' in mapping: updated |= update_if_present(existing, 'car_make', str(row[mapping['car_make']]).strip())
+                    if 'car_model' in mapping: updated |= update_if_present(existing, 'car_model', str(row[mapping['car_model']]).strip())
+                    if 'car_year' in mapping: updated |= update_if_present(existing, 'car_year', safe_int(row[mapping['car_year']]))
+                    
+                    # Dates
+                    if 'birth_date' in mapping:
                          bdate = safe_date(row[mapping.get('birth_date')])
                          if bdate: 
                              existing.birth_date = bdate
                              updated = True
                     
-                    if not existing.purchase_date and 'purchase_date' in mapping:
+                    if 'purchase_date' in mapping:
                          pdate = safe_date(row[mapping.get('purchase_date')])
                          if pdate: 
                              existing.purchase_date = pdate

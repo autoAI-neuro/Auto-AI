@@ -306,23 +306,20 @@ def _call_openai_with_tools(
     user_msg_lower = user_message.lower()
     
     appointment_keywords = [
-        "cita", "agendar", "agéndame", "agendame", "agenda", "appointment",
+        "cita", "agenda", "agéndame", "agendame", "appointment",
         "mañana", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo",
         "10am", "10:00", "11am", "2pm", "3pm", "4pm", "5pm",
         "a las", "para el", "para mañana", "nos vemos"
     ]
-    photo_keywords = ["foto", "ver", "photo", "image", "imagen"]
     
     should_force_appointment = any(kw in user_msg_lower for kw in appointment_keywords)
-    should_suggest_photo = any(kw in user_msg_lower for kw in photo_keywords)
+    
+    # REMOVED: Aggressive photo forcing. Let the AI decide based on context.
     
     # Determine tool_choice
     if should_force_appointment:
         print(f"[SalesAgent] 🎯 Appointment keywords detected! Forcing schedule_appointment tool.")
         tool_choice_param = {"type": "function", "function": {"name": "schedule_appointment"}}
-    elif should_suggest_photo:
-         print(f"[SalesAgent] 📸 Photo keywords detected! Forcing tool choice: send_vehicle_photos")
-         tool_choice_param = {"type": "function", "function": {"name": "send_vehicle_photos"}}
     else:
         tool_choice_param = "auto"
     
@@ -405,28 +402,38 @@ def _call_openai_with_tools(
                     if not model_name:
                         tool_output = "Error: No model name provided."
                     else:
-                        # Scan DB for inventory
-                        # Clean model name (remove year/make if present roughly)
-                        # Just search partial match
+                        # Improved Search Logic
+                        # 1. Try exact match (flexible case)
+                        # 2. Try partial match
+                        # 3. Try splitting terms (e.g. "Toyota Corolla" -> search "Corolla")
                         
-                        # Fix: use %like% search
-                        items = db.query(InventoryItem).filter(
-                            InventoryItem.user_id == user_id,
-                            or_(
-                                InventoryItem.model.ilike(f"%{model_name}%"),
-                                InventoryItem.make.ilike(f"%{model_name}%")
-                            )
-                        ).limit(5).all()
+                        search_terms = [model_name]
+                        if " " in model_name:
+                            search_terms.extend(model_name.split(" "))
+                            
+                        items = []
+                        for term in search_terms:
+                            if len(term) < 3: continue # Skip short terms
+                            
+                            found = db.query(InventoryItem).filter(
+                                InventoryItem.user_id == user_id,
+                                or_(
+                                    InventoryItem.model.ilike(f"%{term}%"),
+                                    InventoryItem.make.ilike(f"%{term}%")
+                                )
+                            ).limit(5).all()
+                            
+                            if found:
+                                items.extend(found)
+                                break # Stop if we found something with the first/best term
                         
                         # Debug: log all found items
-                        print(f"[SalesAgent] 🔍 Search for '{model_name}' found {len(items)} items:")
-                        for idx, i in enumerate(items):
-                            print(f"  [{idx}] {i.year} {i.make} {i.model} | img: {i.primary_image_url[:60] if i.primary_image_url else 'NO IMAGE'}")
+                        print(f"[SalesAgent] 🔍 Search for '{model_name}' found {len(items)} items")
                         
-                        # Pick best match or first
-                        item = items[0] if items else None
+                        # Pick best match (prefer one with image)
+                        item = next((i for i in items if i.primary_image_url), None)
                         
-                        if item and item.primary_image_url:
+                        if item:
                             # FOUND!
                             caption = f"Aquí tienes el {item.year} {item.make} {item.model}. "
                             if item.description:
@@ -445,7 +452,7 @@ def _call_openai_with_tools(
                         else:
                             tool_output = json.dumps({
                                 "status": "not_found",
-                                "message": f"No photos found for {model_name} in inventory."
+                                "message": f"No photos found for {model_name} in inventory. Tell the user you will check specifically."
                             })
                 
                 messages.append({

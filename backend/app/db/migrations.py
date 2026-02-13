@@ -35,4 +35,16 @@ def check_and_migrate_tables():
                 except Exception as e:
                     print(f"[Migration] Error adding interaction_count: {e}")
 
+        # 3. Check 'clients' for 'automation_enabled'
+        if inspector.has_table("clients"):
+            columns = [col["name"] for col in inspector.get_columns("clients")]
+            if "automation_enabled" not in columns:
+                print("[Migration] Adding missing column: clients.automation_enabled")
+                try:
+                    # Default True for existing clients
+                    conn.execute(text("ALTER TABLE clients ADD COLUMN automation_enabled BOOLEAN DEFAULT TRUE"))
+                    conn.commit()
+                except Exception as e:
+                    print(f"[Migration] Error adding automation_enabled: {e}")
+
     print("[Migration] Schema check complete.")

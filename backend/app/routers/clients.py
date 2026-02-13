@@ -144,6 +144,11 @@ def update_client(
     
     # Update fields provided in request
     update_data = client_in.dict(exclude_unset=True)
+    
+    # Explicitly handle automation_enabled if passed (it might be in dict, but just to be safe/clear)
+    # The loop below handles it if it's in the schema.
+    # We need to ensure the Schema (ClientUpdate) has this field.
+    
     for field, value in update_data.items():
         setattr(client, field, value)
         
