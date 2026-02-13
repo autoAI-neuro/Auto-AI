@@ -7,7 +7,7 @@ import json
 from typing import Optional, Dict, Any, List, Tuple
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from openai import OpenAI
 
 from app.services.calculator import CalculatorService
@@ -402,30 +402,41 @@ def _call_openai_with_tools(
                     if not model_name:
                         tool_output = "Error: No model name provided."
                     else:
-                        # Improved Search Logic
-                        # 1. Try exact match (flexible case)
-                        # 2. Try partial match
-                        # 3. Try splitting terms (e.g. "Toyota Corolla" -> search "Corolla")
+                        # Improved Search Logic (Smart Match)
+                        # We construct a full name "Make Model" and search against it.
+                        clean_query = model_name.strip()
                         
-                        search_terms = [model_name]
-                        if " " in model_name:
-                            search_terms.extend(model_name.split(" "))
-                            
-                        items = []
-                        for term in search_terms:
-                            if len(term) < 3: continue # Skip short terms
-                            
-                            found = db.query(InventoryItem).filter(
-                                InventoryItem.user_id == user_id,
-                                or_(
-                                    InventoryItem.model.ilike(f"%{term}%"),
-                                    InventoryItem.make.ilike(f"%{term}%")
-                                )
-                            ).limit(5).all()
-                            
-                            if found:
-                                items.extend(found)
-                                break # Stop if we found something with the first/best term
+                        # 1. Try matching the combined "Make Model" (Best for "Honda Pilot", "Toyota Corolla")
+                        items = db.query(InventoryItem).filter(
+                            InventoryItem.user_id == user_id,
+                            or_(
+                                # Match "Toyota Corolla" against "Toyota Corolla" (Make + Model)
+                                func.lower(func.concat(InventoryItem.make, " ", InventoryItem.model)).contains(clean_query.lower()),
+                                # Match "Corolla" against "Corolla" (Model only)
+                                InventoryItem.model.ilike(f"%{clean_query}%")
+                            )
+                        ).limit(5).all()
+
+                        # 2. Fallback: If no results, and query has spaces (e.g. "Pilot 2024"), try generic word match on MODEL only
+                        if not items and " " in clean_query:
+                             words = clean_query.split()
+                             # Filter out common makes to avoid "Honda" -> "Ridgeline" issue
+                             # (Simple heuristic: if word in simple list of known makes, ignore it for model search)
+                             # actually, just search model for the last word often works (e.g. "Honda Pilot" -> "Pilot")
+                             last_word = words[-1]
+                             if len(last_word) > 2:
+                                 items = db.query(InventoryItem).filter(
+                                     InventoryItem.user_id == user_id,
+                                     InventoryItem.model.ilike(f"%{last_word}%")
+                                 ).limit(5).all()
+
+                        # 3. Last Resort: Search by Make only (if user just said "Toyota")
+                        # Only do this if the query is SHORT (likely just a brand)
+                        if not items and len(clean_query.split()) == 1:
+                             items = db.query(InventoryItem).filter(
+                                 InventoryItem.user_id == user_id,
+                                 InventoryItem.make.ilike(f"%{clean_query}%")
+                             ).limit(5).all()
                         
                         # Debug: log all found items
                         print(f"[SalesAgent] 🔍 Search for '{model_name}' found {len(items)} items")
