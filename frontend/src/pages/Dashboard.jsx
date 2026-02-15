@@ -305,6 +305,24 @@ const Dashboard = () => {
         }
     };
 
+    const handleDeleteAll = async () => {
+        if (!confirm('⚠️ ¿ESTÁS SEGURO? ⚠️\n\nEsto eliminará TODOS tus clientes y sus citas.\nEsta acción NO se puede deshacer.')) return;
+
+        try {
+            const response = await api.delete('/clients/all', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            showNotification(`Limpieza completada: ${response.data.deleted_clients} eliminados`, 'success');
+            loadClients();
+            setStats(s => ({ ...s, totalClients: 0 }));
+            setSelectedClients([]);
+            setSelectAllGlobal(false);
+        } catch (err) {
+            console.error('Delete all error:', err);
+            showNotification('Error al limpiar base de datos', 'error');
+        }
+    };
+
     const toggleSelectClient = (id) => {
         if (selectAllGlobal) {
             setSelectAllGlobal(false);
@@ -559,6 +577,14 @@ const Dashboard = () => {
                                         Clientes
                                     </h2>
                                     <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={handleDeleteAll}
+                                            className="text-xs text-red-500 hover:text-red-400 transition-colors flex items-center gap-1 border border-red-500/30 px-2 py-1 rounded"
+                                            title="Borrar TODOS los clientes"
+                                        >
+                                            <Trash2 className="w-3 h-3" />
+                                            Limpiar Base
+                                        </button>
                                         <button
                                             onClick={selectAllClients}
                                             className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"

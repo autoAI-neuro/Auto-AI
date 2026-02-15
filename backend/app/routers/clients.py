@@ -207,3 +207,41 @@ def get_calendar_events(
         }
         for c in clients
     ]
+@router.delete("/all")
+def delete_all_clients(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Delete ALL clients for the current user.
+    Used for database cleaning/resetting.
+    """
+    try:
+        # 1. Delete all appointments for this user's clients
+        # We join Client to ensure we only delete for this user
+        deleted_appts = db.query(Appointment).filter(
+            Appointment.client_id.in_(
+                db.query(Client.id).filter(Client.user_id == current_user.id)
+            )
+        ).delete(synchronize_session=False)
+        
+        # 2. Delete all clients (Cascades to Messages, Tags, State, Memory usually)
+        # However, to be safe regarding Messages (orphaned messages logic), 
+        # normally we might want to keep messages or let them cascade. 
+        # The user wants a cleanup, so cascade is appropriate.
+        deleted_clients = db.query(Client).filter(
+            Client.user_id == current_user.id
+        ).delete(synchronize_session=False)
+        
+        db.commit()
+        print(f"[Clients API] Bulk delete: {deleted_clients} clients, {deleted_appts} appointments")
+        
+        return {
+            "message": "Cleanup successful", 
+            "deleted_clients": deleted_clients, 
+            "deleted_appointments": deleted_appts
+        }
+    except Exception as e:
+        db.rollback()
+        print(f"[Clients API] Error in bulk delete: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
