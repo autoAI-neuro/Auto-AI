@@ -98,6 +98,9 @@ const Dashboard = () => {
     const [filters, setFilters] = useState({ search: '', tagId: null });
     const [debouncedSearch, setDebouncedSearch] = useState('');
 
+    // Fix for Multi-Page Selection: Store client data (phones) for selected IDs
+    const [selectedClientData, setSelectedClientData] = useState({}); // Map: ID -> Client Object
+
     useEffect(() => {
         if (userId) {
             checkWhatsappStatus();
@@ -306,28 +309,56 @@ const Dashboard = () => {
         if (selectAllGlobal) {
             setSelectAllGlobal(false);
             setSelectedClients([]);
+            setSelectedClientData({});
         } else {
             if (selectedClients.includes(id)) {
                 setSelectedClients(selectedClients.filter(cid => cid !== id));
+                // Optional: Cleanup data, but strictly not necessary as ID filter is key
+                const newData = { ...selectedClientData };
+                delete newData[id];
+                setSelectedClientData(newData);
             } else {
                 setSelectedClients([...selectedClients, id]);
+                // Find client in current page to store their data
+                const client = clients.find(c => c.id === id);
+                if (client) {
+                    setSelectedClientData(prev => ({ ...prev, [id]: client }));
+                }
             }
         }
     };
+
+    // Check if all clients on current page are selected
+    const isPageSelected = clients.length > 0 && clients.every(c => selectedClients.includes(c.id));
 
     const selectAllClients = () => {
         if (selectAllGlobal) {
             // Deselect Global
             setSelectAllGlobal(false);
             setSelectedClients([]);
+            setSelectedClientData({});
         } else {
-            // Toggle Page Selection
-            if (selectedClients.length === clients.length && clients.length > 0) {
-                // Deselect Page
-                setSelectedClients([]);
+            if (isPageSelected) {
+                // Deselect ONLY current page
+                const pageIds = clients.map(c => c.id);
+                setSelectedClients(prev => prev.filter(id => !pageIds.includes(id)));
+
+                // Cleanup data (optional)
+                setSelectedClientData(prev => {
+                    const next = { ...prev };
+                    pageIds.forEach(id => delete next[id]);
+                    return next;
+                });
             } else {
-                // Select Page
-                setSelectedClients(clients.map(c => c.id));
+                // Select CURRENT page (Additive)
+                const pageIds = clients.map(c => c.id);
+                // Add only ones not already selected to avoid duplicates
+                setSelectedClients(prev => [...new Set([...prev, ...pageIds])]);
+
+                // Store data
+                const newMap = {};
+                clients.forEach(c => { newMap[c.id] = c; });
+                setSelectedClientData(prev => ({ ...prev, ...newMap }));
             }
         }
     };
@@ -361,9 +392,16 @@ const Dashboard = () => {
 
             } else {
                 // Case B: Manual Selection (Client-side phones)
-                const selectedPhones = clients
-                    .filter(c => selectedClients.includes(c.id))
-                    .map(c => c.phone);
+                // FIX: Use selectedClientData to get phones for ALL selected clients, not just visible ones
+                const selectedPhones = selectedClients
+                    .map(id => selectedClientData[id]?.phone)
+                    .filter(phone => phone); // Remove nulls/undefined
+
+                if (selectedPhones.length === 0) {
+                    showNotification('Error: No se encontraron números de teléfono para la selección', 'error');
+                    setSending(false);
+                    return;
+                }
 
                 await api.post('/whatsapp/send-bulk', {
                     phones: selectedPhones,
@@ -417,9 +455,16 @@ const Dashboard = () => {
                 showNotification(`¡Enviando media a ${pagination.total} clientes en segundo plano!`, 'success');
             } else {
                 // Case B: Manual Selection
-                const selectedPhones = clients
-                    .filter(c => selectedClients.includes(c.id))
-                    .map(c => c.phone);
+                // FIX: Use selectedClientData for phones
+                const selectedPhones = selectedClients
+                    .map(id => selectedClientData[id]?.phone)
+                    .filter(phone => phone);
+
+                if (selectedPhones.length === 0) {
+                    showNotification('Error: Provee al menos un número válido', 'error');
+                    setSending(false);
+                    return;
+                }
 
                 await api.post('/whatsapp/send-bulk', {
                     phones: selectedPhones,
@@ -519,7 +564,7 @@ const Dashboard = () => {
                                             className="text-xs text-blue-400 hover:text-blue-300 transition-colors flex items-center gap-1"
                                         >
                                             <CheckCircle className="w-3 h-3" />
-                                            {selectedClients.length === clients.length && clients.length > 0 ? 'Deseleccionar' : 'Seleccionar Todo'}
+                                            {isPageSelected ? 'Deseleccionar' : 'Seleccionar Todo'}
                                         </button>
                                         <span className="text-sm text-neutral-500">{stats.totalClients} total</span>
                                     </div>
@@ -551,7 +596,7 @@ const Dashboard = () => {
                                                 </button>
                                             </div>
                                         ) : (
-                                            selectedClients.length === clients.length && pagination.total > clients.length && (
+                                            isPageSelected && pagination.total > clients.length && (
                                                 <div className="bg-neutral-800 text-neutral-300 p-2 rounded-lg border border-white/10 flex items-center justify-center gap-2">
                                                     <span>Has seleccionado los {clients.length} clientes de esta página.</span>
                                                     <button
@@ -743,7 +788,7 @@ const Dashboard = () => {
                                     </div>
 
                                     {/* Global Select Alert */}
-                                    {!selectAllGlobal && selectedClients.length === clients.length && clients.length > 0 && pagination.total > clients.length && (
+                                    {!selectAllGlobal && isPageSelected && pagination.total > clients.length && (
                                         <div className="bg-blue-900/20 border border-blue-500/20 p-2 rounded text-xs text-blue-300 flex justify-between items-center">
                                             <span>Solo {clients.length} seleccionados de esta página.</span>
                                             <button
