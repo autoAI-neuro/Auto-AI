@@ -493,38 +493,49 @@ def process_bulk_send(
 
     with httpx.Client(trust_env=False, timeout=60.0) as client:
         for phone in target_phones:
-            try:
-                # 1. Send Text if present
-                if message:
-                    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
-                    payload = {
-                        "userId": user_id,
-                        "phoneNumber": phone,
-                        "message": message
-                    }
-                    client.post(url, json=payload).raise_for_status()
-                
-                # 2. Send Media if present
-                if media_url and media_type:
-                    url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send-media"
-                    payload = {
-                        "userId": user_id,
-                        "phoneNumber": phone,
-                        "mediaUrl": media_url,
-                        "mediaType": media_type,
-                        "caption": caption or ""
-                    }
-                    client.post(url, json=payload).raise_for_status()
-                
-                success_count += 1
-                
-                # Rate limit / Stability delay
-                time.sleep(random.uniform(0.5, 1.5))
-                
-            except Exception as e:
-                print(f"[BulkWorker] Error sending to {phone}: {e}")
-                fail_count += 1
-                
+            max_retries = 3
+            attempt = 0
+            sent = False
+            
+            while attempt < max_retries and not sent:
+                attempt += 1
+                try:
+                    # 1. Send Text if present
+                    if message:
+                        url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send"
+                        payload = {
+                            "userId": user_id,
+                            "phoneNumber": phone,
+                            "message": message
+                        }
+                        client.post(url, json=payload).raise_for_status()
+                    
+                    # 2. Send Media if present
+                    if media_url and media_type:
+                        url = f"{WHATSAPP_SERVICE_URL}/api/whatsapp/send-media"
+                        payload = {
+                            "userId": user_id,
+                            "phoneNumber": phone,
+                            "mediaUrl": media_url,
+                            "mediaType": media_type,
+                            "caption": caption or ""
+                        }
+                        client.post(url, json=payload).raise_for_status()
+                    
+                    success_count += 1
+                    sent = True
+                    
+                    # Rate limit / Stability delay
+                    time.sleep(random.uniform(0.5, 1.5))
+                    
+                except Exception as e:
+                    print(f"[BulkWorker] Error sending to {phone} (Attempt {attempt}/{max_retries}): {e}")
+                    if attempt < max_retries:
+                        time.sleep(2) # Wait 2 seconds before retry
+                    else:
+                        fail_count += 1
+                        print(f"[BulkWorker] ❌ Failed to send to {phone} after {max_retries} attempts.")
+
     print(f"[BulkWorker] Completed. Success: {success_count}, Failed: {fail_count}")
 
 @router.post("/send-bulk")
