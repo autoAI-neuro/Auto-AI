@@ -16,13 +16,16 @@ class CalendarService:
         """
         db = SessionLocal()
         try:
-            # 1. Get existing appointments to exclude
+            # 1. Get existing appointments to exclude (from REAL Appointment table)
+            from app.models import Appointment
+            
             start_date = datetime.now()
             end_date = start_date + timedelta(days=days_ahead)
             
-            existing_appts = db.query(ConversationState.appointment_datetime).filter(
-                ConversationState.appointment_datetime >= start_date,
-                ConversationState.appointment_datetime <= end_date
+            existing_appts = db.query(Appointment.start_time).filter(
+                Appointment.start_time >= start_date,
+                Appointment.start_time <= end_date,
+                Appointment.status != 'cancelled'
             ).all()
             
             taken_slots = {appt[0].replace(minute=0, second=0, microsecond=0) for appt in existing_appts if appt[0]}

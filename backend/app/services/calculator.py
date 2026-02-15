@@ -6,6 +6,7 @@ Ported from frontend/src/data/toyotaFinanceData.js
 # ===========================================
 # CONSTANTS & DATA (Ported from JS)
 # ===========================================
+from sqlalchemy.orm import Session
 
 TOYOTA_FINANCE_DATA = {
     # Program info
@@ -167,17 +168,40 @@ def get_ltv_bucket(ltv: float) -> str:
     if ltv <= 130: return 'ltv130'
     return None
 
-def find_model_by_name(input_text: str):
-    """Fuzzy search for model code"""
+def find_model_by_name(input_text: str, db: Session = None):
+    """Fuzzy search for model code. Checks Hardcoded first, then DB."""
     input_text = input_text.upper()
-    best_match = None
     
-    # Try looking in our snippet
+    # 1. Try looking in our snippet (Hardcoded Defaults)
     for code, data in TOYOTA_FINANCE_DATA["models"].items():
         if data["name"] in input_text or input_text in data["name"]:
             return code, data
             
-    # Default fallback if simple match fails
+    # 2. Try DB if session provided
+    if db:
+        from app.models import InventoryItem
+        from sqlalchemy import or_, func
+        
+        # Clean query
+        clean_query = input_text.strip()
+        
+        # Search DB
+        item = db.query(InventoryItem).filter(
+             or_(
+                func.upper(func.concat(InventoryItem.make, " ", InventoryItem.model)).contains(clean_query),
+                func.upper(InventoryItem.model).contains(clean_query)
+             )
+        ).first()
+        
+        if item:
+            # Construct a dynamic model data object
+            return "DB_ITEM", {
+                "name": f"{item.make.upper()} {item.model.upper()}",
+                "mrt": item.price,
+                "residuals": {24: 65, 36: 55, 39: 53, 48: 48, 60: 40} # Generic residuals for non-hardcoded cars
+            }
+
+    # Default fallback if simple match fails (Generic Toyota)
     if "COROLLA" in input_text: return "1852", TOYOTA_FINANCE_DATA["models"]["1852"]
     if "CAMRY" in input_text: return "2559", TOYOTA_FINANCE_DATA["models"]["2559"]
     if "RAV4" in input_text: return "4430", TOYOTA_FINANCE_DATA["models"]["4430"]
@@ -216,11 +240,11 @@ def get_money_factor(model_code, tier, ltv, term):
 class CalculatorService:
     
     @staticmethod
-    def calculate_lease(model_name: str, credit_score: int, down_payment: float, term: int = 39, mileage: int = 12000):
+    def calculate_lease(model_name: str, credit_score: int, down_payment: float, term: int = 39, mileage: int = 12000, db: Session = None):
         """
         Calculates Lease Payment based on Ray's inputs.
         """
-        model_code, model_data = find_model_by_name(model_name)
+        model_code, model_data = find_model_by_name(model_name, db)
         if not model_data:
             return {"error": f"Model '{model_name}' not found in database."}
 
@@ -276,11 +300,11 @@ class CalculatorService:
         }
 
     @staticmethod
-    def calculate_finance(model_name: str, credit_score: int, down_payment: float, term: int = 60):
+    def calculate_finance(model_name: str, credit_score: int, down_payment: float, term: int = 60, db: Session = None):
         """
         Calculates Finance Payment (Purchase).
         """
-        model_code, model_data = find_model_by_name(model_name)
+        model_code, model_data = find_model_by_name(model_name, db)
         if not model_data:
             return {"error": f"Model '{model_name}' not found."}
             

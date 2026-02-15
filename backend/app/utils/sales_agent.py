@@ -31,9 +31,10 @@ NO ASUMAS NADA. SIGUE ESTE ORDEN:
 3. SOLO SI TIENES (Modelo + Plan + Score) -> EJECUTA `calculate_payment`.
 
 CASO EXCEPCIONAL (PRECIO EXPLÍCITO):
-Si el cliente pregunta DIRECTAMENTE "¿Cuánto sale?" o "¿Dame precio?" SIN dar datos:
-- DALE UN ESTIMADO GENÉRICO INMEDIATAMENTE (Asume 650/2k) pero advierte: "Como referencia inicial (basado en crédito estándar)...".
-- LUEGO pide el Score para afinar.
+Si el usuario pide precio y la tool `calculate_payment` falla o dice "Model not found":
+- 🚫 NO INVENTES UN PRECIO.
+- 🚫 NO DES UN ESTIMADO GENÉRICO si buscan un auto específico (ej. Honda Pilot).
+- ✅ DI: "Para ese modelo en específico, quiero darte el número exacto del sistema actual. ¿Te parece si agendamos una cita corta para ver las opciones reales?"
 
 PERO SI ESTAMOS EN DÍALOGO NORMAL:
 1. Modelo? -> Chequeado.
@@ -50,10 +51,13 @@ Si ya diste el número, TU SIGUIENTE PREGUNTA DEBE SER:
 - ¿No dijo Down Payment? -> Asume $2,000 (Estándar).
 - ¿No dijo Documento? -> PREGUNTA OBLIGATORIA.
 
-EJEMPLO CORRECTO:
+EJEMPLO CORRECTO 1 (CALCULO EXITOSO):
 Cliente: "Quiero un Corolla, tengo 650 score"
-Ray (Internamente llama a tool): *Calcula*
-Ray (Respuesta): "Con tu score de 650 y $2,000 de inicial (estándar), el Corolla LE te queda en $X/mes. ¿Te cuadra para venir?"
+Ray (Tool returns $350/mo): "Con tu score de 650 y $2,000 de inicial, te queda en $350/mes. ¿Te cuadra?"
+
+EJEMPLO CORRECTO 2 (CALCULO FALLIDO):
+Cliente: "Quiero un Honda Pilot, score 700"
+Ray (Tool error): "Para el Pilot, prefiero darte la cifra exacta del día en persona, ya que los programas cambian rápido. ¿Vienes mañana a las 10 AM para ver los números reales?"
 
 EJEMPLO INCORRECTO (PROHIBIDO 🚫):
 Ray: "Perfecto, un Corolla es gran auto. Déjame hacerte los números..." (ESTO ES FALLO CRÍTICO)
@@ -356,13 +360,18 @@ def _call_openai_with_tools(
                         res = CalculatorService.calculate_lease(
                             func_args.get("model_name"),
                             func_args.get("credit_score", 650),
-                            dp
+                            dp,
+                            39, # term
+                            12000, # mileage
+                            db # Pass DB session
                         )
                     else:
                         res = CalculatorService.calculate_finance(
                             func_args.get("model_name"),
                             func_args.get("credit_score", 650),
-                            dp
+                            dp,
+                            60, # term
+                            db # Pass DB session
                         )
                     tool_output = json.dumps(res)
                     
