@@ -115,10 +115,10 @@ RAY_TOOLS = [
                 "type": "object",
                 "properties": {
                     "datetime_iso": {"type": "string", "description": "ISO 8601 datetime (e.g. 2026-02-08T10:00:00)"},
-                    "notes": {"type": "string", "description": "Any special notes or requirements (documents to bring)"},
+                    "notes": {"type": "string", "description": "MANDATORY: Summary for the salesperson. Format: 'TIPO: [Virtual/Presencial] | AUTO: [Modelo] | CONTEXTO: [Resumen Cliente]'"},
                     "client_name": {"type": "string", "description": "Client's REAL full name (First + Last). NEVER use generic words like 'me', 'yo', 'mi nombre', 'cliente', etc. If unsure, do not include."}
                 },
-                "required": ["datetime_iso"]
+                "required": ["datetime_iso", "notes"]
             }
         }
     },
