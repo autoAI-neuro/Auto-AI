@@ -411,6 +411,29 @@ const CalendarView = ({ onQuickSend }) => {
 
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
+    const [selectedApptDetail, setSelectedApptDetail] = useState(null);
+
+    // Helper to parse notes
+    const parseNotes = (notes) => {
+        if (!notes) return { type: 'No especificado', auto: 'No especificado', context: 'Sin notas adicionales.' };
+
+        // Check if follows new format
+        if (notes.includes('|')) {
+            const parts = notes.split('|');
+            const result = {};
+            parts.forEach(part => {
+                const [key, val] = part.split(':').map(s => s.trim());
+                if (key && val) result[key.toLowerCase()] = val;
+            });
+            return {
+                type: result['tipo'] || 'General',
+                auto: result['auto'] || 'No especificado',
+                context: result['contexto'] || notes
+            };
+        }
+        return { type: 'General', auto: 'No especificado', context: notes };
+    };
+
     return (
         <div className="h-full flex flex-col relative">
             {/* Header */}
@@ -490,6 +513,82 @@ const CalendarView = ({ onQuickSend }) => {
                             <button onClick={() => setSelectedEvent(null)} className="flex-1 py-3 rounded-xl border border-white/10 text-neutral-400 hover:bg-white/5 transition-colors font-medium text-sm">Cancel</button>
                             <button onClick={confirmSend} disabled={sending} className="flex-1 py-3 rounded-xl bg-white text-black hover:bg-neutral-200 transition-colors font-medium text-sm flex items-center justify-center gap-2">
                                 {sending ? 'Enviando...' : <><Send size={16} /> Enviar Ahora</>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Appointment Detail Modal (Rich View) */}
+            {selectedApptDetail && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-4">
+                    <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                        {/* Header */}
+                        <div className="bg-neutral-950 p-6 border-b border-white/10 flex justify-between items-start">
+                            <div>
+                                <h3 className="text-xl font-medium text-white mb-1">{selectedApptDetail.client.name}</h3>
+                                <p className="text-blue-400 text-sm flex items-center gap-2">
+                                    <Clock size={14} /> {selectedApptDetail.time}
+                                    <span className="text-neutral-600">|</span>
+                                    <Phone size={14} /> {selectedApptDetail.client.phone}
+                                </p>
+                            </div>
+                            <button onClick={() => setSelectedApptDetail(null)} className="p-2 hover:bg-white/10 rounded-full text-neutral-500 hover:text-white">
+                                <X size={20} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <div className="p-6 space-y-6 overflow-y-auto">
+                            {(() => {
+                                const details = parseNotes(selectedApptDetail.rawAppt?.notes);
+                                return (
+                                    <>
+                                        {/* Main Cards */}
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-xl">
+                                                <p className="text-xs text-purple-400 font-bold uppercase tracking-wider mb-1">Tipo de Cita</p>
+                                                <p className="text-white font-medium">{details.type}</p>
+                                            </div>
+                                            <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl">
+                                                <p className="text-xs text-blue-400 font-bold uppercase tracking-wider mb-1">Vehículo</p>
+                                                <p className="text-white font-medium">{details.auto}</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Context / Notes */}
+                                        <div className="bg-neutral-800/30 border border-white/5 p-5 rounded-xl">
+                                            <p className="text-xs text-neutral-400 font-bold uppercase tracking-wider mb-3">Contexto del Cliente</p>
+                                            <p className="text-neutral-300 text-sm leading-relaxed whitespace-pre-wrap">
+                                                {details.context}
+                                            </p>
+                                        </div>
+
+                                        {/* Raw Notes Fallback if needed */}
+                                        {!selectedApptDetail.rawAppt?.notes && (
+                                            <p className="text-neutral-600 italic text-sm text-center">Sin notas adicionales.</p>
+                                        )}
+                                    </>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Footer Actions */}
+                        <div className="p-5 border-t border-white/10 bg-neutral-950 flex gap-3">
+                            <button
+                                onClick={() => {
+                                    handleEventClick(selectedApptDetail); // Open Message Modal
+                                    setSelectedApptDetail(null); // Close Detail Modal
+                                }}
+                                className="flex-1 py-3 rounded-xl bg-green-600/20 hover:bg-green-600/30 text-green-400 border border-green-600/30 transition-colors font-medium text-sm flex items-center justify-center gap-2"
+                            >
+                                <MessageSquare size={16} /> Escribir WhatsApp
+                            </button>
+                            <button
+                                onClick={() => setSelectedApptDetail(null)}
+                                className="px-6 py-3 rounded-xl border border-white/10 text-neutral-400 hover:bg-white/5 transition-colors font-medium text-sm"
+                            >
+                                Cerrar
                             </button>
                         </div>
                     </div>
@@ -667,21 +766,32 @@ const CalendarView = ({ onQuickSend }) => {
                                                 </h4>
                                                 <div className="space-y-2">
                                                     {typeEvents.map((ev, idx) => (
-                                                        <div key={idx} className="bg-neutral-900/50 rounded-lg p-3 border border-white/5">
+                                                        <div key={idx} className="bg-neutral-900/50 rounded-lg p-3 border border-white/5 group hover:border-white/10 transition-colors">
                                                             <div className="flex items-start justify-between">
-                                                                <div className="flex-1">
-                                                                    <p className="text-white font-medium text-sm">
-                                                                        {ev.time && <span className="text-neutral-400 mr-2">{ev.time}</span>}
-                                                                        {ev.client?.name || 'Cliente'}
-                                                                    </p>
+                                                                <div
+                                                                    className={`flex-1 ${type === 'appointment' ? 'cursor-pointer hover:bg-white/5 -m-2 p-2 rounded-lg transition-colors' : ''}`}
+                                                                    onClick={() => type === 'appointment' && setSelectedApptDetail(ev)}
+                                                                >
+                                                                    <div className="flex justify-between items-start">
+                                                                        <p className="text-white font-medium text-sm">
+                                                                            {ev.time && <span className="text-neutral-400 mr-2">{ev.time}</span>}
+                                                                            {ev.client?.name || 'Cliente'}
+                                                                        </p>
+                                                                        {type === 'appointment' && (
+                                                                            <span className="text-[10px] bg-blue-600/20 text-blue-400 px-2 py-0.5 rounded-full whitespace-nowrap ml-2">
+                                                                                Ver Ficha
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+
                                                                     {ev.client?.phone && (
                                                                         <p className="text-neutral-500 text-xs flex items-center gap-1 mt-1">
                                                                             <Phone size={10} /> {ev.client.phone}
                                                                         </p>
                                                                     )}
                                                                     {ev.rawAppt?.notes && (
-                                                                        <p className="text-neutral-400 text-xs mt-2 italic">
-                                                                            "{ev.rawAppt.notes.substring(0, 60)}..."
+                                                                        <p className="text-neutral-400 text-xs mt-2 italic line-clamp-2">
+                                                                            "{ev.rawAppt.notes}"
                                                                         </p>
                                                                     )}
                                                                 </div>
