@@ -182,7 +182,7 @@ RAY_TOOLS = [
     }
 ]
 
-def generate_smart_reply(message_content: str, client_name: str = None, context: str = None) -> str:
+def generate_smart_reply(message_content: str, client_name: str = None, context: str = None, conversation_history: list = None) -> str:
     """
     Generate a suggested reply using Ray's persona and tools.
     """
@@ -191,8 +191,21 @@ def generate_smart_reply(message_content: str, client_name: str = None, context:
     
     client = OpenAI()
     
+    # Format history
+    history_text = "\n".join(conversation_history) if conversation_history else "Sin historial reciente."
+    
     # Context setup
-    inputs = f"Cliente: {client_name or 'Desconocido'}\nContexto: {context}\nÚltimo mensaje: {message_content}"
+    inputs = f"""
+INFORMACIÓN DE CONTEXTO:
+Cliente: {client_name or 'Desconocido'}
+Notas del Cliente: {context or 'Sin notas'}
+
+HISTORIAL RECIENTE (IMPORTANTE - USA ESTO PARA SABER DE QUÉ AUTO HABLAN):
+{history_text}
+
+ÚLTIMO MENSAJE DEL CLIENTE: 
+"{message_content}"
+"""
     
     messages = [
         {"role": "system", "content": RAY_SYSTEM_PROMPT},

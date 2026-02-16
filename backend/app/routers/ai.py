@@ -72,6 +72,7 @@ async def get_smart_reply(
     
     client_name = None
     context = None
+    history = []
     
     if request.client_id:
         client = db.query(Client).filter(
@@ -81,8 +82,24 @@ async def get_smart_reply(
         if client:
             client_name = client.name
             context = client.notes
+            
+        # Get recent history for context
+        recent_msgs = db.query(Message).filter(
+            Message.client_id == request.client_id
+        ).order_by(Message.sent_at.desc()).limit(6).all() # Limit 6 to include previous context
+        
+        # Reverse to chronological order and format
+        # Skip the very last one if it duplicates the current request (though request usually implies new inbound)
+        # Actually request.message is the NEW message. Database might not have it yet or it might. 
+        # Usually smart-reply is called BEFORE saving or AFTER saving? 
+        # In this flow, we likely want previous context.
+        
+        for msg in reversed(recent_msgs):
+            role = "Agente" if msg.direction == "outbound" else "Cliente"
+            content = msg.content or "[Media/Imagen]"
+            history.append(f"{role}: {content}")
     
-    reply = generate_smart_reply(request.message, client_name, context)
+    reply = generate_smart_reply(request.message, client_name, context, history)
     
     return {
         "status": "success",
