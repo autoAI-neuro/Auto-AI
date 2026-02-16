@@ -112,7 +112,19 @@ TOYOTA_FINANCE_DATA = {
         "4430": {"name": "RAV4 LE FWD", "mrt": 30800, "residuals": {24: 70, 36: 62, 39: 60, 48: 53, 60: 47}},
         "4440": {"name": "RAV4 XLE FWD", "mrt": 32300, "residuals": {24: 68, 36: 60, 39: 58, 48: 51, 60: 45}},
         "2559": {"name": "CAMRY HYBRID LE", "mrt": 32000, "residuals": {24: 68, 36: 59, 39: 57, 48: 47, 60: 38}},
-        "2561": {"name": "CAMRY HYBRID SE", "mrt": 34100, "residuals": {24: 67, 36: 58, 39: 56, 48: 47, 60: 38}}
+        "2561": {"name": "CAMRY HYBRID SE", "mrt": 34100, "residuals": {24: 67, 36: 58, 39: 56, 48: 47, 60: 38}},
+        # TRUCKS
+        "7146": {"name": "TACOMA SR5", "mrt": 41800, "residuals": {24: 76, 36: 68, 39: 66, 48: 60, 60: 52}},
+        "7530": {"name": "TACOMA HYBRID SPORT", "mrt": 50500, "residuals": {24: 74, 36: 66, 39: 64, 48: 58, 60: 50}},
+        "8261": {"name": "TUNDRA SR5", "mrt": 54000, "residuals": {24: 72, 36: 64, 39: 62, 48: 56, 60: 48}},
+        # SUVS
+        "6946": {"name": "HIGHLANDER XLE", "mrt": 46000, "residuals": {24: 68, 36: 60, 39: 58, 48: 52, 60: 44}},
+        "6702": {"name": "GRAND HIGHLANDER XLE", "mrt": 48000, "residuals": {24: 69, 36: 61, 39: 59, 48: 53, 60: 45}},
+        "8664": {"name": "4RUNNER SR5", "mrt": 45000, "residuals": {24: 74, 36: 64, 39: 62, 48: 56, 60: 50}},
+        "7917": {"name": "SEQUOIA SR5", "mrt": 65000, "residuals": {24: 70, 36: 62, 39: 60, 48: 54, 60: 46}},
+        # CARS
+        "1223": {"name": "PRIUS LE", "mrt": 29000, "residuals": {24: 66, 36: 58, 39: 56, 48: 48, 60: 40}},
+        "4432": {"name": "RAV4 HYBRID LE", "mrt": 33000, "residuals": {24: 72, 36: 64, 39: 62, 48: 54, 60: 46}}
     },
 
     # SPECIAL APR PROGRAMS
@@ -205,6 +217,12 @@ def find_model_by_name(input_text: str, db: Session = None):
     if "COROLLA" in input_text: return "1852", TOYOTA_FINANCE_DATA["models"]["1852"]
     if "CAMRY" in input_text: return "2559", TOYOTA_FINANCE_DATA["models"]["2559"]
     if "RAV4" in input_text: return "4430", TOYOTA_FINANCE_DATA["models"]["4430"]
+    if "TACOMA" in input_text: return "7146", TOYOTA_FINANCE_DATA["models"]["7146"] # PREFER SR5
+    if "TUNDRA" in input_text: return "8261", TOYOTA_FINANCE_DATA["models"]["8261"]
+    if "HIGHLANDER" in input_text: return "6946", TOYOTA_FINANCE_DATA["models"]["6946"]
+    if "PRIUS" in input_text: return "1223", TOYOTA_FINANCE_DATA["models"]["1223"]
+    if "4RUNNER" in input_text: return "8664", TOYOTA_FINANCE_DATA["models"]["8664"]
+    if "SEQUOIA" in input_text: return "7917", TOYOTA_FINANCE_DATA["models"]["7917"]
     
     return None, None
 
