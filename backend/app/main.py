@@ -156,5 +156,6 @@ def ping():
 
 @app.get("/api/version")
 def version():
+    # Force reload trigger
     return {"version": APP_VERSION}
 
