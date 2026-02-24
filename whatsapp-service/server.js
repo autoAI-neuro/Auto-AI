@@ -104,10 +104,27 @@ async function initializeSession(userId) {
             }
 
             if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                log(`Connection closed for ${userId}. Reconnecting: ${shouldReconnect}`);
+                const statusCode = (lastDisconnect?.error)?.output?.statusCode;
+                const errorMessage = lastDisconnect?.error?.message || '';
+                const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+                const isBadMac = errorMessage.includes('Bad MAC') || errorMessage.includes('bad-mac');
 
-                if (shouldReconnect) {
+                log(`Connection closed for ${userId}. Code: ${statusCode}. Reconnecting: ${shouldReconnect}. BadMAC: ${isBadMac}`);
+
+                if (isBadMac) {
+                    // Bad MAC = corrupted session keys. Wipe and force QR re-scan.
+                    log(`[BAD MAC] Corrupted session detected for ${userId}. Wiping auth files...`);
+                    try {
+                        fs.rmSync(authPath, { recursive: true, force: true });
+                        log(`[BAD MAC] Auth files cleared for ${userId}. Will show new QR.`);
+                    } catch (e) {
+                        log(`[BAD MAC] Error clearing auth: ${e.message}`);
+                    }
+                    session.status = 'disconnected';
+                    session.qr = null;
+                    // Re-initialize to show fresh QR
+                    setTimeout(() => initializeSession(userId), 2000);
+                } else if (shouldReconnect) {
                     initializeSession(userId); // Reconnect
                 } else {
                     log(`${userId} logged out.`);
@@ -252,6 +269,39 @@ app.post('/api/whatsapp/send', async (req, res) => {
         log(`Send Error: ${error}`);
         res.status(500).json({ error: error.message });
     }
+});
+
+// Clear Session (Fix Bad MAC / Corrupted Session)
+app.post('/api/whatsapp/clear-session/:userId', async (req, res) => {
+    const { userId } = req.params;
+    log(`[Clear Session] Clearing session for ${userId}`);
+
+    // 1. Close existing socket
+    const session = sessions.get(userId);
+    if (session && session.sock) {
+        try {
+            session.sock.end();
+        } catch (e) {
+            log(`[Clear Session] Error closing socket: ${e.message}`);
+        }
+    }
+    sessions.delete(userId);
+
+    // 2. Delete auth files
+    const authPath = path.join(__dirname, 'auth_info_baileys', userId);
+    try {
+        if (fs.existsSync(authPath)) {
+            fs.rmSync(authPath, { recursive: true, force: true });
+            log(`[Clear Session] Auth files deleted for ${userId}`);
+        }
+    } catch (e) {
+        log(`[Clear Session] Error deleting files: ${e.message}`);
+    }
+
+    // 3. Re-initialize (will show fresh QR)
+    setTimeout(() => initializeSession(userId), 1000);
+
+    res.json({ success: true, message: 'Session cleared. Scan QR again.' });
 });
 
 // Logout
