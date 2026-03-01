@@ -307,7 +307,7 @@ ${feesDetail}
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Toyota Finance Calculator</h2>
-                            <p className="text-xs text-gray-400">Compra Florida • APR Especiales Ene 2026</p>
+                            <p className="text-xs text-gray-400">Compra Florida • APR Especiales Feb 2026</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -508,8 +508,8 @@ ${feesDetail}
                                     key={key}
                                     onClick={() => toggleFee(key)}
                                     className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${includedFees[key]
-                                            ? 'bg-purple-600/30 text-white border border-purple-500/50'
-                                            : 'bg-neutral-800 text-gray-400 border border-transparent hover:bg-neutral-700'
+                                        ? 'bg-purple-600/30 text-white border border-purple-500/50'
+                                        : 'bg-neutral-800 text-gray-400 border border-transparent hover:bg-neutral-700'
                                         }`}
                                 >
                                     <div className="flex items-center gap-2">
@@ -524,7 +524,7 @@ ${feesDetail}
                             ))}
                         </div>
 
-                        <p className="text-[10px] text-gray-500 mt-3">* = Cargos típicos incluidos. Precios aproximados Ene 2026.</p>
+                        <p className="text-[10px] text-gray-500 mt-3">* = Cargos típicos incluidos. Precios aproximados Feb 2026.</p>
                     </div>
                 </div>
 

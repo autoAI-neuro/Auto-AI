@@ -222,7 +222,7 @@ ${feesBreakdown}• Primer Pago: $${result.totalMonthlyPayment.toLocaleString()}
 📊 Residual: $${result.residualValue.toLocaleString()} (${result.residualPercent}%)
 ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósito de seguridad'}
 
-⚠️ _Cotización basada en datos oficiales SET Finance Florida (Ene 2026). Sujeto a aprobación crediticia._
+⚠️ _Cotización basada en datos oficiales SET Finance Florida (Feb 2026). Sujeto a aprobación crediticia._
 
 ¿Deseas agendar una cita?`;
 
@@ -262,7 +262,7 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-white">Toyota Lease Calculator</h2>
-                            <p className="text-xs text-gray-400">SET Finance Florida • Ene 2026</p>
+                            <p className="text-xs text-gray-400">SET Finance Florida • Feb 2026</p>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition-colors">
@@ -437,8 +437,8 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                                         key={t}
                                         onClick={() => setTerm(t)}
                                         className={`flex-1 py-2 px-1 rounded-lg text-sm font-medium transition-colors ${term === t
-                                                ? 'bg-red-600 text-white'
-                                                : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
+                                            ? 'bg-red-600 text-white'
+                                            : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
                                             }`}
                                     >
                                         {t}
@@ -454,8 +454,8 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                                         key={m}
                                         onClick={() => setMileage(m)}
                                         className={`flex-1 py-2 px-2 rounded-lg text-sm font-medium transition-colors ${mileage === m
-                                                ? 'bg-red-600 text-white'
-                                                : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
+                                            ? 'bg-red-600 text-white'
+                                            : 'bg-neutral-800 text-gray-400 hover:bg-neutral-700'
                                             }`}
                                     >
                                         {m / 1000}K
@@ -476,8 +476,8 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                                     key={key}
                                     onClick={() => toggleFee(key)}
                                     className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${includedFees[key]
-                                            ? 'bg-amber-600/30 text-white border border-amber-500/50'
-                                            : 'bg-neutral-800 text-gray-400 border border-transparent'
+                                        ? 'bg-amber-600/30 text-white border border-amber-500/50'
+                                        : 'bg-neutral-800 text-gray-400 border border-transparent'
                                         } ${fee.required ? 'cursor-default' : 'cursor-pointer hover:bg-amber-600/20'}`}
                                 >
                                     <div className="flex items-center gap-2">
@@ -559,7 +559,7 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                 <div className="mx-5 mb-4 p-3 bg-amber-900/20 border border-amber-500/20 rounded-xl flex items-start gap-3">
                     <Info className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
                     <p className="text-xs text-amber-200">
-                        Cálculos basados en SET Finance Florida (Ene 2026). Tax 6% aplicado al pago mensual.
+                        Cálculos basados en SET Finance Florida (Feb 2026). Tax 6% aplicado al pago mensual.
                         {tierNumber <= 2 ? ' Sin depósito de seguridad.' : ' Requiere depósito de seguridad.'}
                     </p>
                 </div>
