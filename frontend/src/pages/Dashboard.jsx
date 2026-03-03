@@ -31,6 +31,7 @@ import TagSelector from '../components/TagSelector';
 import ConversationView from '../components/ConversationView';
 import AnalyticsView from '../components/AnalyticsView';
 import AutomationsPage from './AutomationsPage';
+import CalculatorView from '../components/CalculatorView';
 
 const Dashboard = () => {
     const { token, logout } = useAuth();
@@ -894,6 +895,8 @@ const Dashboard = () => {
                 return <AnalyticsView />;
             case 'automations':
                 return <AutomationsPage />;
+            case 'calculadora':
+                return <CalculatorView />;
         }
     };
 
@@ -930,7 +933,8 @@ const Dashboard = () => {
                 <header className="border-b border-white/5 backdrop-blur-xl bg-neutral-950/50 px-8 py-4 flex items-center justify-between shrink-0">
                     <h2 className="text-xl font-light text-white capitalize">{
                         activeTab === 'dashboard' ? 'Panel Principal' :
-                            activeTab === 'calendar' ? 'Calendario' : 'Configuración'
+                            activeTab === 'calendar' ? 'Calendario' :
+                                activeTab === 'calculadora' ? 'Calculadora' : 'Configuración'
                     }</h2>
 
                     <div className={`flex items - center gap - 2 px - 3 py - 1 rounded - full text - xs ${whatsappStatus === 'connected'

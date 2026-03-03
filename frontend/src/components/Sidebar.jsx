@@ -8,7 +8,8 @@ import {
     Menu,
     PieChart,
     Zap,
-    Users
+    Users,
+    Calculator
 } from 'lucide-react';
 
 const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) => {
@@ -20,6 +21,7 @@ const Sidebar = ({ activeTab, onTabChange, onLogout, isOpen, toggleSidebar }) =>
         { id: 'analytics', label: 'Analíticas', icon: PieChart },
         { id: 'automations', label: 'Automatizaciones', icon: Zap },
         { id: 'calendar', label: 'Calendario', icon: Calendar },
+        { id: 'calculadora', label: 'Calculadora', icon: Calculator },
         { id: 'settings', label: 'Configuración', icon: Settings },
     ];
 
