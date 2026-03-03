@@ -99,7 +99,7 @@ async def get_smart_reply(
             content = msg.content or "[Media/Imagen]"
             history.append(f"{role}: {content}")
     
-    reply = generate_smart_reply(request.message, client_name, context, history)
+    reply = generate_smart_reply(request.message, client_name, context, history, user_id=current_user.id, db=db)
     
     return {
         "status": "success",

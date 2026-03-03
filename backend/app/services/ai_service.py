@@ -98,6 +98,76 @@ from app.services.calculator import CalculatorService
 from app.services.calendar_integration import CalendarService
 import json
 
+
+def _build_user_prompt(clone):
+    """Build a dynamic system prompt from user's SalesClone config, merged with the base prompt."""
+    parts = []
+    
+    # Start with base identity
+    parts.append("Eres un vendedor senior de autos.")
+    parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
+    
+    # User's custom personality
+    if clone.personality:
+        parts.append(f"\n🎭 TU PERSONALIDAD:\n{clone.personality}")
+    
+    # User's custom sales logic/rules
+    if clone.sales_logic:
+        parts.append(f"\n📋 TUS REGLAS DE VENTAS:\n{clone.sales_logic}")
+    
+    # Tone keywords
+    if clone.tone_keywords and len(clone.tone_keywords) > 0:
+        keywords = ", ".join(clone.tone_keywords)
+        parts.append(f"\n✅ PALABRAS/FRASES QUE DEBES USAR: {keywords}")
+    
+    # Avoid keywords  
+    if clone.avoid_keywords and len(clone.avoid_keywords) > 0:
+        avoid = ", ".join(clone.avoid_keywords)
+        parts.append(f"\n🚫 PALABRAS/FRASES QUE NUNCA DEBES USAR: {avoid}")
+    
+    # Example responses
+    if clone.example_responses and len(clone.example_responses) > 0:
+        examples = "\n".join([
+            f"  Cliente: \"{ex.get('question', '')}\"\n  Tú: \"{ex.get('answer', '')}\""
+            for ex in clone.example_responses[:5]
+        ])
+        parts.append(f"\n💬 EJEMPLOS DE CÓMO DEBES RESPONDER:\n{examples}")
+    
+    # Always append the core calculator/appointment logic
+    parts.append("""
+🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥
+
+1. SI EL CLIENTE PIDE PRECIO (TOYOTA):
+   - ¡NO PREGUNTES SI QUIERES USAR LA CALCULADORA! ¡ÚSALA!
+   - SI FALTAN DATOS, PÍDELOS DIRECTAMENTE.
+   - **DOWN PAYMENT:** SIEMPRE ASUME $2,000 a menos que el cliente diga otro monto.
+
+2. SI EL CLIENTE PIDE PRECIO (HONDA u otra marca sin sistema):
+   - DI LA VERDAD: "No tengo sistema del banco para esa marca aquí". INVITÁLO A VERLO EN PERSONA.
+
+🔥 PROTOCOLO DE EJECUCIÓN 🔥
+
+PASO 1: RECOLECCIÓN (SOLO LO QUE FALTE)
+- ¿Falta Plan? -> "¿Lo buscas financiado o en lease?"
+- ¿Falta Score? -> "¿Cómo está tu crédito? ¿Estimado 600, 700...?"
+- ¿Tiene Ambos? -> ¡CALCULA INMEDIATAMENTE!
+
+PASO 2: DAR EL NÚMERO
+- Da el pago mensual estimado.
+- LUEGO: "Para confirmar si calificas, ¿tienes Social, ITIN o Pasaporte?"
+
+PASO 3: AGENDAR
+- PREGUNTA: "¿En qué ciudad estás ubicado?"
+- SI ESTÁ CERCA: Agenda cita FÍSICA en el dealer.
+- SI ESTÁ LEJOS: Agenda cita VIRTUAL (Videollamada).
+
+⚠️ REGLAS DE ORO:
+- JAMÁS PREGUNTES DOWN PAYMENT (Asume $2k).
+- JAMÁS PIDAS PERMISO PARA CALCULAR.
+""")
+    
+    return "\n".join(parts)
+
 RAY_SYSTEM_PROMPT = """Eres un vendedor senior de Toyota.
 TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.
 
@@ -182,7 +252,7 @@ RAY_TOOLS = [
     }
 ]
 
-def generate_smart_reply(message_content: str, client_name: str = None, context: str = None, conversation_history: list = None) -> str:
+def generate_smart_reply(message_content: str, client_name: str = None, context: str = None, conversation_history: list = None, user_id: str = None, db=None) -> str:
     """
     Generate a suggested reply using Ray's persona and tools.
     """
@@ -207,8 +277,20 @@ HISTORIAL RECIENTE (IMPORTANTE - USA ESTO PARA SABER DE QUÉ AUTO HABLAN):
 "{message_content}"
 """
     
+    # Load per-user bot config if available
+    system_prompt = RAY_SYSTEM_PROMPT  # default fallback
+    if user_id and db:
+        try:
+            from app.models import SalesClone
+            clone = db.query(SalesClone).filter(SalesClone.user_id == user_id).first()
+            if clone and (clone.personality or clone.sales_logic):
+                system_prompt = _build_user_prompt(clone)
+                print(f"[AI] Using custom bot config for user {user_id}")
+        except Exception as e:
+            print(f"[AI] Error loading clone config: {e}")
+    
     messages = [
-        {"role": "system", "content": RAY_SYSTEM_PROMPT},
+        {"role": "system", "content": system_prompt},
         {"role": "user", "content": inputs}
     ]
     
