@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, Check, TrendingUp } from 'lucide-react';
+import { X, Calculator, DollarSign, Calendar, Star, Send, Car, Search, ChevronDown, Info, Check, TrendingUp, Edit3 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { TOYOTA_FINANCE_DATA, getCreditTier, getCreditTierNumber } from '../data/toyotaFinanceData';
 
@@ -31,6 +31,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
     const [downPayment, setDownPayment] = useState(5000);
     const [tradeIn, setTradeIn] = useState(0);
     const [sellingPrice, setSellingPrice] = useState(0);
+    const [customAPR, setCustomAPR] = useState('');
     const [result, setResult] = useState(null);
 
     // Included fees state
@@ -151,27 +152,35 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
 
         let apr;
         let isSpecialRate = false;
+        let isCustomRate = false;
         let programName = null;
 
-        if (specialProgram && specialProgram.rates) {
-            const tierKey = `tier${tierNum}`;
-            const termRates = specialProgram.rates[tierKey];
-            if (termRates) {
-                const availableTerms = [36, 48, 60, 72];
-                const closestTerm = availableTerms.reduce((prev, curr) =>
-                    Math.abs(curr - term) < Math.abs(prev - term) ? curr : prev
-                );
-                apr = termRates[closestTerm];
-                if (apr !== undefined) {
-                    isSpecialRate = true;
-                    programName = specialProgram.programName;
+        // If custom APR is set, use it directly (for first-time buyers, etc.)
+        const parsedCustomAPR = parseFloat(customAPR);
+        if (customAPR !== '' && !isNaN(parsedCustomAPR) && parsedCustomAPR >= 0) {
+            apr = parsedCustomAPR;
+            isCustomRate = true;
+        } else {
+            if (specialProgram && specialProgram.rates) {
+                const tierKey = `tier${tierNum}`;
+                const termRates = specialProgram.rates[tierKey];
+                if (termRates) {
+                    const availableTerms = [36, 48, 60, 72];
+                    const closestTerm = availableTerms.reduce((prev, curr) =>
+                        Math.abs(curr - term) < Math.abs(prev - term) ? curr : prev
+                    );
+                    apr = termRates[closestTerm];
+                    if (apr !== undefined) {
+                        isSpecialRate = true;
+                        programName = specialProgram.programName;
+                    }
                 }
             }
-        }
 
-        // Fall back to standard rate
-        if (!isSpecialRate || apr === undefined) {
-            apr = getStandardRate(creditScore, ltv);
+            // Fall back to standard rate
+            if (!isSpecialRate || apr === undefined) {
+                apr = getStandardRate(creditScore, ltv);
+            }
         }
 
         // Calculate monthly payment using amortization formula
@@ -197,6 +206,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
             feeBreakdown,
             apr,
             isSpecialRate,
+            isCustomRate,
             programName,
             totalPayments: Math.round(totalPayments),
             totalInterest: Math.round(totalInterest),
@@ -204,7 +214,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
             bonus
         });
 
-    }, [selectedModel, creditScore, term, downPayment, tradeIn, sellingPrice, includedFees]);
+    }, [selectedModel, creditScore, term, downPayment, tradeIn, sellingPrice, includedFees, customAPR]);
 
     // Handle model selection
     const handleSelectModel = (model) => {
@@ -248,7 +258,7 @@ const ToyotaRetailCalculator = ({ isOpen, onClose, onSend }) => {
 💰 Precio: $${price.toLocaleString()}
 ${result.bonus > 0 ? `🎁 *Bonus APR Cash: $${result.bonus.toLocaleString()}*\n` : ''}
 ⭐ *Crédito:* ${tierInfo.label} (${creditScore})
-${result.isSpecialRate ? `🔥 *TASA ESPECIAL: ${result.apr}% APR*` : `📈 Tasa: ${result.apr}% APR`}
+${result.isCustomRate ? `✏️ *APR MANUAL: ${result.apr}% APR*` : result.isSpecialRate ? `🔥 *TASA ESPECIAL: ${result.apr}% APR*` : `📈 Tasa: ${result.apr}% APR`}
 
 📅 Plazo: ${term} meses
 📥 Down Payment: $${downPayment.toLocaleString()}
@@ -409,6 +419,43 @@ ${feesDetail}
                         />
                     </div>
 
+                    {/* Manual APR Override */}
+                    <div className="p-4 rounded-xl border border-white/10 bg-neutral-800/50">
+                        <div className="flex items-center justify-between">
+                            <label className="text-sm text-gray-300 flex items-center gap-2">
+                                <Edit3 className="w-4 h-4" /> APR Manual (opcional)
+                            </label>
+                            {customAPR !== '' && (
+                                <button
+                                    onClick={() => setCustomAPR('')}
+                                    className="text-xs text-red-400 hover:text-red-300 transition-colors"
+                                >
+                                    ✕ Usar tasa automática
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-gray-500 mt-1 mb-2">Para primeros compradores u otros casos donde el FICO no aplica</p>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                max="30"
+                                value={customAPR}
+                                onChange={(e) => setCustomAPR(e.target.value)}
+                                placeholder={result ? `Auto: ${result.apr}%` : 'Ej: 8.99'}
+                                className={`w-full bg-neutral-900 border rounded-xl py-2.5 pl-4 pr-12 text-white focus:outline-none transition-colors ${customAPR !== '' ? 'border-blue-500 bg-blue-900/20' : 'border-white/10 focus:border-blue-500'
+                                    }`}
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">% APR</span>
+                        </div>
+                        {customAPR !== '' && (
+                            <p className="text-xs text-blue-400 mt-2 flex items-center gap-1">
+                                ✏️ Usando APR manual: {customAPR}% — La barra FICO no afecta el cálculo
+                            </p>
+                        )}
+                    </div>
+
                     {/* Selling Price & Down Payment */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -536,7 +583,12 @@ ${feesDetail}
                             <p className="text-5xl font-bold text-green-400">
                                 ${result.monthlyPayment.toLocaleString()}
                             </p>
-                            {result.isSpecialRate && (
+                            {result.isCustomRate && (
+                                <p className="text-sm text-blue-300 mt-1">
+                                    ✏️ APR manual: {result.apr}%
+                                </p>
+                            )}
+                            {result.isSpecialRate && !result.isCustomRate && (
                                 <p className="text-sm text-green-300 mt-1">
                                     🔥 Tasa especial: {result.apr}% APR
                                 </p>
@@ -567,7 +619,7 @@ ${feesDetail}
                             </div>
                             <div>
                                 <p className="text-gray-500">APR</p>
-                                <p className={result.isSpecialRate ? "text-green-400 font-bold" : "text-white font-medium"}>
+                                <p className={result.isCustomRate ? "text-blue-400 font-bold" : result.isSpecialRate ? "text-green-400 font-bold" : "text-white font-medium"}>
                                     {result.apr}%
                                 </p>
                             </div>
