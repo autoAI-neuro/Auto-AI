@@ -103,7 +103,11 @@ def _build_user_prompt(clone):
     """Build a dynamic system prompt from user's SalesClone config, merged with the base prompt."""
     parts = []
     
-    # Start with base identity
+    # Start with identity - use clone.name if available
+    if clone.name and clone.name != "Mi Clon de Ventas":
+        parts.append(f"Tu nombre es {clone.name}. Cuando te pregunten tu nombre, responde con tu nombre.")
+    
+    # Base identity
     parts.append("Eres un vendedor senior de autos.")
     parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
     

@@ -186,6 +186,90 @@ def process_message_with_agent(
     # === STEP 3: Generate rich context from memory ===
     memory_context = MemoryService.generate_context_for_ray(memory)
     
+    # === STEP 3.5: Build dynamic prompt from user's config ===
+    has_custom_config = bool(
+        (clone.name and clone.name != "Mi Clon de Ventas") or 
+        clone.personality or 
+        clone.sales_logic
+    )
+    
+    if has_custom_config:
+        # Build a fully custom prompt from user's SalesClone configuration
+        prompt_parts = []
+        
+        # Identity: Use clone.name as the agent's name
+        if clone.name and clone.name != "Mi Clon de Ventas":
+            prompt_parts.append(f"Tu nombre es {clone.name}. Cuando te pregunten tu nombre, responde con tu nombre.")
+        
+        prompt_parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
+        
+        # Personality
+        if clone.personality:
+            prompt_parts.append(f"\n🎭 TU PERSONALIDAD:\n{clone.personality}")
+        
+        # Sales Logic / Rules
+        if clone.sales_logic:
+            prompt_parts.append(f"\n📋 TUS REGLAS DE VENTAS:\n{clone.sales_logic}")
+        
+        # Tone keywords
+        if clone.tone_keywords and len(clone.tone_keywords) > 0:
+            keywords = ", ".join(clone.tone_keywords)
+            prompt_parts.append(f"\n✅ PALABRAS/FRASES QUE DEBES USAR: {keywords}")
+        
+        # Avoid keywords
+        if clone.avoid_keywords and len(clone.avoid_keywords) > 0:
+            avoid = ", ".join(clone.avoid_keywords)
+            prompt_parts.append(f"\n🚫 PALABRAS/FRASES QUE NUNCA DEBES USAR: {avoid}")
+        
+        # Core calculator/appointment logic (always needed)
+        prompt_parts.append("""
+🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥
+
+1. SI EL CLIENTE PIDE PRECIO (TOYOTA):
+   - ¡NO PREGUNTES SI QUIERES USAR LA CALCULADORA! ¡ÚSALA!
+   - SI FALTAN DATOS, PÍDELOS DIRECTAMENTE.
+   - **DOWN PAYMENT:** SIEMPRE ASUME $2,000 a menos que el cliente diga otro monto.
+
+2. SI EL CLIENTE PIDE FOTOS (CUALQUIER MARCA):
+   - ¡SÍ TENEMOS FOTOS! Usa la tool `send_vehicle_photos` de inmediato.
+
+3. SI EL CLIENTE PIDE PRECIO (HONDA u otra marca sin sistema):
+   - DI LA VERDAD: "Para esa marca no tengo acceso al banco desde aquí". INVITÁLO A VERLO EN PERSONA.
+
+🔥 PROTOCOLO DE EJECUCIÓN 🔥
+
+PASO 1: RECOLECCIÓN (SOLO LO QUE FALTE)
+- ¿Falta Plan? -> "¿Lo buscas financiado o en lease?"
+- ¿Falta Score? -> "¿Cómo está tu crédito? ¿Estimado 600, 700...?"
+- ¿Tiene Ambos? -> ¡CALCULA INMEDIATAMENTE!
+
+PASO 2: DAR EL NÚMERO
+- Da el pago mensual estimado.
+- LUEGO: "Para confirmar si calificas, ¿tienes Social, ITIN o Pasaporte?"
+
+PASO 3: ANTES DE AGENDAR (CHECKLIST OBLIGATORIO)
+⚠️ NO AGENDES NADA SIN TENER ESTOS 4 DATOS:
+1. Nombre Completo
+2. Vehículo de Interés
+3. Score de Crédito
+4. Documento (Social/ITIN/Pasaporte)
+
+PASO 4: AGENDAR
+- PREGUNTA: "¿En qué ciudad estás ubicado?"
+- SI ESTÁ CERCA: Agenda cita FÍSICA en el dealer.
+- SI ESTÁ LEJOS: Agenda cita VIRTUAL (Videollamada).
+
+⚠️ REGLAS DE ORO:
+- JAMÁS PREGUNTES DOWN PAYMENT (Asume $2k).
+- JAMÁS PIDAS PERMISO PARA CALCULAR.
+""")
+        
+        base_system_prompt = "\n".join(prompt_parts)
+        print(f"[SalesAgent] ✅ Using CUSTOM bot config for user {clone.user_id} (name: {clone.name})")
+    else:
+        base_system_prompt = RAY_SYSTEM_PROMPT
+        print(f"[SalesAgent] Using DEFAULT RAY prompt (no custom config)")
+    
     context_str = f"""
 {memory_context}
 
@@ -196,10 +280,6 @@ ESTADO DE LA CONVERSACIÓN ACTUAL:
 - Documento: {state.get('doc_type', 'No definido')}
 - FECHA Y HORA ACTUAL: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} (Usa esto para calcular "mañana", "lunes", etc)
 
-
-PERSONALIDAD PERSONALIZADA DEL USUARIO:
-{clone.personality or 'Usa el tono de Ray por defecto.'}
-
 INSTRUCCIÓN ESPECIAL DE MEMORIA:
 Si el cliente ya te dio información antes (ves arriba en MEMORIA DEL CLIENTE), 
 NO la pidas de nuevo. Usa lo que ya sabes para personalizar tu respuesta.
@@ -208,7 +288,7 @@ Si hay objeciones previas, tenlas en cuenta al responder.
     
     # === STEP 4: Call OpenAI with full context ===
     response_text, media_info = _call_openai_with_tools(
-        system_prompt=RAY_SYSTEM_PROMPT + "\n" + context_str,
+        system_prompt=base_system_prompt + "\n" + context_str,
         user_message=buyer_message,
         history=conversation_history,
         db=db,
