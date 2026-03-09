@@ -167,22 +167,86 @@ class BaileysClient {
         let body = '';
         let type = 'text';
 
-        if (msg.message?.conversation) {
-            body = msg.message.conversation;
-        } else if (msg.message?.extendedTextMessage?.text) {
-            body = msg.message.extendedTextMessage.text;
-        } else if (msg.message?.imageMessage) {
+        // Unwrap message containers (ephemeral, viewOnce, etc.)
+        let message = msg.message;
+
+        // Ephemeral messages (disappearing messages enabled)
+        if (message?.ephemeralMessage?.message) {
+            message = message.ephemeralMessage.message;
+        }
+        // View once messages
+        if (message?.viewOnceMessage?.message) {
+            message = message.viewOnceMessage.message;
+        }
+        if (message?.viewOnceMessageV2?.message) {
+            message = message.viewOnceMessageV2.message;
+        }
+        // Document with caption messages
+        if (message?.documentWithCaptionMessage?.message) {
+            message = message.documentWithCaptionMessage.message;
+        }
+
+        // Now extract the actual content
+        if (message?.conversation) {
+            body = message.conversation;
+        } else if (message?.extendedTextMessage?.text) {
+            body = message.extendedTextMessage.text;
+        } else if (message?.imageMessage) {
             type = 'image';
-            body = msg.message.imageMessage.caption || '[Imagen]';
-        } else if (msg.message?.videoMessage) {
+            body = message.imageMessage.caption || '[Imagen]';
+        } else if (message?.videoMessage) {
             type = 'video';
-            body = msg.message.videoMessage.caption || '[Video]';
-        } else if (msg.message?.audioMessage) {
+            body = message.videoMessage.caption || '[Video]';
+        } else if (message?.audioMessage) {
             type = 'audio';
             body = '[Audio]';
-        } else if (msg.message?.documentMessage) {
+        } else if (message?.documentMessage) {
             type = 'document';
-            body = msg.message.documentMessage.fileName || '[Documento]';
+            body = message.documentMessage.fileName || '[Documento]';
+        } else if (message?.buttonsResponseMessage) {
+            body = message.buttonsResponseMessage.selectedButtonId ||
+                message.buttonsResponseMessage.selectedDisplayText || '[Botón]';
+        } else if (message?.listResponseMessage) {
+            body = message.listResponseMessage.title ||
+                message.listResponseMessage.singleSelectReply?.selectedRowId || '[Lista]';
+        } else if (message?.templateButtonReplyMessage) {
+            body = message.templateButtonReplyMessage.selectedId ||
+                message.templateButtonReplyMessage.selectedDisplayText || '[Template]';
+        } else if (message?.interactiveResponseMessage) {
+            try {
+                const parsed = JSON.parse(message.interactiveResponseMessage.nativeFlowResponseMessage?.paramsJson || '{}');
+                body = parsed.id || '[Interactivo]';
+            } catch { body = '[Interactivo]'; }
+        } else if (message?.contactMessage) {
+            body = `[Contacto: ${message.contactMessage.displayName || 'Sin nombre'}]`;
+            type = 'contact';
+        } else if (message?.locationMessage) {
+            body = `[Ubicación: ${message.locationMessage.degreesLatitude}, ${message.locationMessage.degreesLongitude}]`;
+            type = 'location';
+        } else if (message?.stickerMessage) {
+            body = '[Sticker]';
+            type = 'sticker';
+        } else if (message?.reactionMessage) {
+            body = message.reactionMessage.text || '[Reacción]';
+            type = 'reaction';
+        } else if (message?.editedMessage?.message) {
+            // Edited messages - extract the edited content
+            const edited = message.editedMessage.message;
+            body = edited?.protocolMessage?.editedMessage?.conversation ||
+                edited?.protocolMessage?.editedMessage?.extendedTextMessage?.text || '';
+            type = 'edited';
+        }
+
+        // Last resort: try to get any text from the message object
+        if (!body && message) {
+            const msgKeys = Object.keys(message);
+            console.log(`[ParseMessage] ⚠️ Unhandled message type. Keys: ${msgKeys.join(', ')}`);
+            // Try common patterns
+            for (const key of msgKeys) {
+                if (message[key]?.text) { body = message[key].text; break; }
+                if (message[key]?.caption) { body = message[key].caption; break; }
+                if (message[key]?.contentText) { body = message[key].contentText; break; }
+            }
         }
 
         return {
