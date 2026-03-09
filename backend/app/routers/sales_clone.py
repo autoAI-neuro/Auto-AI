@@ -19,6 +19,8 @@ class SalesCloneUpdate(BaseModel):
     tone_keywords: Optional[List[str]] = None
     avoid_keywords: Optional[List[str]] = None
     example_responses: Optional[List[dict]] = None  # [{question: str, answer: str}]
+    dealer_city: Optional[str] = None
+    shipping_info: Optional[str] = None
 
 class SalesCloneResponse(BaseModel):
     id: str
@@ -28,6 +30,8 @@ class SalesCloneResponse(BaseModel):
     tone_keywords: Optional[List[str]]
     avoid_keywords: Optional[List[str]]
     example_responses: Optional[List[dict]]
+    dealer_city: Optional[str]
+    shipping_info: Optional[str]
     is_active: bool
     is_trained: bool
     

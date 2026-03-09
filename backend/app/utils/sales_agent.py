@@ -221,6 +221,17 @@ def process_message_with_agent(
             avoid = ", ".join(clone.avoid_keywords)
             prompt_parts.append(f"\n🚫 PALABRAS/FRASES QUE NUNCA DEBES USAR: {avoid}")
         
+        # Dealer city
+        if hasattr(clone, 'dealer_city') and clone.dealer_city:
+            prompt_parts.append(f"\n📍 UBICACIÓN DEL DEALER: {clone.dealer_city}")
+            prompt_parts.append(f"Si el cliente está en {clone.dealer_city} o cerca, invítalo al dealer en persona.")
+            prompt_parts.append(f"Si el cliente está lejos de {clone.dealer_city}, ofrece videollamada.")
+        
+        # Shipping info
+        if hasattr(clone, 'shipping_info') and clone.shipping_info:
+            prompt_parts.append(f"\n🚚 INFORMACIÓN DE ENVÍOS DE VEHÍCULOS:\n{clone.shipping_info}")
+            prompt_parts.append("Si el cliente pregunta por envíos, usa esta información para responder.")
+        
         # Core calculator/appointment logic (always needed)
         prompt_parts.append("""
 🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥

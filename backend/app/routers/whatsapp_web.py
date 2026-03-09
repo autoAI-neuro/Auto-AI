@@ -290,17 +290,19 @@ def whatsapp_webhook(
         
         # Create new client automatically (Lead Capture)
         from app.models import get_uuid
+        from app.utils.phone import ensure_country_code
+        normalized_phone = ensure_country_code(sender_phone)
         client = Client(
             id=get_uuid(),
             user_id=user_id,
             name=f"Lead {sender_phone[-4:]}", # Placeholder name
-            phone=sender_phone,
+            phone=normalized_phone,
             status="Nuevo"
         )
         db.add(client)
         db.commit()
         db.refresh(client)
-        print(f"[Webhook] New client created: {client.id}")
+        print(f"[Webhook] New client created: {client.id} (phone: {normalized_phone})")
         
         # Trigger Automation: CLIENT_CREATED
         try:
@@ -345,87 +347,98 @@ def whatsapp_webhook(
         from app.utils.sales_agent import process_message_with_agent
         from app.models import Message as MessageModel
         
-        clone_status = check_clone_status(db, user_id)
-        print(f"[Webhook DEBUG] Clone Status for {user_id}: {clone_status}", flush=True)
+        # Skip if no text content (audio, sticker, image without caption)
+        if not text or not text.strip():
+            print(f"[Webhook] ⚠️ Empty text message from {sender_phone} (audio/sticker/image?). Skipping AI.", flush=True)
+            return {"status": "processed", "ai_skipped": "empty_text"}
         
-        # CHECK AUTOMATION FLAG (Request #1)
+        clone_status = check_clone_status(db, user_id)
+        print(f"[Webhook DEBUG] Clone Status: active={clone_status['has_active_clone']} for user {user_id}", flush=True)
+        
+        # CHECK AUTOMATION FLAG
         if client and hasattr(client, 'automation_enabled') and client.automation_enabled is False:
-            print(f"[Webhook] 🛑 Automation DISABLED for client {client.name} ({client.phone}). Skipping AI.")
+            print(f"[Webhook] 🛑 Automation DISABLED for client {client.name} ({client.phone}). Skipping AI.", flush=True)
             return {"status": "skipped", "reason": "automation_disabled"}
         
-        # if clone_status["has_active_clone"]:
-        if clone_status["has_active_clone"]: 
-            clone = clone_status["clone"]
-            
-            print(f"[AI Clone + Memory] User {user_id} has active clone, generating response with memory...", flush=True)
-            
-            # Get recent conversation history for context
-            recent_messages = db.query(MessageModel).filter(
-                MessageModel.client_id == client.id
-            ).order_by(MessageModel.sent_at.desc()).limit(10).all()
-            
-            # Convert to format expected by the agent
-            conversation_history = []
-            for msg in reversed(recent_messages):
-                role = "buyer" if msg.direction == "inbound" else "assistant"
-                conversation_history.append({"role": role, "text": msg.content})
-            
-            # Use the NEW process_message_with_agent (includes Memory System!)
-            ai_result = process_message_with_agent(
-                db=db,
-                clone=clone,
-                client_id=client.id,
-                buyer_message=text,
-                conversation_history=conversation_history
-            )
-            
-            ai_response = ai_result.get("response", "")
-            confidence = ai_result.get("confidence", 0)
-            media_url = ai_result.get("media_url")
-            media_caption = ai_result.get("media_caption")
-            
-            print(f"[AI Clone + Memory] Generated response (confidence: {confidence})")
-            print(f"[AI Clone + Memory] Response: {ai_response[:100]}...")
-            print(f"[AI Clone + Memory] 📷 MEDIA URL: {media_url}")
-            
-            # Only send if we have a response and decent confidence
-            if (ai_response or media_url) and confidence >= 0.3:
-                # Send the AI response via WhatsApp
-                try:
-                    send_result = send_whatsapp_message_sync(
-                        user_id=user_id,
-                        phone_number=sender_phone,
-                        message=ai_response or media_caption or "Imagen enviada",
-                        client_id=client.id,
-                        media_url=media_url,
-                        caption=media_caption
-                    )
-                    
-                    # Save AI response as outbound message
-                    ai_message = MessageModel(
-                        id=get_uuid(),
-                        user_id=user_id,
-                        client_id=client.id,
-                        phone=sender_phone,
-                        direction="outbound",
-                        content=ai_response or media_caption or "Imagen enviada",
-                        media_url=media_url,
-                        media_type='image' if media_url else None,
-                        status="sent"
-                    )
-                    db.add(ai_message)
-                    db.commit()
-                    
-                    print(f"[AI Clone + Memory] Auto-response sent successfully to {sender_phone}")
-                    
-                except Exception as send_error:
-                    print(f"[AI Clone + Memory] Failed to send auto-response: {send_error}")
-            else:
-                print(f"[AI Clone + Memory] Skipped response (low confidence or empty)")
+        if not clone_status["has_active_clone"]:
+            print(f"[Webhook] ℹ️ No active clone for user {user_id}. Auto-reply OFF.", flush=True)
+            return {"status": "processed", "ai_skipped": "clone_inactive"}
+        
+        clone = clone_status["clone"]
+        print(f"[AI Auto-Reply] ✅ Clone ACTIVE for user {user_id}, generating response...", flush=True)
+        print(f"[AI Auto-Reply] Client: {client.name} ({sender_phone})", flush=True)
+        print(f"[AI Auto-Reply] Message: {text[:100]}", flush=True)
+        
+        # Get recent conversation history for context
+        recent_messages = db.query(MessageModel).filter(
+            MessageModel.client_id == client.id
+        ).order_by(MessageModel.sent_at.desc()).limit(10).all()
+        
+        # Convert to format expected by the agent
+        conversation_history = []
+        for msg in reversed(recent_messages):
+            role = "buyer" if msg.direction == "inbound" else "assistant"
+            conversation_history.append({"role": role, "text": msg.content or ""})
+        
+        print(f"[AI Auto-Reply] History: {len(conversation_history)} messages", flush=True)
+        
+        # Call AI agent
+        ai_result = process_message_with_agent(
+            db=db,
+            clone=clone,
+            client_id=client.id,
+            buyer_message=text,
+            conversation_history=conversation_history
+        )
+        
+        ai_response = ai_result.get("response", "")
+        confidence = ai_result.get("confidence", 0)
+        media_url = ai_result.get("media_url")
+        media_caption = ai_result.get("media_caption")
+        
+        print(f"[AI Auto-Reply] Response generated (confidence: {confidence})", flush=True)
+        print(f"[AI Auto-Reply] Response preview: {(ai_response or '(empty)')[:150]}", flush=True)
+        if media_url:
+            print(f"[AI Auto-Reply] 📷 Media: {media_url}", flush=True)
+        
+        # Only send if we have a response and decent confidence
+        if (ai_response or media_url) and confidence >= 0.3:
+            try:
+                send_result = send_whatsapp_message_sync(
+                    user_id=user_id,
+                    phone_number=sender_phone,
+                    message=ai_response or media_caption or "Imagen enviada",
+                    client_id=client.id,
+                    media_url=media_url,
+                    caption=media_caption
+                )
+                
+                # Save AI response as outbound message
+                ai_message = MessageModel(
+                    id=get_uuid(),
+                    user_id=user_id,
+                    client_id=client.id,
+                    phone=sender_phone,
+                    direction="outbound",
+                    content=ai_response or media_caption or "Imagen enviada",
+                    media_url=media_url,
+                    media_type='image' if media_url else None,
+                    status="sent"
+                )
+                db.add(ai_message)
+                db.commit()
+                
+                print(f"[AI Auto-Reply] ✅ Response SENT to {sender_phone}", flush=True)
+                
+            except Exception as send_error:
+                print(f"[AI Auto-Reply] ❌ FAILED to send response: {send_error}", flush=True)
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"[AI Auto-Reply] ⚠️ Skipped: confidence={confidence}, response_empty={not ai_response}", flush=True)
                 
     except Exception as e:
-        # Don't fail webhook if AI response fails
-        print(f"[AI Clone + Memory] Error generating response: {e}")
+        print(f"[AI Auto-Reply] ❌ ERROR in auto-reply pipeline: {e}", flush=True)
         import traceback
         traceback.print_exc()
 

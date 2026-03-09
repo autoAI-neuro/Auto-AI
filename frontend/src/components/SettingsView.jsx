@@ -14,6 +14,8 @@ const SettingsView = ({ user }) => {
         sales_logic: '',
         tone_keywords: [],
         avoid_keywords: [],
+        dealer_city: '',
+        shipping_info: '',
         is_active: false,
         is_trained: false,
     });
@@ -49,6 +51,8 @@ const SettingsView = ({ user }) => {
                 sales_logic: botConfig.sales_logic,
                 tone_keywords: botConfig.tone_keywords,
                 avoid_keywords: botConfig.avoid_keywords,
+                dealer_city: botConfig.dealer_city,
+                shipping_info: botConfig.shipping_info,
             }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -115,8 +119,8 @@ const SettingsView = ({ user }) => {
                     <button
                         onClick={toggleBot}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${botConfig.is_active
-                                ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
-                                : 'bg-neutral-800 text-neutral-400 border border-white/10 hover:bg-neutral-700'
+                            ? 'bg-green-500/20 text-green-400 border border-green-500/30 hover:bg-green-500/30'
+                            : 'bg-neutral-800 text-neutral-400 border border-white/10 hover:bg-neutral-700'
                             }`}
                     >
                         <Power size={16} />
@@ -164,6 +168,32 @@ const SettingsView = ({ user }) => {
                                 value={botConfig.sales_logic || ''}
                                 onChange={(e) => setBotConfig(prev => ({ ...prev, sales_logic: e.target.value }))}
                                 placeholder="Ej: - Siempre ofrecer test drive antes de negociar precio&#10;- No dar precios exactos por teléfono, invitar al dealer&#10;- Si el cliente pregunta por Honda, decir que también tenemos opciones&#10;- Siempre preguntar por trade-in"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-green-500 transition-colors resize-none"
+                            />
+                        </div>
+
+                        {/* Dealer City */}
+                        <div className="space-y-2">
+                            <label className="text-sm text-neutral-400">Ciudad del Dealer</label>
+                            <p className="text-xs text-neutral-600">Ciudad donde se ubica tu dealer principal</p>
+                            <input
+                                type="text"
+                                value={botConfig.dealer_city || ''}
+                                onChange={(e) => setBotConfig(prev => ({ ...prev, dealer_city: e.target.value }))}
+                                placeholder="Ej: Miami, FL"
+                                className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white focus:outline-none focus:border-green-500 transition-colors"
+                            />
+                        </div>
+
+                        {/* Shipping Info */}
+                        <div className="space-y-2">
+                            <label className="text-sm text-neutral-400">Información de Envíos de Vehículos</label>
+                            <p className="text-xs text-neutral-600">¿Hacen envíos a todo USA? ¿Qué vehículos? ¿Costos? ¿Tiempo de entrega? ¿Requisitos para aplicar?</p>
+                            <textarea
+                                rows={4}
+                                value={botConfig.shipping_info || ''}
+                                onChange={(e) => setBotConfig(prev => ({ ...prev, shipping_info: e.target.value }))}
+                                placeholder="Ej: Sí, hacemos envíos a todo USA. Enviamos Toyota y Honda nuevos. Costo de envío: $500-$1500 dependiendo de la distancia. Tiempo de entrega: 5-10 días. Requisitos: Social, ITIN o Pasaporte, down payment mínimo de $2000."
                                 className="w-full bg-black/50 border border-white/10 rounded-lg p-3 text-white text-sm focus:outline-none focus:border-green-500 transition-colors resize-none"
                             />
                         </div>

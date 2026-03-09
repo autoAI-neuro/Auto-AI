@@ -129,6 +129,14 @@ def _build_user_prompt(clone):
         avoid = ", ".join(clone.avoid_keywords)
         parts.append(f"\n🚫 PALABRAS/FRASES QUE NUNCA DEBES USAR: {avoid}")
     
+    # Dealer city
+    if hasattr(clone, 'dealer_city') and clone.dealer_city:
+        parts.append(f"\n📍 UBICACIÓN DEL DEALER: {clone.dealer_city}")
+    
+    # Shipping info
+    if hasattr(clone, 'shipping_info') and clone.shipping_info:
+        parts.append(f"\n🚚 INFORMACIÓN DE ENVÍOS:\n{clone.shipping_info}")
+    
     # Example responses
     if clone.example_responses and len(clone.example_responses) > 0:
         examples = "\n".join([

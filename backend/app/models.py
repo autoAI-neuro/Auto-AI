@@ -199,6 +199,10 @@ class SalesClone(Base):
     avoid_keywords = Column(JSON, nullable=True)     # Words to avoid
     example_responses = Column(JSON, nullable=True)  # Example Q&A pairs for training
     
+    # Dealer Configuration
+    dealer_city = Column(String, nullable=True)      # City where the dealer is located (e.g., "Miami")
+    shipping_info = Column(Text, nullable=True)      # Vehicle shipping details (nationwide, costs, etc)
+    
     # Training Data
     voice_samples = Column(JSON, nullable=True)      # Paths to voice notes (future)
     
