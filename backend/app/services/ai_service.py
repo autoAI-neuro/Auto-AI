@@ -100,136 +100,46 @@ import json
 
 
 def _build_user_prompt(clone):
-    """Build a dynamic system prompt from user's SalesClone config, merged with the base prompt."""
-    parts = []
+    """Build a dynamic system prompt from user's SalesClone config, using the DEFAULT prompt as base."""
+    from app.utils.sales_agent import DEFAULT_SYSTEM_PROMPT
     
-    # Start with identity - use clone.name if available
-    if clone.name and clone.name != "Mi Clon de Ventas":
-        parts.append(f"Tu nombre es {clone.name}. Cuando te pregunten tu nombre, responde con tu nombre.")
+    # Start with DEFAULT prompt, inject agent name
+    agent_name = clone.name if (clone.name and clone.name != "Mi Clon de Ventas") else "tu asesor de ventas"
+    prompt = DEFAULT_SYSTEM_PROMPT.replace("{AGENT_NAME}", agent_name)
     
-    # Base identity
-    parts.append("Eres un vendedor senior de autos.")
-    parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
+    # Layer user's custom config ON TOP
+    extras = []
     
-    # User's custom personality
     if clone.personality:
-        parts.append(f"\n🎭 TU PERSONALIDAD:\n{clone.personality}")
+        extras.append(f"\n--- INSTRUCCIONES ADICIONALES ---\n{clone.personality}")
     
-    # User's custom sales logic/rules
     if clone.sales_logic:
-        parts.append(f"\n📋 TUS REGLAS DE VENTAS:\n{clone.sales_logic}")
+        extras.append(f"\n--- REGLAS DE VENTAS PERSONALIZADAS ---\n{clone.sales_logic}")
     
-    # Tone keywords
     if clone.tone_keywords and len(clone.tone_keywords) > 0:
-        keywords = ", ".join(clone.tone_keywords)
-        parts.append(f"\n✅ PALABRAS/FRASES QUE DEBES USAR: {keywords}")
+        extras.append(f"\nPALABRAS/FRASES QUE DEBES USAR: {', '.join(clone.tone_keywords)}")
     
-    # Avoid keywords  
     if clone.avoid_keywords and len(clone.avoid_keywords) > 0:
-        avoid = ", ".join(clone.avoid_keywords)
-        parts.append(f"\n🚫 PALABRAS/FRASES QUE NUNCA DEBES USAR: {avoid}")
+        extras.append(f"\nPALABRAS/FRASES QUE NUNCA DEBES USAR: {', '.join(clone.avoid_keywords)}")
     
-    # Dealer city
     if hasattr(clone, 'dealer_city') and clone.dealer_city:
-        parts.append(f"\n📍 UBICACIÓN DEL DEALER: {clone.dealer_city}")
+        extras.append(f"\nUBICACIÓN DEL DEALER: {clone.dealer_city}")
     
-    # Shipping info
     if hasattr(clone, 'shipping_info') and clone.shipping_info:
-        parts.append(f"\n🚚 INFORMACIÓN DE ENVÍOS:\n{clone.shipping_info}")
+        extras.append(f"\nINFORMACIÓN DE ENVÍOS:\n{clone.shipping_info}")
     
-    # Example responses
     if clone.example_responses and len(clone.example_responses) > 0:
         examples = "\n".join([
             f"  Cliente: \"{ex.get('question', '')}\"\n  Tú: \"{ex.get('answer', '')}\""
             for ex in clone.example_responses[:5]
         ])
-        parts.append(f"\n💬 EJEMPLOS DE CÓMO DEBES RESPONDER:\n{examples}")
+        extras.append(f"\nEJEMPLOS DE CÓMO RESPONDER:\n{examples}")
     
-    # Always append the core calculator/appointment logic
-    parts.append("""
-🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥
-
-1. SI EL CLIENTE PIDE PRECIO (TOYOTA):
-   - ¡NO PREGUNTES SI QUIERES USAR LA CALCULADORA! ¡ÚSALA!
-   - SI FALTAN DATOS, PÍDELOS DIRECTAMENTE.
-   - **DOWN PAYMENT:** SIEMPRE ASUME $2,000 a menos que el cliente diga otro monto.
-
-2. SI EL CLIENTE PIDE PRECIO (HONDA u otra marca sin sistema):
-   - DI LA VERDAD: "No tengo sistema del banco para esa marca aquí". INVITÁLO A VERLO EN PERSONA.
-
-🔥 PROTOCOLO DE EJECUCIÓN 🔥
-
-PASO 1: RECOLECCIÓN (SOLO LO QUE FALTE)
-- ¿Falta Plan? -> "¿Lo buscas financiado o en lease?"
-- ¿Falta Score? -> "¿Cómo está tu crédito? ¿Estimado 600, 700...?"
-- ¿Tiene Ambos? -> ¡CALCULA INMEDIATAMENTE!
-
-PASO 2: DAR EL NÚMERO
-- Da el pago mensual estimado.
-- LUEGO: "Para confirmar si calificas, ¿tienes Social, ITIN o Pasaporte?"
-
-PASO 3: AGENDAR
-- PREGUNTA: "¿En qué ciudad estás ubicado?"
-- SI ESTÁ CERCA: Agenda cita FÍSICA en el dealer.
-- SI ESTÁ LEJOS: Agenda cita VIRTUAL (Videollamada).
-
-⚠️ REGLAS DE ORO:
-- JAMÁS PREGUNTES DOWN PAYMENT (Asume $2k).
-- JAMÁS PIDAS PERMISO PARA CALCULAR.
-""")
+    if extras:
+        extras.append("\n⚠️ PRIORIDAD: Las instrucciones personalizadas anteriores tienen MÁXIMA PRIORIDAD.")
+        prompt += "\n".join(extras)
     
-    return "\n".join(parts)
-
-RAY_SYSTEM_PROMPT = """Eres un vendedor senior de Toyota.
-TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.
-
-🚫 PROHIBIDO DECIR TU NOMBRE O PRESENTARTE 🚫 
-ERES UN AGENTE DE VENTAS GENÉRICO. JAMÁS DIGAS "Soy Ray" NI NADA SIMILAR.
-
-🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥
-
-1. SI EL CLIENTE PIDE PRECIO (TOYOTA):
-   - ¡NO PREGUNTES SI QUIERES USAR LA CALCULADORA! ¡ÚSALA!
-   - SI FALTAN DATOS, PÍDELOS DIRECTAMENTE. NO DIGAS "Necesito confirmar detalles", SOLO PREGUNTA: "¿Crédito estimado?" o "¿Lease o compra?".
-   - **DOWN PAYMENT:** SIEMPRE ASUME $2,000. ¡NUNCA PREGUNTES "¿Cuánto quieres dar?"! 
-     (Solo si el cliente explícitamente dice "Doy $5000", úsalo. Si no, usa $2000 en silencio).
-
-2. SI EL CLIENTE PIDE PRECIO (HONDA):
-   - DI LA VERDAD: "No tengo sistema del banco para Honda aquí". INVITÁLO A VERLO EN PERSONA.
-
-🔥 PROTOCOLO DE EJECUCIÓN (TOYOTA) 🔥
-
-NO ASUMAS PLAN NI SCORE. ASUME DOWN PAYMENT ($2k).
-
-PASO 1: RECOLECCIÓN (SOLO LO QUE FALTE)
-- ¿Falta Plan? -> "¿Lo buscas financiado o en lease?"
-- ¿Falta Score? -> "¿Cómo está tu crédito? ¿Estimado 600, 700...?"
-- ¿Tiene Ambos (Model+Plan+Score)? -> ¡CALCULA INMEDIATAMENTE! (Usa $2000 down implícito).
-
-PASO 2: DAR EL NÚMERO
-- "Con tu crédito y $2,000 iniciales, te queda en $585/mes aprox."
-- LUEGO: "Para confirmar si calificas, ¿tienes Social, ITIN o Pasaporte?"
-
-PASO 3: AGENDAR (LÓGICA DE UBICACIÓN)
-- ANTES DE DAR HORA, PREGUNTA: "¿En qué ciudad estás ubicado?"
-- SI DICE "MIAMI" (o cerca): Agenda cita FÍSICA en el dealer.
-- SI DICE OTRA CIUDAD/LEJOS: Agenda cita VIRTUAL (Videollamada).
-
-EJEMPLO PERFECTO:
-Cliente: "Precio de la Tacoma"
-Agente: "¿Lease o financiada? ¿Y cómo anda tu crédito aprox?"
-Cliente: "Lease y 700"
-Agente (Usa Tool con Down=2000): "Perfecto. Con ese perfil y $2k iniciales, te queda en $450/mes. ¿Te sirve? ¿Tienes Social o Pasaporte?"
-Cliente: "Sí tengo pasaporte"
-Agente: "¿En qué ciudad estás?"
-Cliente: "Orlando"
-Agente: "Como estás lejos, hagamos una videollamada para mostrarte los números oficiales. ¿Mañana a las 10am?"
-
-⚠️ REGLAS DE ORO:
-- JAMÁS PREGUNTES DOWN PAYMENT (Asume $2k).
-- JAMÁS PIDAS PERMISO PARA CALCULAR.
-- SI ES MIAMI -> DEALER. SI ES LEJOS -> VIDEOLLAMADA.
-"""
+    return prompt
 
 
 RAY_TOOLS = [
@@ -289,17 +199,22 @@ HISTORIAL RECIENTE (IMPORTANTE - USA ESTO PARA SABER DE QUÉ AUTO HABLAN):
 "{message_content}"
 """
     
-    # Load per-user bot config if available
-    system_prompt = RAY_SYSTEM_PROMPT  # default fallback
+    # Load per-user bot config - ALWAYS uses DEFAULT_SYSTEM_PROMPT as base
+    system_prompt = None
     if user_id and db:
         try:
             from app.models import SalesClone
             clone = db.query(SalesClone).filter(SalesClone.user_id == user_id).first()
-            if clone and (clone.personality or clone.sales_logic):
+            if clone:
                 system_prompt = _build_user_prompt(clone)
-                print(f"[AI] Using custom bot config for user {user_id}")
+                print(f"[AI] Using bot config for user {user_id}")
         except Exception as e:
             print(f"[AI] Error loading clone config: {e}")
+    
+    # Fallback if no clone found
+    if not system_prompt:
+        from app.utils.sales_agent import DEFAULT_SYSTEM_PROMPT
+        system_prompt = DEFAULT_SYSTEM_PROMPT.replace("{AGENT_NAME}", "tu asesor de ventas")
     
     messages = [
         {"role": "system", "content": system_prompt},
