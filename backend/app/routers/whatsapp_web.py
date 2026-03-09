@@ -9,8 +9,23 @@ from app.utils.reliability import message_rate_limiter
 from app.routers.messages import save_outbound_message
 from pydantic import BaseModel
 import os
+import threading
 
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
+
+# ============================================
+# MESSAGE BATCHING SYSTEM (45-second debounce)
+# ============================================
+# Collects messages per client, waits 45s of silence, then responds with ONE message
+BATCH_DELAY_SECONDS = 45
+
+# pending_responses[client_id] = {
+#    "messages": ["Hola", "Como estas", "Quiero un Corolla"],
+#    "timer": threading.Timer,
+#    "user_id": str, "sender_phone": str, "clone_id": str
+# }
+pending_responses = {}
+pending_lock = threading.Lock()
 
 # Use environment variable for production, fallback to localhost for development
 WHATSAPP_SERVICE_URL = os.getenv("WHATSAPP_SERVICE_URL", "http://127.0.0.1:3005")
@@ -60,6 +75,108 @@ def send_whatsapp_message_sync(user_id: str, phone_number: str, message: str, cl
     except Exception as e:
         print(f"[Backend] Error sending message: {str(e)}")
         raise e
+
+
+def _process_batched_messages(client_id: str):
+    """
+    Timer callback: called 45 seconds after the LAST message from a client.
+    Combines all accumulated messages and generates ONE AI response.
+    """
+    from app.db.session import SessionLocal
+    from app.models import Message as MessageModel, SalesClone
+    
+    # Extract batch data
+    with pending_lock:
+        batch = pending_responses.pop(client_id, None)
+    
+    if not batch or not batch["messages"]:
+        return
+    
+    combined_text = "\n".join(batch["messages"])
+    user_id = batch["user_id"]
+    sender_phone = batch["sender_phone"]
+    msg_count = len(batch["messages"])
+    
+    print(f"[Batch] ⏰ Timer fired for client {client_id}. Processing {msg_count} messages as ONE.", flush=True)
+    print(f"[Batch] Combined text: {combined_text[:200]}", flush=True)
+    
+    # Open fresh DB session (we're in a background thread)
+    db = SessionLocal()
+    try:
+        from app.utils.ai_response import check_clone_status
+        from app.utils.sales_agent import process_message_with_agent
+        
+        clone_status = check_clone_status(db, user_id)
+        if not clone_status["has_active_clone"]:
+            print(f"[Batch] No active clone for user {user_id}. Skipping.", flush=True)
+            return
+        
+        clone = clone_status["clone"]
+        
+        # Get recent conversation history
+        recent_messages = db.query(MessageModel).filter(
+            MessageModel.client_id == client_id
+        ).order_by(MessageModel.sent_at.desc()).limit(10).all()
+        
+        conversation_history = []
+        for msg in reversed(recent_messages):
+            role = "buyer" if msg.direction == "inbound" else "assistant"
+            conversation_history.append({"role": role, "text": msg.content or ""})
+        
+        # Call AI with combined text
+        ai_result = process_message_with_agent(
+            db=db,
+            clone=clone,
+            client_id=client_id,
+            buyer_message=combined_text,
+            conversation_history=conversation_history
+        )
+        
+        ai_response = ai_result.get("response", "")
+        confidence = ai_result.get("confidence", 0)
+        media_url = ai_result.get("media_url")
+        media_caption = ai_result.get("media_caption")
+        
+        print(f"[Batch] ✅ AI response generated for {msg_count} messages (confidence: {confidence})", flush=True)
+        
+        if (ai_response or media_url) and confidence >= 0.3:
+            try:
+                send_whatsapp_message_sync(
+                    user_id=user_id,
+                    phone_number=sender_phone,
+                    message=ai_response or media_caption or "Imagen enviada",
+                    client_id=client_id,
+                    media_url=media_url,
+                    caption=media_caption
+                )
+                
+                # Save AI response as outbound message
+                from app.models import get_uuid as get_new_uuid
+                ai_message = MessageModel(
+                    id=get_new_uuid(),
+                    user_id=user_id,
+                    client_id=client_id,
+                    phone=sender_phone,
+                    direction="outbound",
+                    content=ai_response or media_caption or "Imagen enviada",
+                    media_url=media_url,
+                    media_type='image' if media_url else None,
+                    status="sent"
+                )
+                db.add(ai_message)
+                db.commit()
+                
+                print(f"[Batch] ✅ Response sent! ({msg_count} msgs → 1 reply)", flush=True)
+            except Exception as send_err:
+                print(f"[Batch] ❌ Error sending response: {send_err}", flush=True)
+        else:
+            print(f"[Batch] ⚠️ Low confidence ({confidence}) or empty response. Skipping.", flush=True)
+    except Exception as e:
+        print(f"[Batch] ❌ Error processing batch: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+    finally:
+        db.close()
 
 @router.get("/debug-connectivity")
 def debug_connectivity():
@@ -341,104 +458,53 @@ def whatsapp_webhook(
     except Exception as e:
         print(f"[Webhook] Automation error: {e}")
 
-    # 5. AI Sales Clone Auto-Response (NOW WITH MEMORY SYSTEM!)
+    # 5. AI Sales Clone Auto-Response with MESSAGE BATCHING (45-second debounce)
     try:
         from app.utils.ai_response import check_clone_status
-        from app.utils.sales_agent import process_message_with_agent
-        from app.models import Message as MessageModel
         
         # Skip if no text content (audio, sticker, image without caption)
         if not text or not text.strip():
-            print(f"[Webhook] ⚠️ Empty text message from {sender_phone} (audio/sticker/image?). Skipping AI.", flush=True)
+            print(f"[Webhook] ⚠️ Empty text message from {sender_phone}. Skipping AI.", flush=True)
             return {"status": "processed", "ai_skipped": "empty_text"}
-        
-        clone_status = check_clone_status(db, user_id)
-        print(f"[Webhook DEBUG] Clone Status: active={clone_status['has_active_clone']} for user {user_id}", flush=True)
         
         # CHECK AUTOMATION FLAG
         if client and hasattr(client, 'automation_enabled') and client.automation_enabled is False:
-            print(f"[Webhook] 🛑 Automation DISABLED for client {client.name} ({client.phone}). Skipping AI.", flush=True)
+            print(f"[Webhook] 🛑 Automation DISABLED for {client.name}. Skipping AI.", flush=True)
             return {"status": "skipped", "reason": "automation_disabled"}
         
+        clone_status = check_clone_status(db, user_id)
         if not clone_status["has_active_clone"]:
-            print(f"[Webhook] ℹ️ No active clone for user {user_id}. Auto-reply OFF.", flush=True)
+            print(f"[Webhook] ℹ️ No active clone for user {user_id}.", flush=True)
             return {"status": "processed", "ai_skipped": "clone_inactive"}
         
-        clone = clone_status["clone"]
-        print(f"[AI Auto-Reply] ✅ Clone ACTIVE for user {user_id}, generating response...", flush=True)
-        print(f"[AI Auto-Reply] Client: {client.name} ({sender_phone})", flush=True)
-        print(f"[AI Auto-Reply] Message: {text[:100]}", flush=True)
+        # === BATCHING: Add message to buffer, reset timer ===
+        client_id = client.id
         
-        # Get recent conversation history for context
-        recent_messages = db.query(MessageModel).filter(
-            MessageModel.client_id == client.id
-        ).order_by(MessageModel.sent_at.desc()).limit(10).all()
+        with pending_lock:
+            if client_id in pending_responses:
+                # Cancel existing timer and add message to batch
+                existing = pending_responses[client_id]
+                existing["timer"].cancel()
+                existing["messages"].append(text.strip())
+                msg_count = len(existing["messages"])
+                print(f"[Batch] ➕ Added message #{msg_count} for {client.name}. Timer reset to {BATCH_DELAY_SECONDS}s.", flush=True)
+            else:
+                # First message from this client — start new batch
+                pending_responses[client_id] = {
+                    "messages": [text.strip()],
+                    "user_id": user_id,
+                    "sender_phone": sender_phone,
+                }
+                print(f"[Batch] 🆕 New batch for {client.name}. Waiting {BATCH_DELAY_SECONDS}s for more messages...", flush=True)
+            
+            # Set new timer (45 seconds)
+            timer = threading.Timer(BATCH_DELAY_SECONDS, _process_batched_messages, args=[client_id])
+            timer.daemon = True
+            pending_responses[client_id]["timer"] = timer
+            timer.start()
         
-        # Convert to format expected by the agent
-        conversation_history = []
-        for msg in reversed(recent_messages):
-            role = "buyer" if msg.direction == "inbound" else "assistant"
-            conversation_history.append({"role": role, "text": msg.content or ""})
-        
-        print(f"[AI Auto-Reply] History: {len(conversation_history)} messages", flush=True)
-        
-        # Call AI agent
-        ai_result = process_message_with_agent(
-            db=db,
-            clone=clone,
-            client_id=client.id,
-            buyer_message=text,
-            conversation_history=conversation_history
-        )
-        
-        ai_response = ai_result.get("response", "")
-        confidence = ai_result.get("confidence", 0)
-        media_url = ai_result.get("media_url")
-        media_caption = ai_result.get("media_caption")
-        
-        print(f"[AI Auto-Reply] Response generated (confidence: {confidence})", flush=True)
-        print(f"[AI Auto-Reply] Response preview: {(ai_response or '(empty)')[:150]}", flush=True)
-        if media_url:
-            print(f"[AI Auto-Reply] 📷 Media: {media_url}", flush=True)
-        
-        # Only send if we have a response and decent confidence
-        if (ai_response or media_url) and confidence >= 0.3:
-            try:
-                send_result = send_whatsapp_message_sync(
-                    user_id=user_id,
-                    phone_number=sender_phone,
-                    message=ai_response or media_caption or "Imagen enviada",
-                    client_id=client.id,
-                    media_url=media_url,
-                    caption=media_caption
-                )
-                
-                # Save AI response as outbound message
-                ai_message = MessageModel(
-                    id=get_uuid(),
-                    user_id=user_id,
-                    client_id=client.id,
-                    phone=sender_phone,
-                    direction="outbound",
-                    content=ai_response or media_caption or "Imagen enviada",
-                    media_url=media_url,
-                    media_type='image' if media_url else None,
-                    status="sent"
-                )
-                db.add(ai_message)
-                db.commit()
-                
-                print(f"[AI Auto-Reply] ✅ Response SENT to {sender_phone}", flush=True)
-                
-            except Exception as send_error:
-                print(f"[AI Auto-Reply] ❌ FAILED to send response: {send_error}", flush=True)
-                import traceback
-                traceback.print_exc()
-        else:
-            print(f"[AI Auto-Reply] ⚠️ Skipped: confidence={confidence}, response_empty={not ai_response}", flush=True)
-                
     except Exception as e:
-        print(f"[AI Auto-Reply] ❌ ERROR in auto-reply pipeline: {e}", flush=True)
+        print(f"[Webhook] ❌ Batching error: {e}", flush=True)
         import traceback
         traceback.print_exc()
 
