@@ -47,4 +47,49 @@ def check_and_migrate_tables():
                 except Exception as e:
                     print(f"[Migration] Error adding automation_enabled: {e}")
 
+        # 4. Check 'sales_clones' for 'dealer_city'
+        if inspector.has_table("sales_clones"):
+            columns = [col["name"] for col in inspector.get_columns("sales_clones")]
+            if "dealer_city" not in columns:
+                print("[Migration] Adding missing column: sales_clones.dealer_city")
+                try:
+                    conn.execute(text("ALTER TABLE sales_clones ADD COLUMN dealer_city VARCHAR"))
+                    conn.commit()
+                    print("[Migration] ✅ dealer_city added.")
+                except Exception as e:
+                    print(f"[Migration] Error adding dealer_city: {e}")
+
+        # 5. Check 'sales_clones' for 'shipping_info'
+        if inspector.has_table("sales_clones"):
+            columns = [col["name"] for col in inspector.get_columns("sales_clones")]
+            if "shipping_info" not in columns:
+                print("[Migration] Adding missing column: sales_clones.shipping_info")
+                try:
+                    conn.execute(text("ALTER TABLE sales_clones ADD COLUMN shipping_info TEXT"))
+                    conn.commit()
+                    print("[Migration] ✅ shipping_info added.")
+                except Exception as e:
+                    print(f"[Migration] Error adding shipping_info: {e}")
+
+        # 6. Normalize phone numbers (add +1 to 10/11 digit US numbers)
+        if inspector.has_table("clients"):
+            try:
+                # Fix 10-digit numbers (missing country code entirely)
+                result = conn.execute(text(
+                    "UPDATE clients SET phone = '+1' || phone WHERE phone ~ '^[0-9]{10}$'"
+                ))
+                if result.rowcount > 0:
+                    print(f"[Migration] ✅ Normalized {result.rowcount} phones (10-digit → +1)")
+                
+                # Fix 11-digit numbers starting with 1 (missing + prefix)
+                result2 = conn.execute(text(
+                    "UPDATE clients SET phone = '+' || phone WHERE phone ~ '^1[0-9]{10}$'"
+                ))
+                if result2.rowcount > 0:
+                    print(f"[Migration] ✅ Normalized {result2.rowcount} phones (11-digit → +)")
+                
+                conn.commit()
+            except Exception as e:
+                print(f"[Migration] Phone normalization: {e}")
+
     print("[Migration] Schema check complete.")
