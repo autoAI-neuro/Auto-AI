@@ -201,15 +201,21 @@ def process_message_with_agent(
         if clone.name and clone.name != "Mi Clon de Ventas":
             prompt_parts.append(f"Tu nombre es {clone.name}. Cuando te pregunten tu nombre, responde con tu nombre.")
         
-        prompt_parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
+        # Only add generic purpose if user has NO custom personality
+        if not clone.personality:
+            prompt_parts.append("TU PROPÓSITO ÚNICO ES CERRAR VENTAS ASISTIDAS POR DATOS.")
         
         # Personality
         if clone.personality:
-            prompt_parts.append(f"\n🎭 TU PERSONALIDAD:\n{clone.personality}")
+            prompt_parts.append(f"\n🎭 TU PERSONALIDAD E INSTRUCCIONES PRINCIPALES:\n{clone.personality}")
         
         # Sales Logic / Rules
         if clone.sales_logic:
             prompt_parts.append(f"\n📋 TUS REGLAS DE VENTAS:\n{clone.sales_logic}")
+        
+        # Priority instruction - user's config MUST override everything
+        if clone.personality or clone.sales_logic:
+            prompt_parts.append("\n⚠️ PRIORIDAD: Las instrucciones de PERSONALIDAD y REGLAS DE VENTAS anteriores tienen MÁXIMA PRIORIDAD. Sigue esas instrucciones por encima de cualquier otra regla.")
         
         # Tone keywords
         if clone.tone_keywords and len(clone.tone_keywords) > 0:
@@ -232,47 +238,32 @@ def process_message_with_agent(
             prompt_parts.append(f"\n🚚 INFORMACIÓN DE ENVÍOS DE VEHÍCULOS:\n{clone.shipping_info}")
             prompt_parts.append("Si el cliente pregunta por envíos, usa esta información para responder.")
         
-        # Core calculator/appointment logic (always needed)
+        # Tool usage instructions (ALWAYS needed - teaches AI HOW to use available tools)
         prompt_parts.append("""
-🔥 LÓGICA DE CÁLCULO (CRÍTICO) 🔥
+🔧 HERRAMIENTAS DISPONIBLES:
 
-1. SI EL CLIENTE PIDE PRECIO (TOYOTA):
-   - ¡NO PREGUNTES SI QUIERES USAR LA CALCULADORA! ¡ÚSALA!
-   - SI FALTAN DATOS, PÍDELOS DIRECTAMENTE.
-   - **DOWN PAYMENT:** SIEMPRE ASUME $2,000 a menos que el cliente diga otro monto.
+1. `calculate_payment` - Calcula pagos mensuales estimados (Toyota solamente).
+   Necesitas: modelo, plan (finance/lease), score crediticio. 
+   Down payment: asume $2,000 si el cliente no dice otro monto.
 
-2. SI EL CLIENTE PIDE FOTOS (CUALQUIER MARCA):
-   - ¡SÍ TENEMOS FOTOS! Usa la tool `send_vehicle_photos` de inmediato.
+2. `send_vehicle_photos` - Envía fotos de vehículos al cliente.
+   Úsala cuando el cliente pida ver fotos de cualquier vehículo.
 
-3. SI EL CLIENTE PIDE PRECIO (HONDA u otra marca sin sistema):
-   - DI LA VERDAD: "Para esa marca no tengo acceso al banco desde aquí". INVITÁLO A VERLO EN PERSONA.
+3. `check_calendar` / `schedule_appointment` - Consulta disponibilidad y agenda citas.
+   Úsala cuando el cliente quiera agendar una cita o videollamada.
 
-🔥 PROTOCOLO DE EJECUCIÓN 🔥
+Para marcas sin sistema de cálculo (Honda, etc.), informa que el precio exacto requiere visita presencial.
+""")
+        
+        # Sales approach logic - ONLY if user has NO custom sales_logic
+        if not clone.sales_logic:
+            prompt_parts.append("""
+🔥 PROTOCOLO DE VENTAS (POR DEFECTO):
 
-PASO 1: RECOLECCIÓN (SOLO LO QUE FALTE)
-- ¿Falta Plan? -> "¿Lo buscas financiado o en lease?"
-- ¿Falta Score? -> "¿Cómo está tu crédito? ¿Estimado 600, 700...?"
-- ¿Tiene Ambos? -> ¡CALCULA INMEDIATAMENTE!
-
-PASO 2: DAR EL NÚMERO
-- Da el pago mensual estimado.
-- LUEGO: "Para confirmar si calificas, ¿tienes Social, ITIN o Pasaporte?"
-
-PASO 3: ANTES DE AGENDAR (CHECKLIST OBLIGATORIO)
-⚠️ NO AGENDES NADA SIN TENER ESTOS 4 DATOS:
-1. Nombre Completo
-2. Vehículo de Interés
-3. Score de Crédito
-4. Documento (Social/ITIN/Pasaporte)
-
-PASO 4: AGENDAR
-- PREGUNTA: "¿En qué ciudad estás ubicado?"
-- SI ESTÁ CERCA: Agenda cita FÍSICA en el dealer.
-- SI ESTÁ LEJOS: Agenda cita VIRTUAL (Videollamada).
-
-⚠️ REGLAS DE ORO:
-- JAMÁS PREGUNTES DOWN PAYMENT (Asume $2k).
-- JAMÁS PIDAS PERMISO PARA CALCULAR.
+PASO 1: Recolectar datos faltantes (plan de pago, score crediticio)
+PASO 2: Calcular y dar pago mensual estimado
+PASO 3: Antes de agendar, recolectar: Nombre, Vehículo, Score, Documento (Social/ITIN/Pasaporte)
+PASO 4: Agendar cita presencial (si está cerca) o virtual (si está lejos)
 """)
         
         base_system_prompt = "\n".join(prompt_parts)
