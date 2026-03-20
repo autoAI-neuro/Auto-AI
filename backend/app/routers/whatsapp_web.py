@@ -405,6 +405,13 @@ def whatsapp_webhook(
             # Just skip this message
             return {"success": True, "message": "Skipped system ID"}
         
+        # Skip auto-registration if user has no active clone (automations off)
+        from app.utils.ai_response import check_clone_status
+        clone_status = check_clone_status(db, user_id)
+        if not clone_status["has_active_clone"]:
+            print(f"[Webhook] 🛑 No active clone for user {user_id}. Skipping auto-registration for {sender_phone}.")
+            return {"status": "skipped", "reason": "automations_off"}
+        
         # Create new client automatically (Lead Capture)
         from app.models import get_uuid
         from app.utils.phone import ensure_country_code
