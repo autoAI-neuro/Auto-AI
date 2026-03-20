@@ -24,14 +24,26 @@ router = APIRouter(prefix="/files", tags=["files"])
 
 # Helper functions defined at module level to avoid redefinition
 def safe_date(val):
+    """Parse dates from various formats including Excel serial date numbers."""
     if pd.isna(val) or val is None: return None
     s = str(val).strip()
     if not s: return None
     try:
-        # Try pandas first (handles most formats automatically)
-        dt = pd.to_datetime(s, errors='coerce')
+        # Check if it's an Excel serial date number (e.g. 32739 = 1989-08-19)
+        # Excel epoch is 1899-12-30, serial numbers typically range 10000-60000
+        try:
+            num = float(s)
+            if 10000 <= num <= 60000 and '/' not in s and '-' not in s:
+                # Convert Excel serial date: days since 1899-12-30
+                dt = datetime.datetime(1899, 12, 30) + datetime.timedelta(days=int(num))
+                return dt.date()
+        except (ValueError, TypeError):
+            pass
+        
+        # Try pandas parser (handles YYYY-MM-DD, MM/DD/YYYY, etc.)
+        dt = pd.to_datetime(s, errors='coerce', dayfirst=False)
         if pd.notnull(dt):
-            return dt.date() # Return python date object
+            return dt.date()
         return None
     except:
         return None
@@ -44,6 +56,34 @@ def safe_int(val):
         return int(float(s))
     except:
         return None
+
+def normalize_phone(phone_raw: str) -> str:
+    """Clean and normalize phone number, auto-adding +1 US country code if missing."""
+    # Strip everything except digits and +
+    phone = ''.join(c for c in phone_raw if c.isdigit() or c == '+')
+    
+    # Remove any + that isn't at the start
+    if '+' in phone:
+        phone = phone[0] + phone[1:].replace('+', '')
+    
+    # Already has +1 prefix → good to go
+    if phone.startswith('+1') and len(phone) == 12:
+        return phone
+    
+    # Has + with other country code → leave as-is (international)
+    if phone.startswith('+'):
+        return phone
+    
+    # 10 digits (US number without country code, e.g. 8091234567)
+    if len(phone) == 10 and phone.isdigit():
+        return '+1' + phone
+    
+    # 11 digits starting with 1 (US number with 1 but no +, e.g. 18091234567)
+    if len(phone) == 11 and phone.startswith('1') and phone.isdigit():
+        return '+' + phone
+    
+    # Anything else → return cleaned version as-is
+    return phone
 
 @router.post("/import-clients")
 def import_clients(
@@ -133,8 +173,8 @@ def import_clients(
                 if not name or not phone_raw:
                     continue
                     
-                # Clean Phone
-                phone_clean = ''.join(filter(lambda x: x.isdigit() or x == '+', phone_raw))
+                # Clean & normalize phone (auto-add +1 if missing)
+                phone_clean = normalize_phone(phone_raw)
                 if len(phone_clean) < 7: # Basic validation
                     continue
 
