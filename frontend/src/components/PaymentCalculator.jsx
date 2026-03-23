@@ -38,7 +38,8 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
         downPayment: 5000,
         interestRate: 6.0,
         loanTermMonths: 60,
-        tradeInValue: 0
+        tradeInAcv: 0,
+        tradeInPayoff: 0
     });
 
     const [result, setResult] = useState(null);
@@ -75,14 +76,17 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
     }, [formData, selectedFees]);
 
     const calculatePayment = () => {
-        const { vehiclePrice, downPayment, interestRate, loanTermMonths, tradeInValue } = formData;
+        const { vehiclePrice, downPayment, interestRate, loanTermMonths, tradeInAcv, tradeInPayoff } = formData;
         const totalFees = calculateTotalFees();
 
         // Total amount including fees
         const totalPrice = vehiclePrice + totalFees;
 
+        // Calculate net trade-in (Negative means they owe more than it's worth)
+        const netTradeInEquity = tradeInAcv - tradeInPayoff;
+
         // Amount to finance
-        const principal = totalPrice - downPayment - tradeInValue;
+        const principal = totalPrice - downPayment - netTradeInEquity;
 
         if (principal <= 0) {
             setResult({ monthlyPayment: 0, totalPayment: 0, totalInterest: 0, principal: 0, totalFees: 0, outTheDoor: 0 });
@@ -142,13 +146,17 @@ const PaymentCalculator = ({ isOpen, onClose, onSend, vehicleInfo = null }) => {
             return `  • ${fee.name}: $${Math.round(amount).toLocaleString()}`;
         }).filter(Boolean).join('\n');
 
+        const netTradeInEquity = formData.tradeInAcv - formData.tradeInPayoff;
+        const tradeInMessage = formData.tradeInAcv > 0 || formData.tradeInPayoff > 0
+            ? `🔄 Trade-in ACV: $${formData.tradeInAcv.toLocaleString()}\n📉 Payoff: $${formData.tradeInPayoff.toLocaleString()}${netTradeInEquity < 0 ? `\n❌ Negative Equity Rolled in: $${Math.abs(netTradeInEquity).toLocaleString()}` : `\n✅ Positive Equity Applied: -$${Math.abs(netTradeInEquity).toLocaleString()}`}\n`
+            : '';
+
         const message = `💰 *Cotización de Financiamiento*
 
 🚗 ${vehicleInfo ? `${vehicleInfo.make} ${vehicleInfo.model} ${vehicleInfo.year}` : 'Vehículo'}
 💵 Precio Base: $${formData.vehiclePrice.toLocaleString()}
 📥 Enganche: $${formData.downPayment.toLocaleString()}
-${formData.tradeInValue > 0 ? `🔄 Trade-in: $${formData.tradeInValue.toLocaleString()}\n` : ''}
-📋 *Cargos y Fees:*
+${tradeInMessage}📋 *Cargos y Fees:*
 ${selectedFeesList}
 💲 Total Fees: $${result.totalFees.toLocaleString()}
 
@@ -276,18 +284,47 @@ ${selectedFeesList}
 
                     {/* Trade-in, APR & Term */}
                     <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="text-sm text-gray-400 mb-2 block">Trade-in</label>
-                            <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                <input
-                                    type="number"
-                                    value={formData.tradeInValue}
-                                    onChange={(e) => handleChange('tradeInValue', e.target.value)}
-                                    className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-green-500"
-                                />
+                        {/* Trade-in ACV & Payoff */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">ACV (Valor del Carro)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                    <input
+                                        type="number"
+                                        value={formData.tradeInAcv || ''}
+                                        onChange={(e) => handleChange('tradeInAcv', e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-green-500"
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">Pay OFF (Deuda)</label>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                    <input
+                                        type="number"
+                                        value={formData.tradeInPayoff || ''}
+                                        onChange={(e) => handleChange('tradeInPayoff', e.target.value)}
+                                        placeholder="0"
+                                        className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-red-500"
+                                    />
+                                </div>
                             </div>
                         </div>
+
+                        {/* Negative/Positive Equity Indicator */}
+                        {(formData.tradeInAcv > 0 || formData.tradeInPayoff > 0) && (
+                            <div className={`p-3 rounded-xl border flex items-center justify-between text-sm ${formData.tradeInAcv - formData.tradeInPayoff < 0 ? 'bg-red-900/20 border-red-500/30' : 'bg-green-900/20 border-green-500/30'}`}>
+                                <span className={formData.tradeInAcv - formData.tradeInPayoff < 0 ? 'text-red-400' : 'text-green-400'}>
+                                    {formData.tradeInAcv - formData.tradeInPayoff < 0 ? 'Negative Equity (Upside Down):' : 'Positive Equity (A favor):'}
+                                </span>
+                                <span className={`font-bold ${formData.tradeInAcv - formData.tradeInPayoff < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                    {formData.tradeInAcv - formData.tradeInPayoff < 0 ? '+' : '-'}${Math.abs(formData.tradeInAcv - formData.tradeInPayoff).toLocaleString()} a financiar
+                                </span>
+                            </div>
+                        )}
                         <div>
                             <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">
                                 <Percent className="w-4 h-4" /> Tasa APR

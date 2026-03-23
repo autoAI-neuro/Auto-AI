@@ -26,7 +26,8 @@ const ToyotaLeaseCalculator = ({ isOpen, onClose, onSend }) => {
     const [term, setTerm] = useState(39);
     const [mileage, setMileage] = useState(15000);
     const [downPayment, setDownPayment] = useState(3000);
-    const [tradeIn, setTradeIn] = useState(0);
+    const [tradeInAcv, setTradeInAcv] = useState(0);
+    const [tradeInPayoff, setTradeInPayoff] = useState(0);
     const [sellingPrice, setSellingPrice] = useState(0);
     const [result, setResult] = useState(null);
 
@@ -94,7 +95,8 @@ const ToyotaLeaseCalculator = ({ isOpen, onClose, onSend }) => {
 
         // Cap cost reductions
         const bonus = selectedModel.bonus || 0;
-        const capCostReduction = downPayment + tradeIn + bonus;
+        const netTradeInEquity = tradeInAcv - tradeInPayoff;
+        const capCostReduction = downPayment + netTradeInEquity + bonus;
 
         // Adjusted Cap Cost
         const adjustedCapCost = grossCapCost - capCostReduction;
@@ -160,7 +162,7 @@ const ToyotaLeaseCalculator = ({ isOpen, onClose, onSend }) => {
             upfrontFees: totalUpfrontFees
         });
 
-    }, [selectedModel, selectedModelCode, creditScore, term, mileage, downPayment, tradeIn, sellingPrice, tierNumber, includedFees, totalUpfrontFees]);
+    }, [selectedModel, selectedModelCode, creditScore, term, mileage, downPayment, tradeInAcv, tradeInPayoff, sellingPrice, tierNumber, includedFees, totalUpfrontFees]);
 
     // Handle model selection
     const handleSelectModel = (model) => {
@@ -190,19 +192,22 @@ const ToyotaLeaseCalculator = ({ isOpen, onClose, onSend }) => {
         if (includedFees.docFee) feesBreakdown += `• Doc Fee: $${FLORIDA_LEASE_FEES.docFee.amount}\n`;
         if (includedFees.tagTitle) feesBreakdown += `• Tag/Title/Reg: $${FLORIDA_LEASE_FEES.tagTitle.amount}\n`;
 
+        const netTradeInEquity = tradeInAcv - tradeInPayoff;
+        const tradeInMessage = tradeInAcv > 0 || tradeInPayoff > 0
+            ? `🔄 Trade-in ACV: $${tradeInAcv.toLocaleString()}\n📉 Payoff: $${tradeInPayoff.toLocaleString()}${netTradeInEquity < 0 ? `\n❌ Negative Equity Rolled in: $${Math.abs(netTradeInEquity).toLocaleString()}` : `\n✅ Positive Equity Applied: -$${Math.abs(netTradeInEquity).toLocaleString()}`}\n`
+            : '';
+
         const message = `🚗 *Cotización de Lease - Toyota Financial Services*
 
 📋 *Vehículo:* ${selectedModel.name}
 💰 Precio: $${price.toLocaleString()}
 ${result.bonus > 0 ? `🎁 *Bonus Lease Cash: $${result.bonus.toLocaleString()}*\n` : ''}
-
 ⭐ *Crédito:* ${tierInfo.label} - ${tierInfo.description} (${creditScore})
-${result.isSpecial ? `🔥 *PROGRAMA ESPECIAL ${term} MESES*\n` : ''}
-📈 Money Factor: ${result.moneyFactor.toFixed(5)} (~${mfToAPREquivalent(result.moneyFactor)}% equiv.)
+${result.isSpecial ? `🔥 *PROGRAMA ESPECIAL ${term} MESES*\n` : ''}📈 Money Factor: ${result.moneyFactor.toFixed(5)} (~${mfToAPREquivalent(result.moneyFactor)}% equiv.)
 
 📅 Plazo: ${term} meses
 🛣️ Millas: ${(mileage / 1000).toFixed(0)}K/año
-
+${tradeInMessage}
 ━━━━━━━━━━━━━━━━━━━
 📦 *DESGLOSE MENSUAL:*
 • Depreciación: $${result.depreciation.toLocaleString()}
@@ -411,19 +416,47 @@ ${tierNumber <= 2 ? '✅ SIN depósito de seguridad' : '⚠️ Requiere depósit
                         </div>
                     </div>
 
-                    {/* Trade-in */}
-                    <div>
-                        <label className="text-sm text-gray-400 mb-2 block">Trade-in Value (opcional)</label>
-                        <div className="relative">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                            <input
-                                type="number"
-                                value={tradeIn}
-                                onChange={(e) => setTradeIn(parseFloat(e.target.value) || 0)}
-                                className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-red-500"
-                            />
+                    {/* Trade-in ACV & Payoff */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">ACV (Valor del Carro)</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                <input
+                                    type="number"
+                                    value={tradeInAcv || ''}
+                                    onChange={(e) => setTradeInAcv(parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-red-500"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-sm text-gray-400 mb-2 block flex items-center gap-2">Pay OFF (Deuda)</label>
+                            <div className="relative">
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                <input
+                                    type="number"
+                                    value={tradeInPayoff || ''}
+                                    onChange={(e) => setTradeInPayoff(parseFloat(e.target.value) || 0)}
+                                    placeholder="0"
+                                    className="w-full bg-neutral-800 border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-red-500"
+                                />
+                            </div>
                         </div>
                     </div>
+
+                    {/* Negative/Positive Equity Indicator */}
+                    {(tradeInAcv > 0 || tradeInPayoff > 0) && (
+                        <div className={`p-3 rounded-xl border flex items-center justify-between text-sm ${tradeInAcv - tradeInPayoff < 0 ? 'bg-red-900/20 border-red-500/30' : 'bg-green-900/20 border-green-500/30'}`}>
+                            <span className={tradeInAcv - tradeInPayoff < 0 ? 'text-red-400' : 'text-green-400'}>
+                                {tradeInAcv - tradeInPayoff < 0 ? 'Negative Equity (Upside Down):' : 'Positive Equity (A favor):'}
+                            </span>
+                            <span className={`font-bold ${tradeInAcv - tradeInPayoff < 0 ? 'text-red-500' : 'text-green-500'}`}>
+                                {tradeInAcv - tradeInPayoff < 0 ? '+' : '-'}${Math.abs(tradeInAcv - tradeInPayoff).toLocaleString()} al Cap Cost
+                            </span>
+                        </div>
+                    )}
 
                     {/* Term & Mileage */}
                     <div className="grid grid-cols-2 gap-4">
