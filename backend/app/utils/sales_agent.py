@@ -190,7 +190,11 @@ RAY_TOOLS = [
                     "model_name": {"type": "string", "description": "Model name. If generic (e.g. 'Corolla'), assume Base Trim (e.g. 'Corolla LE')."},
                     "plan_type": {"type": "string", "enum": ["lease", "finance"], "description": "Type of deal. If unsure, pick sensible default."},
                     "credit_score": {"type": "integer", "description": "Score. Default 650 if missing."},
-                    "down_payment": {"type": "number", "description": "Down payment. Default 2000.0 if missing."}
+                    "down_payment": {"type": "number", "description": "Down payment. Default 2000.0 if missing."},
+                    "override_msrp": {"type": "number", "description": "Exact MRT/MSRP found in the Attached Lease/Purchase PDF Data for this specific model. Provide only if found."},
+                    "override_residual": {"type": "number", "description": "Exact 36-month residual percentage (e.g., 60 for 60%) found in the Attached Lease PDF Data for this specific model. Provide only if found."},
+                    "override_money_factor": {"type": "number", "description": "Exact Money Factor (e.g., 0.00295) found in the Attached Lease PDF Data for this tier/model. Provide only if found."},
+                    "override_apr": {"type": "number", "description": "Exact APR percentage (e.g., 4.99) found in the Attached Purchase/Finance PDF Data for this tier/model. Provide only if found."}
                 },
                 "required": ["model_name", "plan_type"]
             }
@@ -317,6 +321,17 @@ def process_message_with_agent(
     if extra_instructions:
         extra_instructions.append("\n⚠️ PRIORIDAD: Las instrucciones personalizadas anteriores tienen MÁXIMA PRIORIDAD sobre las instrucciones por defecto.")
         base_system_prompt += "\n".join(extra_instructions)
+        
+    # Append the March 2026 Lease & Purchase PDFs text data so the AI can extract exact prices
+    try:
+        with open("lease_content.txt", "r", encoding="utf-8") as f:
+            pdf_data = f.read()
+        with open("compra_content.txt", "r", encoding="utf-8") as f:
+            pdf_data += "\n\n=== TABLAS DE COMPRA / FINANCIAMIENTO ===\n" + f.read()
+            
+        base_system_prompt += f"\n\n=== DATOS EXACTOS DE LEASE Y COMPRA (MARZO) ===\nBusca aquí los valores exactos (MRT, Residual, Money Factor o APR mensual) para el modelo solicitado y pásalos a la herramienta calculate_payment:\n{pdf_data}\n================================================\n"
+    except Exception as e:
+        print(f"[SalesAgent] Warning: Could not load lease/compra_content.txt: {e}")
     
     print(f"[SalesAgent] Agent: {agent_name} | Custom config: {bool(extra_instructions)}", flush=True)
     
@@ -472,7 +487,10 @@ def _call_openai_with_tools(
                             dp,
                             39, # term
                             12000, # mileage
-                            db # Pass DB session
+                            db, # Pass DB session
+                            override_msrp=func_args.get("override_msrp"),
+                            override_residual=func_args.get("override_residual"),
+                            override_money_factor=func_args.get("override_money_factor")
                         )
                     else:
                         res = CalculatorService.calculate_finance(
@@ -480,7 +498,9 @@ def _call_openai_with_tools(
                             func_args.get("credit_score", 650),
                             dp,
                             60, # term
-                            db # Pass DB session
+                            db, # Pass DB session
+                            override_msrp=func_args.get("override_msrp"),
+                            override_apr=func_args.get("override_apr")
                         )
                     tool_output = json.dumps(res)
                     

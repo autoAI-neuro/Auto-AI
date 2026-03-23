@@ -258,15 +258,15 @@ def get_money_factor(model_code, tier, ltv, term):
 class CalculatorService:
     
     @staticmethod
-    def calculate_lease(model_name: str, credit_score: int, down_payment: float, term: int = 39, mileage: int = 12000, db: Session = None):
+    def calculate_lease(model_name: str, credit_score: int, down_payment: float, term: int = 39, mileage: int = 12000, db: Session = None, override_msrp: float = None, override_residual: float = None, override_money_factor: float = None):
         """
-        Calculates Lease Payment based on Ray's inputs.
+        Calculates Lease Payment based on Ray's inputs, optionally using overrides from PDF data.
         """
         model_code, model_data = find_model_by_name(model_name, db)
-        if not model_data:
-            return {"error": f"Model '{model_name}' not found in database."}
+        if not model_data and not override_msrp:
+            return {"error": f"Model '{model_name}' not found in database and no MSRP override provided."}
 
-        price = model_data["mrt"]
+        price = override_msrp if override_msrp else model_data["mrt"]
         tier = get_credit_tier_number(credit_score)
         
         # Fees
@@ -283,8 +283,11 @@ class CalculatorService:
         ltv = (adjusted_cap_cost / price) * 100
         
         # Residual
-        res_key = 36 if term not in model_data["residuals"] else term
-        residual_percent = model_data["residuals"].get(res_key, 50)
+        if override_residual:
+            residual_percent = override_residual
+        else:
+            res_key = 36 if term not in model_data["residuals"] else term
+            residual_percent = model_data["residuals"].get(res_key, 50)
         
         # Mileage Adj
         if mileage == 12000: residual_percent += 2
@@ -293,7 +296,10 @@ class CalculatorService:
         residual_value = round(price * (residual_percent / 100))
         
         # Money Factor
-        money_factor = get_money_factor(model_code, tier, ltv, term)
+        if override_money_factor:
+            money_factor = override_money_factor
+        else:
+            money_factor = get_money_factor(model_code, tier, ltv, term)
         
         # Calc
         depreciation = (adjusted_cap_cost - residual_value) / term
@@ -318,15 +324,15 @@ class CalculatorService:
         }
 
     @staticmethod
-    def calculate_finance(model_name: str, credit_score: int, down_payment: float, term: int = 60, db: Session = None):
+    def calculate_finance(model_name: str, credit_score: int, down_payment: float, term: int = 60, db: Session = None, override_msrp: float = None, override_apr: float = None):
         """
         Calculates Finance Payment (Purchase).
         """
         model_code, model_data = find_model_by_name(model_name, db)
-        if not model_data:
-            return {"error": f"Model '{model_name}' not found."}
+        if not model_data and not override_msrp:
+            return {"error": f"Model '{model_name}' not found and no MSRP provided."}
             
-        price = model_data["mrt"]
+        price = override_msrp if override_msrp else model_data["mrt"]
         
         # Fees
         fees = FLORIDA_FEES["doc_fee"] + FLORIDA_FEES["tag_title_reg_purchase"] + FLORIDA_FEES["loan_processing"]
@@ -336,10 +342,13 @@ class CalculatorService:
         amount_financed = total_price - down_payment
         
         # APR
-        # Simple lookup for now based on score
-        apr = 6.99
-        if credit_score >= 740: apr = 5.99
-        elif credit_score < 650: apr = 12.99
+        if override_apr:
+            apr = override_apr
+        else:
+            # Simple lookup for now based on score
+            apr = 6.99
+            if credit_score >= 740: apr = 5.99
+            elif credit_score < 650: apr = 12.99
         
         # Monthly
         monthly_rate = (apr / 100) / 12
