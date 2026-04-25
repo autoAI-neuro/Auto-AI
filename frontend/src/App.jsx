@@ -13,7 +13,7 @@ import ClientsPage from './pages/ClientsPage';
 //  🔧 MODO MANTENIMIENTO
 //  Cambia a false cuando quieras volver a estar online
 // ══════════════════════════════════════════════
-const MAINTENANCE_MODE = true;
+const MAINTENANCE_MODE = false;
 
 const MaintenancePage = () => (
   <div style={{
